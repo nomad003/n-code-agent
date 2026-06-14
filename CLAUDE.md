@@ -48,8 +48,11 @@ Intended module responsibilities:
 | `agent.py` | LLM interaction loop (tool calling) |
 | `agent_sdk.py` | Claude Agent SDK backend (used when `AGENT_BACKEND=sdk`) |
 | `main.py` | FastAPI service (`POST /ask`, `GET /health`), runs on port **8900** |
+| `mcp_server.py` | MCP server exposing `ask_codebase` over streamable-http, port **8901** |
 | `cli.py` | Interactive command-line testing mode |
 | `vendor/claude-cli/` | Vendored Claude Code CLI (linux-x64) for the SDK backend; native binary stored via **Git LFS** |
+
+`main.py`, `mcp_server.py`, and `cli.py` are three entrypoints over the same `agent.answer()`. The MCP server (`mcp_server.py`) is a thin FastMCP adapter — one high-level tool `ask_codebase(question)` — run as its own process/port; start with `scripts/mcp.sh`. See [docs/mcp.md](docs/mcp.md).
 
 ## Commands
 
@@ -59,6 +62,7 @@ location (runnable from any CWD) and auto-create the venv on first use:
 ```bash
 scripts/setup.sh                          # create venv + install deps
 scripts/serve.sh                          # run HTTP service (port 8900)
+scripts/mcp.sh                            # run MCP server (streamable-http, port 8901)
 scripts/cli.sh ["question"]               # interactive REPL, or one-shot if arg given
 scripts/ask.sh [--no-cache] "question"    # curl a RUNNING service's POST /ask
 ```

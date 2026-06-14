@@ -7,6 +7,7 @@
 | [architecture.md](architecture.md) | 整体架构、请求流程、双后端、工具层 |
 | [configuration.md](configuration.md) | 全部环境变量、`.env`、两套后端各自的配置 |
 | [api.md](api.md) | HTTP 接口（`/ask`、`/health`）、CLI、脚本 |
+| [mcp.md](mcp.md) | MCP server 接入（`ask_codebase`，streamable-http） |
 | [testing.md](testing.md) | 测试运行方式、覆盖范围、端到端 verify |
 | [deployment.md](deployment.md) | 部署、迁移、Git LFS、vendored CLI、常见问题 |
 

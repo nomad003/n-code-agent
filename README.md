@@ -2,7 +2,7 @@
 
 游戏服务器 / 战斗 / 客户端 / 引擎 代码理解服务 — 对外提供 HTTP 接口，解释代码结构、字段含义和功能流程。
 
-> 详细文档见 [`docs/`](docs/)：[架构](docs/architecture.md) · [配置](docs/configuration.md) · [接口](docs/api.md) · [测试](docs/testing.md) · [部署与迁移](docs/deployment.md)
+> 详细文档见 [`docs/`](docs/)：[架构](docs/architecture.md) · [配置](docs/configuration.md) · [接口](docs/api.md) · [MCP](docs/mcp.md) · [测试](docs/testing.md) · [部署与迁移](docs/deployment.md)
 
 ## 架构
 

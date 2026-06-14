@@ -85,7 +85,8 @@ litellm 的 tool-calling 循环（最多 `MAX_ITERATIONS` 轮）：
 | `tools.py` | 4 个沙箱工具 + 工具 schema + `dispatch()` 注册表 |
 | `agent.py` | 后端分发 + custom（litellm）循环 |
 | `agent_sdk.py` | sdk（Claude Agent SDK）后端 |
-| `main.py` | FastAPI 服务（`/ask`、`/health`）+ 问答缓存 |
+| `main.py` | FastAPI 服务（`/ask`、`/health`）+ 问答缓存（端口 8900） |
+| `mcp_server.py` | MCP server，暴露 `ask_codebase`（streamable-http，端口 8901，见 [mcp.md](mcp.md)） |
 | `cli.py` | 命令行交互 / 单次提问 |
 | `vendor/claude-cli/` | 内置 Claude Code CLI（linux-x64，二进制经 Git LFS） |
 
