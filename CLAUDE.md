@@ -21,7 +21,16 @@ HTTP POST /ask  →  FastAPI (main.py)  →  LLM agent loop (agent.py)
                                    mushigen proxy → gemini-3.5-flash
 ```
 
-The agent is a **tool-calling loop**: the LLM is given four code-search tools and iterates (call tool → feed result back → repeat) until it can answer. Tools to implement in `tools.py`:
+### Two interchangeable backends
+
+`agent.answer()` dispatches on the `AGENT_BACKEND` env var:
+
+- **`custom`** (default) — the litellm tool-calling loop in `agent.py` (`_answer_custom`). Provider-agnostic; routes through the mushigen `/v1` proxy with the `openai/` prefix. Model = `LLM_MODEL`.
+- **`sdk`** — the Claude Agent SDK loop in `agent_sdk.py` (imported lazily). Uses `claude-agent-sdk` + the Claude Code CLI, routed to **Bedrock** via env vars (`CLAUDE_CODE_USE_BEDROCK`, `ANTHROPIC_BEDROCK_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, …). Model = `SDK_MODEL` (falls back to `ANTHROPIC_MODEL`).
+
+**Both backends share the same `tools.py` and `config.SYSTEM_PROMPT`.** The SDK backend wraps the existing sandboxed tools as `@tool`/SDK-MCP tools that delegate to `tools.dispatch()` — so the path sandbox and output caps are identical — and disables the SDK's built-in Read/Grep/Bash so the model is confined to our four tools. `max_turns = MAX_ITERATIONS`.
+
+The agent is a **tool-calling loop**: the LLM is given four code-search tools and iterates (call tool → feed result back → repeat) until it can answer. Tools in `tools.py`:
 
 - `grep_code(pattern, path)` — search code for symbols/keywords
 - `read_file(path, start, end)` — read a file slice
@@ -35,8 +44,10 @@ Intended module responsibilities:
 | `config.py` | Model id, API base/key, target-code path, system prompt |
 | `tools.py` | The four search-tool implementations + their tool-call schemas |
 | `agent.py` | LLM interaction loop (tool calling) |
+| `agent_sdk.py` | Claude Agent SDK backend (used when `AGENT_BACKEND=sdk`) |
 | `main.py` | FastAPI service (`POST /ask`, `GET /health`), runs on port **8900** |
 | `cli.py` | Interactive command-line testing mode |
+| `vendor/claude-cli/` | Vendored Claude Code CLI (linux-x64) for the SDK backend; native binary stored via **Git LFS** |
 
 ## Commands
 
@@ -60,6 +71,8 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ```
 
 Use a venv — the system Python is PEP 668 externally-managed and rejects `pip install`. No test, lint, or build tooling is defined yet; the tools layer is pure-Python and testable without the LLM (import `tools` and call directly).
+
+**Git LFS:** `vendor/claude-cli/.../claude` (~239M, linux-x64) is stored via Git LFS (see `.gitattributes`). Cloning requires `git lfs` installed, or that binary comes down as a pointer file. The vendored CLI is **linux-x64 only**; on other platforms reinstall `@anthropic-ai/claude-code` or rely on a system `claude` on PATH (`agent_sdk._resolve_cli_path()` falls back to it).
 
 ## Configuration
 

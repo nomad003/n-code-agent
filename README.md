@@ -42,6 +42,21 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 
+## 两种 Agent 后端
+
+通过 `AGENT_BACKEND` 切换（两者共用同一套沙箱工具和 system prompt）：
+
+| 后端 | 说明 |
+|------|------|
+| `custom`（默认） | litellm tool-calling 循环，经 mushigen `/v1` 代理，模型由 `LLM_MODEL` 指定 |
+| `sdk` | Claude Agent SDK + Claude Code CLI，经 Bedrock，模型由 `SDK_MODEL`（默认取 `ANTHROPIC_MODEL`）指定 |
+
+`sdk` 后端会优先使用项目内置的 CLI（`vendor/claude-cli/`，经 Git LFS 存储，仅 linux-x64），找不到则回退系统 PATH 上的 `claude`。
+
+```bash
+AGENT_BACKEND=sdk scripts/cli.sh "SceneMgr 是做什么的？"
+```
+
 ## 配置
 
 环境变量（或直接改 config.py）：
