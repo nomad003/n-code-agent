@@ -34,7 +34,7 @@ cp .env.example .env     # 填入 LLM_API_KEY，按需改 TARGET_CODE_PATH / AGE
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `LLM_MODEL` | `vertex_ai/gemini-3.5-flash` | 模型（实际会被加 `openai/` 前缀走代理） |
-| `LLM_API_BASE` | `https://mushigen.comet.scopelyai.com/v1` | 代理地址（OpenAI 兼容，注意是 `/v1`） |
+| `LLM_API_BASE` | `http://10.253.17.63:8090/v1` | 代理地址（OpenAI 兼容，注意是 `/v1`） |
 | `LLM_API_KEY` | （必填，无默认） | 认证 token，缺失时首次调用即报清晰错误 |
 | `LLM_TEMPERATURE` | `0` | 采样温度 |
 | `LLM_TIMEOUT` | `120` | 单次 LLM 超时（秒） |
@@ -49,7 +49,7 @@ cp .env.example .env     # 填入 LLM_API_KEY，按需改 TARGET_CODE_PATH / AGE
 |------|------|------|
 | `SDK_MODEL` | `us.anthropic.claude-opus-4-8` | 模型；不设则取 `ANTHROPIC_MODEL` |
 | `CLAUDE_CODE_USE_BEDROCK` | `1` | 启用 Bedrock |
-| `ANTHROPIC_BEDROCK_BASE_URL` | `https://mushigen.comet.scopelyai.com/bedrock` | Bedrock 代理地址（注意是 `/bedrock`） |
+| `ANTHROPIC_BEDROCK_BASE_URL` | `http://10.253.17.63:8090/bedrock` | Bedrock 代理地址（注意是 `/bedrock`） |
 | `CLAUDE_CODE_SKIP_BEDROCK_AUTH` | `1` | 跳过原生 AWS 鉴权（走代理 token） |
 | `AWS_REGION` | `us-east-1` | 区域 |
 | `ANTHROPIC_AUTH_TOKEN` | `sk-...` | 代理认证 token |

@@ -8,7 +8,7 @@ lives behind this layer so it can later be swapped for the offline index (方案
 without changing the agent.
 """
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 import agent
@@ -44,7 +44,12 @@ def ask(req: AskRequest) -> AskResponse:
     if req.use_cache and question in _CACHE:
         return AskResponse(answer=_CACHE[question], cached=True)
 
-    result = agent.answer(question)
+    try:
+        result = agent.answer(question)
+    except Exception as exc:
+        # Surface a clean error (e.g. upstream budget/auth/timeout) instead of a
+        # 500 with a stack trace. Failures are never cached.
+        raise HTTPException(status_code=502, detail=f"上游模型调用失败: {exc}")
 
     if req.use_cache:
         _CACHE[question] = result

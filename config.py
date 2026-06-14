@@ -11,9 +11,7 @@ LLM_MODEL = os.environ.get("LLM_MODEL", "vertex_ai/gemini-3.5-flash")
 # model through it as an "openai/" custom endpoint — otherwise a "vertex_ai/"
 # prefix triggers litellm's native Google Cloud auth (which we don't use) and
 # the request never hits the proxy.
-LLM_API_BASE = os.environ.get(
-    "LLM_API_BASE", "https://mushigen.comet.scopelyai.com/v1"
-)
+LLM_API_BASE = os.environ.get("LLM_API_BASE", "http://10.253.17.63:8090/v1")
 # No hardcoded default: the auth token must come from the environment (see
 # .env.example). Keeps secrets out of the repo and git history.
 LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
@@ -40,6 +38,14 @@ AGENT_BACKEND = os.environ.get("AGENT_BACKEND", "custom").strip().lower()
 # ANTHROPIC_MODEL env var that the Bedrock setup already provides.
 SDK_MODEL = os.environ.get(
     "SDK_MODEL", os.environ.get("ANTHROPIC_MODEL", "us.anthropic.claude-opus-4-8")
+)
+
+# Bedrock proxy base URL for the SDK backend (the /bedrock path on the same
+# gateway whose /v1 path serves the custom backend). The Claude Code CLI reads
+# this via ANTHROPIC_BEDROCK_BASE_URL; we default it here so both backends point
+# at the same proxy out of the box.
+SDK_BEDROCK_BASE_URL = os.environ.get(
+    "ANTHROPIC_BEDROCK_BASE_URL", "http://10.253.17.63:8090/bedrock"
 )
 
 # --- Agent loop ------------------------------------------------------------

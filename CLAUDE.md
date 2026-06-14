@@ -72,7 +72,16 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python cli.py ["question"]
 ```
 
-Use a venv — the system Python is PEP 668 externally-managed and rejects `pip install`. No test, lint, or build tooling is defined yet; the tools layer is pure-Python and testable without the LLM (import `tools` and call directly).
+Use a venv — the system Python is PEP 668 externally-managed and rejects `pip install`.
+
+### Tests
+
+```bash
+scripts/test.sh              # all tests (auto-installs pytest/httpx)
+scripts/test.sh -k grep      # filter; or pass a nodeid like tests/test_api.py::test_health
+```
+
+pytest suite under `tests/` is **fully offline** — the LLM is monkeypatched, tools run against a temp codebase (`target_code` fixture). Covers the tool sandbox/caps/dispatch, `_routed_model()` prefixing, backend dispatch, and the `/ask` cache + 502 error path. Dev deps in `requirements-dev.txt`, config in `pytest.ini`. See [docs/testing.md](docs/testing.md). When changing tool or API behavior, update these tests.
 
 **Git LFS:** `vendor/claude-cli/.../claude` (~239M, linux-x64) is stored via Git LFS (see `.gitattributes`). Cloning requires `git lfs` installed, or that binary comes down as a pointer file. The vendored CLI is **linux-x64 only**; on other platforms reinstall `@anthropic-ai/claude-code` or rely on a system `claude` on PATH (`agent_sdk._resolve_cli_path()` falls back to it).
 
@@ -83,13 +92,13 @@ Set via env vars (or edit `config.py`):
 | Var | Default |
 |-----|---------|
 | `LLM_MODEL` | `vertex_ai/gemini-3.5-flash` |
-| `LLM_API_BASE` | `https://mushigen.comet.scopelyai.com/v1` |
+| `LLM_API_BASE` | `http://10.253.17.63:8090/v1` |
 | `LLM_API_KEY` | (provided in README) |
 | `TARGET_CODE_PATH` | `./target_code` |
 
 LLM access goes through **litellm** to the mushigen proxy — do not call the model provider SDK directly.
 
-**Proxy routing gotcha:** mushigen is an OpenAI-compatible gateway at `/v1`. litellm picks its client from the model's leading provider segment, so a bare `vertex_ai/…` model triggers litellm's *native* Google Cloud auth (fails with `ModuleNotFoundError: google` / "Google Cloud SDK not found") and never reaches the proxy. `agent.py` therefore prepends `openai/` to `LLM_MODEL` (`_routed_model()`), forcing the OpenAI-compatible path; the proxy still receives the real model name after the prefix. Keep this prefixing if you touch the LLM call.
+**Proxy routing gotcha:** the proxy is an OpenAI-compatible gateway at `/v1` (custom backend) and Bedrock at `/bedrock` (sdk backend); both default to `http://10.253.17.63:8090`. litellm picks its client from the model's leading provider segment, so a bare `vertex_ai/…` model triggers litellm's *native* Google Cloud auth (fails with `ModuleNotFoundError: google` / "Google Cloud SDK not found") and never reaches the proxy. `agent.py` therefore prepends `openai/` to `LLM_MODEL` (`_routed_model()`), forcing the OpenAI-compatible path; the proxy still receives the real model name after the prefix. Keep this prefixing if you touch the LLM call.
 
 ## API
 

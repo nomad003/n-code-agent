@@ -92,15 +92,24 @@ _ALLOWED_TOOLS = [
 
 
 def _bedrock_env() -> dict:
-    """Bedrock routing vars for the CLI, sourced from the current environment."""
-    keys = (
-        "CLAUDE_CODE_USE_BEDROCK",
-        "ANTHROPIC_BEDROCK_BASE_URL",
-        "CLAUDE_CODE_SKIP_BEDROCK_AUTH",
-        "AWS_REGION",
-        "ANTHROPIC_AUTH_TOKEN",
-    )
-    return {k: os.environ[k] for k in keys if k in os.environ}
+    """Bedrock routing vars for the CLI.
+
+    Defaults come from config (so the SDK backend points at the same proxy as
+    the custom backend), and any matching env var overrides them.
+    """
+    env = {
+        "CLAUDE_CODE_USE_BEDROCK": "1",
+        "ANTHROPIC_BEDROCK_BASE_URL": config.SDK_BEDROCK_BASE_URL,
+        "CLAUDE_CODE_SKIP_BEDROCK_AUTH": "1",
+        "AWS_REGION": "us-east-1",
+        # The proxy authenticates with the same token the custom backend uses.
+        "ANTHROPIC_AUTH_TOKEN": config.LLM_API_KEY or os.environ.get("ANTHROPIC_AUTH_TOKEN", ""),
+    }
+    # Let an explicitly-exported env var win over our defaults.
+    for key in list(env):
+        if os.environ.get(key):
+            env[key] = os.environ[key]
+    return env
 
 
 def _resolve_cli_path() -> str | None:

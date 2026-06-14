@@ -2,7 +2,7 @@
 
 游戏服务器 / 战斗 / 客户端 / 引擎 代码理解服务 — 对外提供 HTTP 接口，解释代码结构、字段含义和功能流程。
 
-> 详细文档见 [`docs/`](docs/)：[架构](docs/architecture.md) · [配置](docs/configuration.md) · [接口](docs/api.md) · [部署与迁移](docs/deployment.md)
+> 详细文档见 [`docs/`](docs/)：[架构](docs/architecture.md) · [配置](docs/configuration.md) · [接口](docs/api.md) · [测试](docs/testing.md) · [部署与迁移](docs/deployment.md)
 
 ## 架构
 
@@ -66,7 +66,7 @@ AGENT_BACKEND=sdk scripts/cli.sh "SceneMgr 是做什么的？"
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `LLM_MODEL` | `vertex_ai/gemini-3.5-flash` | litellm 模型标识 |
-| `LLM_API_BASE` | `https://mushigen.comet.scopelyai.com/v1` | 代理地址（OpenAI 兼容） |
+| `LLM_API_BASE` | `http://10.253.17.63:8090/v1` | 代理地址（OpenAI 兼容） |
 | `TARGET_CODE_PATH` | `./target_code` | 被分析的目标代码库路径 |
 | `LLM_API_KEY` | （必填，无默认） | 认证 token，从环境变量 / `.env` 读取，不写进代码 |
 
