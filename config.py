@@ -29,6 +29,19 @@ TARGET_CODE_PATH = os.path.abspath(
     )
 )
 
+# --- Agent backend ---------------------------------------------------------
+# "custom" = the litellm tool-calling loop (default, model-agnostic via proxy).
+# "sdk"    = the Claude Agent SDK loop (claude-agent-sdk + Claude Code CLI,
+#            routed through Bedrock env vars). Both reuse the same sandboxed
+#            tools in tools.py and expose the same agent.answer() interface.
+AGENT_BACKEND = os.environ.get("AGENT_BACKEND", "custom").strip().lower()
+
+# Model used by the SDK backend (Bedrock model id). Falls back to the
+# ANTHROPIC_MODEL env var that the Bedrock setup already provides.
+SDK_MODEL = os.environ.get(
+    "SDK_MODEL", os.environ.get("ANTHROPIC_MODEL", "us.anthropic.claude-opus-4-8")
+)
+
 # --- Agent loop ------------------------------------------------------------
 MAX_ITERATIONS = int(os.environ.get("AGENT_MAX_ITERATIONS", "12"))
 LLM_TEMPERATURE = float(os.environ.get("LLM_TEMPERATURE", "0"))

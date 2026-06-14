@@ -1,8 +1,14 @@
-"""LLM agent loop: tool-calling over the code-search tools via litellm.
+"""Agent entry point with two interchangeable backends.
 
-The loop is provider-agnostic — it speaks the OpenAI tool-call shape that
-litellm normalizes to, and routes every call through the mushigen proxy
-configured in ``config.py``. Swapping the model only means changing env vars.
+``answer()`` dispatches on ``config.AGENT_BACKEND``:
+
+- "custom" (default): the litellm tool-calling loop in this module — provider-
+  agnostic, speaks the OpenAI tool-call shape, routes through the mushigen proxy.
+- "sdk": the Claude Agent SDK loop in ``agent_sdk.py`` (imported lazily so the
+  SDK is only required when actually selected).
+
+Both backends reuse the same sandboxed tools in ``tools.py`` and the same
+``config.SYSTEM_PROMPT``, and expose the identical ``answer(question)`` contract.
 """
 import json
 
@@ -10,6 +16,15 @@ import litellm
 
 import config
 import tools
+
+
+def answer(question: str, *, verbose: bool = False) -> str:
+    """Answer a question using the configured backend (see config.AGENT_BACKEND)."""
+    if config.AGENT_BACKEND == "sdk":
+        import agent_sdk  # lazy: only import (and require) the SDK when selected
+
+        return agent_sdk.answer(question, verbose=verbose)
+    return _answer_custom(question, verbose=verbose)
 
 
 def _routed_model() -> str:
@@ -56,8 +71,8 @@ def _run_tool_call(tool_call) -> dict:
     }
 
 
-def answer(question: str, *, verbose: bool = False) -> str:
-    """Run the tool-calling loop until the model produces a final answer."""
+def _answer_custom(question: str, *, verbose: bool = False) -> str:
+    """Run the litellm tool-calling loop until the model produces a final answer."""
     messages: list[dict] = [
         {"role": "system", "content": config.SYSTEM_PROMPT},
         {"role": "user", "content": question},
