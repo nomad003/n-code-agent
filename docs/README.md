@@ -1,0 +1,12 @@
+# 文档索引
+
+游戏服务器 / 战斗 / 客户端 / 引擎 代码理解服务 —— 项目文档。
+
+| 文档 | 内容 |
+|------|------|
+| [architecture.md](architecture.md) | 整体架构、请求流程、双后端、工具层 |
+| [configuration.md](configuration.md) | 全部环境变量、`.env`、两套后端各自的配置 |
+| [api.md](api.md) | HTTP 接口（`/ask`、`/health`）、CLI、脚本 |
+| [deployment.md](deployment.md) | 部署、迁移、Git LFS、vendored CLI、常见问题 |
+
+快速上手见项目根目录的 [README.md](../README.md)。给 Claude Code 的工作指引见 [CLAUDE.md](../CLAUDE.md)。

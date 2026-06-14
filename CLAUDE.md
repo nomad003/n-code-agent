@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Implemented and verified end-to-end (方案 1): `config.py`, `tools.py`, `agent.py`, `main.py`, `cli.py`, `requirements.txt`. A sample `target_code/` tree exists for local testing. No automated test suite yet.
+Implemented and verified end-to-end (方案 1): `config.py`, `tools.py`, `agent.py`, `agent_sdk.py`, `main.py`, `cli.py`, `requirements.txt`. A sample `target_code/` tree exists for local testing. No automated test suite yet.
+
+Detailed docs live in `docs/` ([architecture](docs/architecture.md), [configuration](docs/configuration.md), [api](docs/api.md), [deployment](docs/deployment.md)) — keep them in sync when changing behavior.
 
 ## What this is
 

@@ -1,0 +1,98 @@
+# 接口与用法
+
+## HTTP API
+
+服务默认监听 `0.0.0.0:8900`（`SERVICE_HOST` / `SERVICE_PORT` 可改）。
+
+### `GET /health`
+
+健康检查。
+
+```bash
+curl http://localhost:8900/health
+# {"status":"ok"}
+```
+
+### `POST /ask`
+
+提问。
+
+**请求体**
+
+```json
+{
+  "question": "要问的问题",
+  "use_cache": true
+}
+```
+
+| 字段 | 类型 | 默认 | 说明 |
+|------|------|------|------|
+| `question` | string | （必填） | 自然语言问题 |
+| `use_cache` | bool | `true` | 是否使用缓存 |
+
+**响应**
+
+```json
+{
+  "answer": "SceneMgr 是场景管理器……",
+  "cached": false
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `answer` | string | 回答 |
+| `cached` | bool | 本次是否命中缓存 |
+
+**示例**
+
+```bash
+curl -X POST http://localhost:8900/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question": "SceneMgr 是做什么的？"}'
+```
+
+### 缓存说明
+
+缓存是 `main.py` 里的进程内字典（问题 → 答案）：
+
+- `use_cache=true` 且问题问过 → 直接返回缓存，`cached:true`，**不调 LLM**（省时省 token）。
+- 重启服务即清空。
+- 缓存层位于 agent 之上，将来（方案 2）可替换为离线索引而不动 agent。
+- 空问题返回 `{"answer":"问题不能为空。","cached":false}`。
+
+## 命令行（`cli.py`）
+
+```bash
+# 交互模式（会打印工具调用过程）
+scripts/cli.sh
+
+# 单次提问
+scripts/cli.sh "SceneMgr 是做什么的？"
+
+# 切后端
+AGENT_BACKEND=sdk scripts/cli.sh "暴击伤害怎么算？"
+```
+
+交互模式下输入 `quit` / `exit` / `q` 或 Ctrl-D 退出。
+
+## 脚本（`scripts/`）
+
+脚本从自身位置解析项目根，可在任意目录调用，首次运行自动建好 venv 并加载 `.env`。
+
+| 脚本 | 作用 |
+|------|------|
+| `setup.sh` | 创建 venv 并安装依赖 |
+| `serve.sh` | 启动 HTTP 服务（端口 8900） |
+| `cli.sh ["问题"]` | 命令行交互；带参数则单次提问 |
+| `ask.sh [--no-cache] "问题"` | 用 curl 向**运行中**的服务发 `/ask` |
+
+`scripts/common.sh` 是被 source 的公共库（`PROJECT_ROOT`、`VENV_PY`、`ensure_venv`、`run_py`、加载 `.env`），不直接运行。
+
+```bash
+# 典型流程
+scripts/serve.sh                          # 终端 A
+scripts/ask.sh "玩家生命值字段叫什么？"      # 终端 B
+scripts/ask.sh --no-cache "同一个问题"      # 绕过缓存
+```
