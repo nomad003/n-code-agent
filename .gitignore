@@ -7,6 +7,9 @@ venv/
 # Secrets / local env
 .env
 
+# Runtime logs
+logs/
+
 # Editor / OS
 .idea/
 .vscode/

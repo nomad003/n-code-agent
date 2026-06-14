@@ -9,8 +9,11 @@
 ## 启动
 
 ```bash
-scripts/mcp.sh                                  # streamable-http，默认 0.0.0.0:8901/mcp
-MCP_PORT=8901 AGENT_BACKEND=sdk scripts/mcp.sh  # 指定端口 / 后端
+scripts/mcp.sh                                  # 前台运行（streamable-http，默认 0.0.0.0:8901/mcp）
+scripts/mcp.sh start                            # 后台启动（pid/日志在 logs/mcp.{pid,log}）
+scripts/mcp.sh stop                             # 停止
+scripts/mcp.sh restart | status                 # 重启 / 查看状态
+MCP_PORT=8901 AGENT_BACKEND=sdk scripts/mcp.sh start
 ```
 
 等价裸命令：`python mcp_server.py`（脚本会自动建 venv、加载 `.env`）。

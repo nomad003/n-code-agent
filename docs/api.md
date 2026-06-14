@@ -84,15 +84,34 @@ AGENT_BACKEND=sdk scripts/cli.sh "暴击伤害怎么算？"
 | 脚本 | 作用 |
 |------|------|
 | `setup.sh` | 创建 venv 并安装依赖 |
-| `serve.sh` | 启动 HTTP 服务（端口 8900） |
+| `serve.sh [start\|stop\|restart\|status]` | HTTP 服务（端口 8900）；无参数=前台运行 |
+| `mcp.sh [start\|stop\|restart\|status]` | MCP 服务（端口 8901）；无参数=前台运行 |
 | `cli.sh ["问题"]` | 命令行交互；带参数则单次提问 |
 | `ask.sh [--no-cache] "问题"` | 用 curl 向**运行中**的服务发 `/ask` |
 
-`scripts/common.sh` 是被 source 的公共库（`PROJECT_ROOT`、`VENV_PY`、`ensure_venv`、`run_py`、加载 `.env`），不直接运行。
+`scripts/common.sh` 是被 source 的公共库（`PROJECT_ROOT`、`VENV_PY`、`ensure_venv`、`run_py`、加载 `.env`、`daemon_*` 守护进程助手），不直接运行。
+
+### 后台运行 / 停止
+
+`serve.sh` 和 `mcp.sh` 支持子命令：
+
+```bash
+scripts/serve.sh start      # 后台启动，pid/日志写 logs/serve.{pid,log}
+scripts/serve.sh status     # 查看状态
+scripts/serve.sh stop       # 停止（先 SIGTERM，10s 后 SIGKILL）
+scripts/serve.sh restart    # 重启
+scripts/serve.sh            # 不带参数 = 前台运行（Ctrl-C 停）
+
+scripts/mcp.sh start        # 同理，logs/mcp.{pid,log}
+scripts/mcp.sh stop
+```
+
+pid 文件与日志都在 `logs/` 下（已 gitignore）。`stop`/`start` 幂等：重复 stop 提示未运行，重复 start 提示已运行。
 
 ```bash
 # 典型流程
-scripts/serve.sh                          # 终端 A
-scripts/ask.sh "玩家生命值字段叫什么？"      # 终端 B
+scripts/serve.sh start                    # 后台起服务
+scripts/ask.sh "玩家生命值字段叫什么？"      # 提问
 scripts/ask.sh --no-cache "同一个问题"      # 绕过缓存
+scripts/serve.sh stop                     # 用完停掉
 ```

@@ -61,11 +61,13 @@ location (runnable from any CWD) and auto-create the venv on first use:
 
 ```bash
 scripts/setup.sh                          # create venv + install deps
-scripts/serve.sh                          # run HTTP service (port 8900)
-scripts/mcp.sh                            # run MCP server (streamable-http, port 8901)
+scripts/serve.sh [start|stop|restart|status]  # HTTP service (8900); no arg = foreground
+scripts/mcp.sh   [start|stop|restart|status]  # MCP server (8901); no arg = foreground
 scripts/cli.sh ["question"]               # interactive REPL, or one-shot if arg given
 scripts/ask.sh [--no-cache] "question"    # curl a RUNNING service's POST /ask
 ```
+
+`serve.sh`/`mcp.sh` background mode writes `logs/<name>.{pid,log}`; `daemon_*` helpers live in `common.sh`. `stop` is graceful (SIGTERM, then SIGKILL after 10s).
 
 `scripts/common.sh` is a sourced helper (PROJECT_ROOT, VENV_PY, `ensure_venv`,
 `run_py`), not run directly. Equivalent raw commands:

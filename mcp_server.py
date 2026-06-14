@@ -16,7 +16,10 @@ This is a thin adapter: it reuses agent.answer() and config, so it honours the
 same backend selection, sandboxed tools, and target codebase as the HTTP/CLI
 entrypoints.
 """
+import logging
 import os
+import time
+from logging.handlers import RotatingFileHandler
 
 from mcp.server.fastmcp import FastMCP
 
@@ -26,6 +29,24 @@ import config
 MCP_HOST = os.environ.get("MCP_HOST", "0.0.0.0")
 MCP_PORT = int(os.environ.get("MCP_PORT", "8901"))
 MCP_PATH = os.environ.get("MCP_PATH", "/mcp")
+
+# Log file path. Defaults to <project>/logs/mcp.log; override with MCP_LOG_FILE.
+_DEFAULT_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "mcp.log")
+MCP_LOG_FILE = os.environ.get("MCP_LOG_FILE", _DEFAULT_LOG)
+
+_fmt = logging.Formatter("%(asctime)s [%(name)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+_handlers: list[logging.Handler] = [logging.StreamHandler()]  # console (stdout)
+try:
+    os.makedirs(os.path.dirname(MCP_LOG_FILE), exist_ok=True)
+    # 5 MB per file, keep 3 backups.
+    _handlers.append(RotatingFileHandler(MCP_LOG_FILE, maxBytes=5_000_000, backupCount=3, encoding="utf-8"))
+except OSError as exc:  # fall back to console-only if the dir isn't writable
+    print(f"[mcp] WARN: cannot open log file {MCP_LOG_FILE}: {exc}; console only")
+    MCP_LOG_FILE = None
+for _h in _handlers:
+    _h.setFormatter(_fmt)
+logging.basicConfig(level=logging.INFO, handlers=_handlers)
+log = logging.getLogger("mcp.ask")
 
 mcp = FastMCP(
     "code-agent",
@@ -55,10 +76,21 @@ def ask_codebase(question: str) -> str:
     """
     question = (question or "").strip()
     if not question:
+        log.info("ask_codebase | 空问题，已拒绝")
         return "问题不能为空。"
     # agent.answer is synchronous; FastMCP runs sync tools in a worker thread,
     # so this does not block the event loop.
-    return agent.answer(question)
+    log.info("ask_codebase | 收到提问: %s", question)
+    start = time.monotonic()
+    try:
+        answer = agent.answer(question)
+    except Exception as exc:
+        elapsed = time.monotonic() - start
+        log.warning("ask_codebase | 失败 (%.1fs): %s", elapsed, exc)
+        raise
+    elapsed = time.monotonic() - start
+    log.info("ask_codebase | 完成 (%.1fs, 答案 %d 字): %s", elapsed, len(answer), question)
+    return answer
 
 
 def main() -> None:
@@ -66,6 +98,7 @@ def main() -> None:
         f"[mcp] code-agent MCP server (backend={config.AGENT_BACKEND}) "
         f"on http://{MCP_HOST}:{MCP_PORT}{MCP_PATH}"
     )
+    print(f"[mcp] 日志文件: {MCP_LOG_FILE or '(仅控制台)'}")
     mcp.run(transport="streamable-http")
 
 
