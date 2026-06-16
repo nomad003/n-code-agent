@@ -53,6 +53,7 @@ Intended module responsibilities:
 | `shortcut.py` | Entry short-circuit: answer "where is X defined" from the index, skipping the LLM (方案 2) |
 | `diagnose.py` | Runtime diagnosis (方向 F): parse backtrace, map frames to code via index, run agent |
 | `knowledge.py` | Knowledge flywheel (方案 3): precipitate Q&A → SQLite/FTS, recall with staleness check |
+| `evaluate.py` | Eval harness (方向 E): score {question → expected files/symbols} dataset; `--twice` measures flywheel recall |
 | `agent.py` | Backend dispatch + custom loop (`CodeAgent`: event history, stuck detection, retries) |
 | `events.py` | `Action`/`Observation` event model for the custom loop |
 | `agent_sdk.py` | Claude Agent SDK backend (used when `AGENT_BACKEND=sdk`) |
@@ -70,7 +71,8 @@ location (runnable from any CWD) and auto-create the venv on first use:
 
 ```bash
 scripts/setup.sh                          # create venv + install deps
-scripts/index.sh                          # build the offline symbol index (方案 2)
+scripts/index.sh [--update]               # build (or incrementally update) the symbol index (方案 2)
+scripts/eval.sh [dataset.jsonl] [--twice] # run the Q&A eval harness (方向 E)
 scripts/serve.sh [start|stop|restart|status]  # HTTP service (8900); no arg = foreground
 scripts/mcp.sh   [start|stop|restart|status]  # MCP server (8901); no arg = foreground
 scripts/cli.sh ["question"]               # interactive REPL, or one-shot if arg given

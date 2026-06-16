@@ -1,0 +1,4 @@
+{"question": "SceneMgr 定义在哪个文件？", "expect_files": ["scene/scene_mgr.py"], "expect_symbols": ["SceneMgr"], "note": "where-defined, should short-circuit"}
+{"question": "SceneMgr 是做什么的？", "expect_files": ["scene/scene_mgr.py"], "expect_symbols": ["SceneMgr", "load_scene"], "note": "explanatory, runs agent"}
+{"question": "玩家的生命值字段叫什么？", "expect_files": ["scene/player.py"], "expect_symbols": ["hp"], "note": "field lookup"}
+{"question": "load_scene 方法做什么？", "expect_files": ["scene/scene_mgr.py"], "expect_symbols": ["load_scene"], "note": "method explanation"}

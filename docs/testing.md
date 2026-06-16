@@ -48,3 +48,17 @@ scripts/ask.sh "SceneMgr 有什么方法？"          # 经真实代理返回答
 ```
 
 若代理预算超限 / token 失效，`/ask` 会返回 **502**（`上游模型调用失败: ...`）而非 500 栈——这是预期的错误处理。
+
+## 质量评测（方向 E，需要可用代理 + key）
+
+单元测试验证逻辑；**评测**衡量回答质量。评测集是 `{问题 → 期望文件/符号}` 的 JSONL：
+
+```bash
+scripts/eval.sh                                  # 跑样例集 eval/dataset.sample.jsonl
+scripts/eval.sh eval/my_set.jsonl                # 自定义评测集
+USE_KNOWLEDGE=1 scripts/eval.sh <set> --twice     # 同时测方案 3 飞轮召回率
+```
+
+每题调 agent，按"答案是否提到全部期望符号 + 至少一个期望文件"打分，输出通过率（确定性子串匹配，无 LLM judge）。`--twice` 每题问两次，报告第二次召回第一次沉淀的比例——判断方案 3 是否值得默认开启的信号。换模型/改 prompt/调限额后跑一遍，用通过率量化影响。
+
+> 扩充评测集（针对真实 gameserver 符号）是开启方案 3 默认值前要补的一步——样例集太小，召回率不具统计意义。
