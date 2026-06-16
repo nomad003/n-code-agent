@@ -98,6 +98,13 @@ USE_KNOWLEDGE = os.environ.get("USE_KNOWLEDGE", "0") not in ("0", "false", "Fals
 SERVICE_PORT = int(os.environ.get("SERVICE_PORT", "8900"))
 SERVICE_HOST = os.environ.get("SERVICE_HOST", "0.0.0.0")
 
+# Concurrency governance for /ask and /diagnose (each runs a long LLM loop).
+# At most MAX_CONCURRENCY run at once; up to MAX_QUEUE more may wait, others get
+# 503; a single request is capped at REQUEST_TIMEOUT seconds (504 on overrun).
+MAX_CONCURRENCY = int(os.environ.get("MAX_CONCURRENCY", "4"))
+MAX_QUEUE = int(os.environ.get("MAX_QUEUE", "8"))
+REQUEST_TIMEOUT = float(os.environ.get("REQUEST_TIMEOUT", "180"))
+
 def require_api_key() -> str:
     """Return LLM_API_KEY or raise a clear error if it isn't configured.
 

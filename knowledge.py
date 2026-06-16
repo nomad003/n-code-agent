@@ -96,20 +96,43 @@ def store(question: str, answer: str, ref_paths: list[str]) -> int | None:
         return None
 
 
-def _fts_or_query(query: str) -> str:
-    """Build an FTS5 OR-of-terms query from free text.
+# Lightweight synonym groups so differently-phrased but semantically similar
+# questions still recall (a cheap stand-in for vector search until an embedding
+# endpoint exists / hit-rate is validated). Each token expands to its group.
+_SYNONYMS: list[set[str]] = [
+    {"作用", "功能", "职责", "用途", "干嘛", "干什么", "做什么", "用来"},
+    {"类", "class", "类型", "结构"},
+    {"函数", "方法", "function", "method", "接口"},
+    {"字段", "成员", "属性", "变量", "member", "field"},
+    {"流程", "逻辑", "过程", "怎么", "如何", "机制"},
+    {"调用", "使用", "用法", "call"},
+    {"初始化", "创建", "构造", "init"},
+]
+_SYNONYM_INDEX: dict[str, set[str]] = {}
+for _grp in _SYNONYMS:
+    for _w in _grp:
+        _SYNONYM_INDEX[_w] = _grp
 
-    Recall should fire when the new question shares *keywords* with a stored
-    one, not only on an exact phrase. We split into word/CJK tokens, quote each
-    (so punctuation/operators can't break FTS5 syntax), and OR them together.
+
+def _fts_or_query(query: str) -> str:
+    """Build an FTS5 OR-of-terms query from free text, with synonym expansion.
+
+    Recall should fire when the new question shares *keywords or synonyms* with
+    a stored one, not only on an exact phrase. We tokenize (Latin words + CJK
+    runs), expand each token through small synonym groups, quote each term (so
+    punctuation/operators can't break FTS5 syntax), and OR them together.
     """
-    # Latin words (>=2 chars) and runs of CJK characters.
     tokens = re.findall(r"[A-Za-z_][A-Za-z0-9_]+|[一-鿿]+", query)
-    # Keep CJK runs of length >=2 (single chars are too noisy).
-    tokens = [t for t in tokens if len(t) >= 2]
+    tokens = [t for t in tokens if len(t) >= 2]  # single CJK chars too noisy
     if not tokens:
         return ""
-    return " OR ".join(f'"{t}"' for t in dict.fromkeys(tokens))
+    expanded: list[str] = []
+    for t in tokens:
+        expanded.append(t)
+        expanded.extend(_SYNONYM_INDEX.get(t, ()))
+        expanded.extend(_SYNONYM_INDEX.get(t.lower(), ()))
+    # FTS5 ranks by relevance (rank) already; more matching terms => better rank.
+    return " OR ".join(f'"{t}"' for t in dict.fromkeys(expanded))
 
 
 def _stale_refs(refs: list[dict]) -> list[str]:

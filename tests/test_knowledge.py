@@ -75,6 +75,28 @@ def test_no_refs_never_stale(kb):
     assert knowledge.recall("general")[0]["stale"] is False
 
 
+# --- synonym-expanded recall -----------------------------------------------
+
+
+def test_recall_via_synonym(kb):
+    # Stored with "作用"; queried with synonym "干嘛" must still recall.
+    knowledge.store("SceneMgr 的作用", "场景管理", ["scene.cpp"])
+    hits = knowledge.recall("SceneMgr 是干嘛的")
+    assert hits and hits[0]["answer"] == "场景管理"
+
+
+def test_recall_via_function_synonym(kb):
+    knowledge.store("Update 这个函数做什么", "驱动场景更新", [])
+    # "方法" is a synonym of "函数"; shared token SceneMgr/Update + synonym
+    hits = knowledge.recall("Update 方法的功能")
+    assert hits and "驱动" in hits[0]["answer"]
+
+
+def test_fts_or_query_expands_synonyms():
+    q = knowledge._fts_or_query("作用")
+    assert '"功能"' in q and '"职责" ' in q + " "  # group members present
+
+
 # --- agent integration -----------------------------------------------------
 
 

@@ -121,6 +121,8 @@ LLM access goes through **litellm** to the mushigen proxy — do not call the mo
 `POST /diagnose` — body `{"backtrace": str, "log": str}` → `{"answer", "frames", "resolved", "total_frames"}` (方向 F).
 `GET /health` → `{"status": "ok"}`.
 
+`/ask` and `/diagnose` are async and run the blocking agent loop through a concurrency gate (`main._run_governed`): `MAX_CONCURRENCY` slots + `MAX_QUEUE` queue (overflow → 503) + `REQUEST_TIMEOUT` (→ 504). Cache hits bypass the gate.
+
 `use_cache`/`cached` imply a caching layer for repeated questions — implement this in or behind `main.py`.
 
 ## Roadmap (informs design decisions)

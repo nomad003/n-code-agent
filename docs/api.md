@@ -94,6 +94,19 @@ curl -X POST http://localhost:8900/diagnose \
 
 逐帧用符号索引（方案 2）映射到 `file:line`；带类名的帧（`SceneMgr::Update`）自动收窄同名候选。`log` 字段（可选）会被反查到打印它的代码位置（剥时间戳 + 变量归一化 → FTS）。`backtrace` 与 `log` 可单独或组合提供。空 backtrace 返回 400。
 
+### 并发治理
+
+`/ask` 和 `/diagnose` 是异步接口，阻塞的 agent 循环走并发闸门：
+
+| 情况 | 状态码 |
+|------|--------|
+| 正常 | 200 |
+| 上游模型调用失败（预算/鉴权等） | 502 |
+| 服务繁忙（并发 + 排队已满，`MAX_CONCURRENCY`/`MAX_QUEUE`） | 503 |
+| 单请求超时（`REQUEST_TIMEOUT`，默认 180s） | 504 |
+
+缓存命中不占并发槽，直接返回。阈值见 [configuration.md](configuration.md)。
+
 ## 命令行（`cli.py`）
 
 ```bash
