@@ -48,8 +48,9 @@ Intended module responsibilities:
 |------|----------------|
 | `config.py` | Model id, API base/key, target-code path, system prompt |
 | `tools.py` | The four search-tool implementations + schemas (index-backed, fall back to live scan) |
-| `indexer.py` | Build the offline index (tree-sitter C++ → SQLite symbols + FTS5) |
+| `indexer.py` | Build/`update()` the offline index (tree-sitter C++ → SQLite symbols + FTS5; incremental by file hash) |
 | `index_query.py` | Read-only index queries (returns None when no index → tools fall back) |
+| `shortcut.py` | Entry short-circuit: answer "where is X defined" from the index, skipping the LLM (方案 2) |
 | `diagnose.py` | Runtime diagnosis (方向 F): parse backtrace, map frames to code via index, run agent |
 | `knowledge.py` | Knowledge flywheel (方案 3): precipitate Q&A → SQLite/FTS, recall with staleness check |
 | `agent.py` | Backend dispatch + custom loop (`CodeAgent`: event history, stuck detection, retries) |
@@ -128,7 +129,7 @@ LLM access goes through **litellm** to the mushigen proxy — do not call the mo
 ## Roadmap (informs design decisions)
 
 1. **方案 1 (done):** LLM + live code search, every query goes through tool calls.
-2. **方案 2 (symbol index landed):** `indexer.py` builds a tree-sitter C++ → SQLite symbol table + FTS5 index; `find_symbol`/`grep_code` use it and fall back to live scan.
+2. **方案 2 (symbol index landed):** `indexer.py` builds (and incrementally `update()`s) a tree-sitter C++ → SQLite symbol table + FTS5 index; `find_symbol`/`grep_code` use it and fall back to live scan. Precise "where is X defined" questions short-circuit the LLM entirely (`shortcut.py`, `USE_SHORTCUT`).
 3. **方案 3 (knowledge flywheel landed, off by default):** `knowledge.py` precipitates each Q&A and recalls related leads (with staleness check) on later questions. Toggle `USE_KNOWLEDGE=1`. Semantic recall deferred to V3. See [docs/roadmap.md](docs/roadmap.md).
 
 Keep the tool layer separable so the future index can back the same tools.

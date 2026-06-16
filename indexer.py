@@ -114,44 +114,22 @@ def build(root: str | None = None, db_path: str | None = None, *, verbose: bool 
 
     os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
     if os.path.exists(db_path):
-        os.remove(db_path)  # full rebuild; incremental is a later step
+        os.remove(db_path)  # full rebuild
     conn = sqlite3.connect(db_path)
     _init_schema(conn)
 
     n_files = n_syms = 0
     for abs_path in _iter_cpp_files(root):
         rel = os.path.relpath(abs_path, root)
-        try:
-            with open(abs_path, "r", encoding="utf-8", errors="replace") as fh:
-                text = fh.read()
-        except OSError:
+        text = _read_text(abs_path)
+        if text is None:
             continue
-        source = text.encode("utf-8", "replace")
-        digest = _file_hash(text)
-        conn.execute(
-            "INSERT INTO files(path, hash, content) VALUES (?, ?, ?)",
-            (rel, digest, text),
-        )
-        conn.execute(
-            "INSERT INTO files_fts(path, content) VALUES (?, ?)", (rel, text)
-        )
-        syms = _extract_symbols(parser, rel, source)
-        if syms:
-            conn.executemany(
-                "INSERT INTO symbols(name, kind, path, line, file_hash) "
-                "VALUES (?, ?, ?, ?, ?)",
-                [(n, k, p, ln, digest) for (n, k, p, ln) in syms],
-            )
-            n_syms += len(syms)
+        n_syms += _index_one(conn, parser, rel, text)
         n_files += 1
         if verbose and n_files % 100 == 0:
             print(f"  indexed {n_files} files, {n_syms} symbols...")
 
-    conn.execute(
-        "INSERT INTO meta(key, value) VALUES ('root', ?) "
-        "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-        (root,),
-    )
+    _set_root(conn, root)
     conn.commit()
     conn.close()
     summary = {"files": n_files, "symbols": n_syms, "db": db_path, "root": root}
@@ -160,27 +138,130 @@ def build(root: str | None = None, db_path: str | None = None, *, verbose: bool 
     return summary
 
 
+def update(root: str | None = None, db_path: str | None = None, *, verbose: bool = False) -> dict:
+    """Incrementally sync the index to the current files.
+
+    Re-parses only files whose content hash changed (or are new), and drops rows
+    for files that no longer exist. Falls back to a full build if there's no
+    existing index yet. Much cheaper than build() when little changed.
+    """
+    from tree_sitter import Language, Parser
+    import tree_sitter_cpp
+
+    root = os.path.abspath(root or config.TARGET_CODE_PATH)
+    db_path = db_path or config.INDEX_DB_PATH
+    if not os.path.isfile(db_path):
+        return build(root, db_path, verbose=verbose)
+
+    parser = Parser(Language(tree_sitter_cpp.language()))
+    conn = sqlite3.connect(db_path)
+    _init_schema(conn)  # idempotent (IF NOT EXISTS)
+
+    # Current on-disk hashes.
+    disk: dict[str, str] = {}
+    for abs_path in _iter_cpp_files(root):
+        rel = os.path.relpath(abs_path, root)
+        text = _read_text(abs_path)
+        if text is not None:
+            disk[rel] = text  # keep text; we may need to re-index
+    # Stored hashes.
+    stored = {row[0]: row[1] for row in conn.execute("SELECT path, hash FROM files")}
+
+    added = changed = removed = 0
+    # Removed: in DB but no longer on disk.
+    for rel in set(stored) - set(disk):
+        _delete_file(conn, rel)
+        removed += 1
+    # Added / changed.
+    for rel, text in disk.items():
+        digest = _file_hash(text)
+        if rel not in stored:
+            _index_one(conn, parser, rel, text)
+            added += 1
+        elif stored[rel] != digest:
+            _delete_file(conn, rel)
+            _index_one(conn, parser, rel, text)
+            changed += 1
+
+    _set_root(conn, root)
+    conn.commit()
+    conn.close()
+    summary = {"added": added, "changed": changed, "removed": removed, "db": db_path, "root": root}
+    if verbose:
+        print(f"[index] incremental: {summary}")
+    return summary
+
+
+def _read_text(abs_path: str) -> str | None:
+    try:
+        with open(abs_path, "r", encoding="utf-8", errors="replace") as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
+def _index_one(conn: sqlite3.Connection, parser, rel: str, text: str) -> int:
+    """Insert one file's rows (files + FTS + symbols). Returns symbol count.
+
+    Caller must ensure no existing rows for ``rel`` remain (delete first on
+    update). Returns the number of symbols indexed.
+    """
+    digest = _file_hash(text)
+    conn.execute(
+        "INSERT INTO files(path, hash, content) VALUES (?, ?, ?)", (rel, digest, text)
+    )
+    conn.execute("INSERT INTO files_fts(path, content) VALUES (?, ?)", (rel, text))
+    syms = _extract_symbols(parser, rel, text.encode("utf-8", "replace"))
+    if syms:
+        conn.executemany(
+            "INSERT INTO symbols(name, kind, path, line, file_hash) VALUES (?, ?, ?, ?, ?)",
+            [(n, k, p, ln, digest) for (n, k, p, ln) in syms],
+        )
+    return len(syms)
+
+
+def _delete_file(conn: sqlite3.Connection, rel: str) -> None:
+    """Remove all rows for a file (files + FTS + symbols)."""
+    conn.execute("DELETE FROM files WHERE path = ?", (rel,))
+    conn.execute("DELETE FROM files_fts WHERE path = ?", (rel,))
+    conn.execute("DELETE FROM symbols WHERE path = ?", (rel,))
+
+
+def _set_root(conn: sqlite3.Connection, root: str) -> None:
+    conn.execute(
+        "INSERT INTO meta(key, value) VALUES ('root', ?) "
+        "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        (root,),
+    )
+
+
 def _init_schema(conn: sqlite3.Connection) -> None:
+    # IF NOT EXISTS so update() can call this on an existing DB harmlessly.
     conn.executescript(
         """
-        CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT);
-        CREATE TABLE files(
+        CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
+        CREATE TABLE IF NOT EXISTS files(
             path TEXT PRIMARY KEY,
             hash TEXT NOT NULL,
             content TEXT NOT NULL
         );
-        CREATE TABLE symbols(
+        CREATE TABLE IF NOT EXISTS symbols(
             name TEXT NOT NULL,
             kind TEXT NOT NULL,
             path TEXT NOT NULL,
             line INTEGER NOT NULL,
             file_hash TEXT NOT NULL
         );
-        CREATE INDEX idx_symbols_name ON symbols(name);
-        CREATE VIRTUAL TABLE files_fts USING fts5(path, content);
+        CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name);
+        CREATE VIRTUAL TABLE IF NOT EXISTS files_fts USING fts5(path, content);
         """
     )
 
 
 if __name__ == "__main__":
-    build(verbose=True)
+    import sys
+
+    if "--update" in sys.argv or "-u" in sys.argv:
+        update(verbose=True)
+    else:
+        build(verbose=True)

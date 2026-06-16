@@ -82,6 +82,10 @@ INDEX_DB_PATH = os.environ.get(
 # Set USE_INDEX=0 to force the live-scan fallback even if an index exists.
 USE_INDEX = os.environ.get("USE_INDEX", "1") not in ("0", "false", "False")
 
+# Entry short-circuit: answer precise "where is X defined" questions straight
+# from the index, skipping the LLM (方案 2). Set USE_SHORTCUT=0 to disable.
+USE_SHORTCUT = os.environ.get("USE_SHORTCUT", "1") not in ("0", "false", "False")
+
 # --- Knowledge flywheel (方案 3) -------------------------------------------
 # Precipitate answered questions into a SQLite knowledge base and recall related
 # entries (as leads, re-verified) on later questions. Separate DB since it's

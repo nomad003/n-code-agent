@@ -24,7 +24,21 @@ from events import Action, Observation, action_key
 
 
 def answer(question: str, *, verbose: bool = False) -> str:
-    """Answer a question using the configured backend (see config.AGENT_BACKEND)."""
+    """Answer a question using the configured backend (see config.AGENT_BACKEND).
+
+    First tries an index-only short-circuit (方案 2): precise "where is X
+    defined" questions are answered straight from the symbol index, skipping the
+    LLM entirely. Anything else runs the full agent loop.
+    """
+    if config.USE_SHORTCUT:
+        import shortcut
+
+        hit = shortcut.try_answer(question)
+        if hit is not None:
+            if verbose:
+                print("  [shortcut] 命中索引，跳过 LLM")
+            return hit
+
     if config.AGENT_BACKEND == "sdk":
         import agent_sdk  # lazy: only import (and require) the SDK when selected
 
