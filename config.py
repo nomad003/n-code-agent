@@ -71,6 +71,17 @@ MAX_READ_BYTES = int(os.environ.get("MAX_READ_BYTES", "20000"))
 MAX_GREP_MATCHES = int(os.environ.get("MAX_GREP_MATCHES", "100"))
 MAX_LIST_ENTRIES = int(os.environ.get("MAX_LIST_ENTRIES", "300"))
 
+# --- Offline index (方案 2) ------------------------------------------------
+# SQLite symbol/FTS index. When present, find_symbol/grep_code use it (fast,
+# exact); otherwise they fall back to live filesystem scanning. Build with
+# `python indexer.py` / scripts/index.sh.
+INDEX_DB_PATH = os.environ.get(
+    "INDEX_DB_PATH",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "index", "code_index.db"),
+)
+# Set USE_INDEX=0 to force the live-scan fallback even if an index exists.
+USE_INDEX = os.environ.get("USE_INDEX", "1") not in ("0", "false", "False")
+
 # --- Service ---------------------------------------------------------------
 SERVICE_PORT = int(os.environ.get("SERVICE_PORT", "8900"))
 SERVICE_HOST = os.environ.get("SERVICE_HOST", "0.0.0.0")

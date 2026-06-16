@@ -88,12 +88,16 @@ litellm 的 tool-calling 循环（最多 `MAX_ITERATIONS` 轮）。设计借鉴 
 
 > 已知边界：`_resolve()` 不对软链接做 `realpath` 解析，符号链接逃逸不在防护范围内。
 
+**索引加速（方案 2）**：存在索引时，`find_symbol` 直接查 SQLite 符号表（精确、一步命中），`grep_code` 对「整库 + 纯文本」走 FTS5 全文索引；正则或限定子目录的搜索仍走 live scan。索引缺失或 `USE_INDEX=0` 时全部回退 live scan，行为不变。
+
 ## 模块职责
 
 | 文件 | 职责 |
 |------|------|
 | `config.py` | 全局配置（环境变量驱动）、system prompt、`require_api_key()` |
-| `tools.py` | 4 个沙箱工具 + 工具 schema + `dispatch()` 注册表 |
+| `tools.py` | 4 个沙箱工具 + 工具 schema + `dispatch()` 注册表（索引优先，回退 live scan） |
+| `indexer.py` | 离线建索引：tree-sitter 解析 C++ → SQLite 符号表 + FTS5 |
+| `index_query.py` | 索引只读查询层（无索引返回 None 让工具回退） |
 | `agent.py` | 后端分发 + custom 循环（`CodeAgent`：事件历史/stuck/重试） |
 | `events.py` | custom 循环的 `Action`/`Observation` 事件模型 |
 | `agent_sdk.py` | sdk（Claude Agent SDK）后端 |
@@ -105,6 +109,6 @@ litellm 的 tool-calling 循环（最多 `MAX_ITERATIONS` 轮）。设计借鉴 
 ## 演进计划
 
 1. **当前（方案 1）**：LLM + 实时代码搜索，每次查询走 tool call。
-2. **下一步（方案 2）**：离线建索引（tree-sitter AST → SQLite 符号表 + 向量库），精确查询不走 LLM 直接返回。`tools.py` 被刻意做成唯一接触文件的层，就是为了让索引顶替这些实现而上层不动。
+2. **方案 2（符号索引已落地）**：`indexer.py` 用 tree-sitter 解析 C++ → SQLite 符号表 + FTS5 全文索引；`tools.find_symbol`/`grep_code` 优先走索引（快、精确），无索引则回退 live scan。`tools.py` 作为唯一接触文件的层，索引顶替其实现而 `agent.py` 不动。构建：`scripts/index.sh`。向量库/语义检索推迟到方案 3。
 
 > 已落地优化、明确舍弃的设计、以及更细的后续方向（服务治理、缓存、评测等）见 [roadmap.md](roadmap.md)。

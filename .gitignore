@@ -10,6 +10,9 @@ venv/
 # Runtime logs
 logs/
 
+# Built index (rebuild with scripts/index.sh)
+index/
+
 # Editor / OS
 .idea/
 .vscode/

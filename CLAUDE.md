@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Implemented and verified end-to-end (方案 1): `config.py`, `tools.py`, `agent.py`, `agent_sdk.py`, `main.py`, `cli.py`, `requirements.txt`. A sample `target_code/` tree exists for local testing. No automated test suite yet.
+Implemented and verified end-to-end: 方案 1 (litellm/SDK tool-calling loop) + 方案 2 first step (offline tree-sitter C++ symbol index). Entrypoints: `main.py` (REST), `mcp_server.py` (MCP), `cli.py`. Offline pytest suite under `tests/`.
 
 Detailed docs live in `docs/` ([architecture](docs/architecture.md), [configuration](docs/configuration.md), [api](docs/api.md), [deployment](docs/deployment.md)) — keep them in sync when changing behavior.
 
@@ -44,7 +44,9 @@ Intended module responsibilities:
 | File | Responsibility |
 |------|----------------|
 | `config.py` | Model id, API base/key, target-code path, system prompt |
-| `tools.py` | The four search-tool implementations + their tool-call schemas |
+| `tools.py` | The four search-tool implementations + schemas (index-backed, fall back to live scan) |
+| `indexer.py` | Build the offline index (tree-sitter C++ → SQLite symbols + FTS5) |
+| `index_query.py` | Read-only index queries (returns None when no index → tools fall back) |
 | `agent.py` | Backend dispatch + custom loop (`CodeAgent`: event history, stuck detection, retries) |
 | `events.py` | `Action`/`Observation` event model for the custom loop |
 | `agent_sdk.py` | Claude Agent SDK backend (used when `AGENT_BACKEND=sdk`) |
@@ -62,6 +64,7 @@ location (runnable from any CWD) and auto-create the venv on first use:
 
 ```bash
 scripts/setup.sh                          # create venv + install deps
+scripts/index.sh                          # build the offline symbol index (方案 2)
 scripts/serve.sh [start|stop|restart|status]  # HTTP service (8900); no arg = foreground
 scripts/mcp.sh   [start|stop|restart|status]  # MCP server (8901); no arg = foreground
 scripts/cli.sh ["question"]               # interactive REPL, or one-shot if arg given
@@ -116,7 +119,7 @@ LLM access goes through **litellm** to the mushigen proxy — do not call the mo
 
 ## Roadmap (informs design decisions)
 
-1. **Now (方案 1):** LLM + live code search, every query goes through tool calls.
-2. **Next (方案 2):** offline indexing (tree-sitter AST → SQLite symbol table + vector DB) so exact queries can return without invoking the LLM.
+1. **方案 1 (done):** LLM + live code search, every query goes through tool calls.
+2. **方案 2 (symbol index landed):** `indexer.py` builds a tree-sitter C++ → SQLite symbol table + FTS5 index; `find_symbol`/`grep_code` use it and fall back to live scan. Vector/semantic search deferred to 方案 3. See [docs/roadmap.md](docs/roadmap.md).
 
 Keep the tool layer separable so the future index can back the same tools.

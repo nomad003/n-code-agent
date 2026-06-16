@@ -4,5 +4,9 @@ litellm>=1.40
 pydantic>=2.0
 # MCP server (exposes ask_codebase over streamable-http to other MCP clients).
 mcp>=1.20
+# Offline symbol index (方案 2). Only needed to build the index; querying uses
+# stdlib sqlite3. tree-sitter-cpp must be ABI-compatible with tree-sitter.
+tree-sitter>=0.25
+tree-sitter-cpp>=0.23
 # Only needed when AGENT_BACKEND=sdk (also requires the Claude Code CLI).
 claude-agent-sdk>=0.2

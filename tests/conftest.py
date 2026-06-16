@@ -41,4 +41,7 @@ def target_code(tmp_path, monkeypatch):
     (root / ".hidden").write_text("secret\n", encoding="utf-8")
 
     monkeypatch.setattr(config, "TARGET_CODE_PATH", str(root))
+    # Tool tests exercise the live-scan logic against this temp tree; disable the
+    # offline index so they never accidentally hit a real prebuilt index DB.
+    monkeypatch.setattr(config, "USE_INDEX", False)
     return root

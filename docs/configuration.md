@@ -25,6 +25,8 @@ cp .env.example .env     # 填入 LLM_API_KEY，按需改 TARGET_CODE_PATH / AGE
 | `MAX_READ_BYTES` | `20000` | 单次读文件上限（字节） |
 | `MAX_GREP_MATCHES` | `100` | grep 最多返回条数 |
 | `MAX_LIST_ENTRIES` | `300` | 列目录最多条数 |
+| `INDEX_DB_PATH` | `./index/code_index.db` | 离线索引 SQLite 路径（`scripts/index.sh` 构建） |
+| `USE_INDEX` | `1` | 是否用索引加速 `find_symbol`/`grep_code`，0=强制 live scan |
 | `SERVICE_HOST` | `0.0.0.0` | HTTP 监听地址 |
 | `SERVICE_PORT` | `8900` | HTTP 端口 |
 

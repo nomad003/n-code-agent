@@ -46,6 +46,14 @@ def _rel(abs_path: str) -> str:
 # --- Tool implementations --------------------------------------------------
 
 
+_REGEX_META = set(r".^$*+?{}[]\|()")
+
+
+def _is_plain_text(pattern: str) -> bool:
+    """True if the pattern has no regex metacharacters (a literal search)."""
+    return not any(ch in _REGEX_META for ch in pattern)
+
+
 def grep_code(pattern: str, path: str = ".") -> str:
     """Search files under ``path`` for ``pattern`` (a regular expression)."""
     if not pattern:
@@ -53,6 +61,24 @@ def grep_code(pattern: str, path: str = ".") -> str:
     base = _resolve(path)
     if not os.path.exists(base):
         raise ToolError(f"path does not exist: {path!r}")
+
+    # Fast path: whole-repo literal search via the FTS index. Only when the
+    # pattern is plain text (FTS can't do regex) and the scope is the whole repo
+    # (the index isn't path-scoped). Otherwise fall through to the live scan.
+    if path in (".", "", "/") and _is_plain_text(pattern):
+        try:
+            import index_query
+
+            hits = index_query.search_fts(pattern, limit=config.MAX_GREP_MATCHES)
+        except Exception:
+            hits = None
+        if hits is not None:
+            if not hits:
+                return f"no matches for {pattern!r} under {_rel(base)}"
+            lines = [f"{h['path']}:{h['line']}: {h['text']}" for h in hits]
+            if len(hits) >= config.MAX_GREP_MATCHES:
+                lines.append(f"... (truncated at {config.MAX_GREP_MATCHES} matches)")
+            return "\n".join(lines)
 
     try:
         regex = re.compile(pattern)
@@ -138,9 +164,27 @@ def list_dir(path: str = ".") -> str:
 
 
 def find_symbol(name: str) -> str:
-    """Locate likely definitions of a class/function/variable named ``name``."""
+    """Locate likely definitions of a class/function/variable named ``name``.
+
+    Uses the offline index when available (exact, fast); falls back to a
+    regex scan over the tree otherwise.
+    """
     if not name:
         raise ToolError("name is required")
+
+    # Fast path: offline symbol index.
+    try:
+        import index_query
+
+        rows = index_query.find_symbol(name)
+    except Exception:
+        rows = None
+    if rows:
+        lines = [f"{r['path']}:{r['line']}: [{r['kind']}] {r['name']}" for r in rows]
+        return "\n".join(lines)
+    # rows == [] means the index exists but has no match; rows is None means no
+    # index. Either way, fall through to the live scan for best-effort leads.
+
     ident = re.escape(name)
     # Common definition forms across Python / C-like / Lua game code
     # (server, combat, client, engine).
