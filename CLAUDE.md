@@ -39,6 +39,7 @@ The agent is a **tool-calling loop**: the LLM is given four code-search tools an
 - `list_dir(path)` — list a directory
 - `find_symbol(name)` — locate a class/function definition
 - `resolve_frame(frame)` — map a backtrace frame to its definition (方向 F; class-aware narrowing)
+- `find_log_source(message)` — reverse-lookup the code that prints a runtime log line (方向 F; value/prefix normalization → FTS)
 
 Intended module responsibilities:
 

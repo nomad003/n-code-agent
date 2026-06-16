@@ -162,6 +162,52 @@ def _format_frames(frames: list[Frame]) -> str:
     return "\n".join(lines)
 
 
+# --- log source lookup -----------------------------------------------------
+
+# Leading timestamp / level prefixes commonly prepended at runtime, e.g.
+# "[2026-06-16 11:00:01] ", "[ERROR] ", "2026/06/16 11:00:01 ".
+_LOG_PREFIX_RE = re.compile(
+    r"^\s*(?:\[[^\]]*\]\s*)+|^\s*\d{4}[-/]\d\d[-/]\d\d[ T]\d\d:\d\d:\d\d\S*\s*"
+)
+# Runtime values that replace printf-style placeholders: ints, hex, floats.
+_VALUE_RE = re.compile(r"0x[0-9a-fA-F]+|[-+]?\d+\.\d+|[-+]?\d+")
+
+
+def _literal_runs(message: str, *, min_len: int = 8) -> list[str]:
+    """Extract the longest fixed-text fragments from a runtime log line.
+
+    A log line is a format string with its %-placeholders filled in at runtime.
+    The text *between* placeholders appears verbatim in the source, so we strip
+    the timestamp prefix, split on runtime values, and keep the long literal
+    runs — these are reliable FTS queries against the format string.
+    """
+    msg = _LOG_PREFIX_RE.sub("", message).strip()
+    parts = _VALUE_RE.split(msg)
+    runs = [p.strip(" \t:,;=()[]{}\"'") for p in parts]
+    runs = [r for r in runs if len(r) >= min_len]
+    return sorted(set(runs), key=len, reverse=True)
+
+
+def find_log_source(message: str, *, limit: int = 10) -> list[dict]:
+    """Locate the code that prints a given runtime log line.
+
+    Returns FTS hits (path/line/text) for the log's longest literal fragment.
+    Empty list if no index or no match.
+    """
+    try:
+        import index_query
+    except Exception:
+        return []
+    runs = _literal_runs(message)
+    if not runs:
+        return []
+    for run in runs:  # try longest fragments first
+        hits = index_query.search_fts(run, limit=limit)
+        if hits:
+            return hits
+    return []
+
+
 # --- diagnosis -------------------------------------------------------------
 
 _DIAGNOSIS_PROMPT = """\
@@ -197,6 +243,18 @@ def diagnose(backtrace: str, *, extra_log: str = "", verbose: bool = False) -> d
     prompt = _DIAGNOSIS_PROMPT.format(frames=frames_text, raw=backtrace.strip())
     if extra_log.strip():
         prompt += f"\n\n相关日志片段：\n{extra_log.strip()}"
+        # Pre-resolve each log line to its print site so the agent starts with
+        # concrete code locations instead of having to call the tool itself.
+        log_sources: list[str] = []
+        for line in extra_log.strip().splitlines():
+            if not line.strip():
+                continue
+            hits = find_log_source(line, limit=3)
+            if hits:
+                locs = "; ".join(f"{h['path']}:{h['line']}" for h in hits[:3])
+                log_sources.append(f"  「{line.strip()[:60]}」 → {locs}")
+        if log_sources:
+            prompt += "\n\n日志打印位置（已反查）：\n" + "\n".join(log_sources)
 
     answer = agent.answer(prompt, verbose=verbose)
     return {

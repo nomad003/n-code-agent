@@ -84,6 +84,60 @@ def test_resolve_frame_tool(indexed):
     assert "scenemgr.h" in out
 
 
+# --- log source lookup -----------------------------------------------------
+
+
+def test_literal_runs_strips_values_and_prefix():
+    runs = diagnose._literal_runs(
+        "[2026-06-16 11:00:01] Buff 1024 cache data not found"
+    )
+    assert "cache data not found" in runs
+    # timestamp and the number 1024 must be gone
+    assert all("1024" not in r and "2026" not in r for r in runs)
+
+
+def test_literal_runs_too_short():
+    assert diagnose._literal_runs("err 5") == []  # nothing >= 8 chars
+
+
+@pytest.fixture
+def log_indexed(tmp_path, monkeypatch):
+    root = tmp_path / "src"
+    root.mkdir()
+    (root / "buff.cpp").write_text(
+        'void f() {\n'
+        '    LogError("Buff %u cache data not found", id);\n'
+        '    LogInfo("server stoped");\n'
+        '}\n',
+        encoding="utf-8",
+    )
+    db = tmp_path / "idx.db"
+    indexer.build(root=str(root), db_path=str(db))
+    monkeypatch.setattr(config, "TARGET_CODE_PATH", str(root))
+    monkeypatch.setattr(config, "INDEX_DB_PATH", str(db))
+    monkeypatch.setattr(config, "USE_INDEX", True)
+    return root
+
+
+def test_find_log_source_with_variable(log_indexed):
+    hits = diagnose.find_log_source("Buff 4096 cache data not found")
+    assert hits and any("buff.cpp" in h["path"] for h in hits)
+
+
+def test_find_log_source_with_timestamp(log_indexed):
+    hits = diagnose.find_log_source("[2026-06-16 11:00:01] server stoped")
+    assert hits and any(h["line"] == 3 for h in hits)
+
+
+def test_find_log_source_tool(log_indexed):
+    out = tools.find_log_source("Buff 99 cache data not found")
+    assert "buff.cpp" in out
+
+
+def test_find_log_source_no_match(log_indexed):
+    assert diagnose.find_log_source("totally unrelated banana text here") == []
+
+
 # --- diagnose() orchestration (agent stubbed) ------------------------------
 
 

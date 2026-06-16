@@ -127,16 +127,17 @@ custom 后端的 stuck / 遮蔽 / 重试，SDK 后端目前依赖框架自身机
 
 把服务从「读代码」扩展到「诊断运行时问题」：给一段 **崩溃栈（backtrace）** 或 **日志片段**，结合代码库定位根因、解释每一帧、给出排查方向。这是 gameserver 场景的高价值诉求（崩溃/卡死/异常日志的根因定位）。
 
-**已落地（MVP：backtrace 诊断）**
-- `diagnose.py`：解析 gdb 风格 backtrace → 逐帧提取函数 → 复用符号索引（`index_query`）映射到 `file:line`；带类名（`SceneMgr::Update`）时自动收窄同名候选（实测 50 个 → 1 个），含 `c++filt` demangle。
-- `tools.resolve_frame`：第 5 个 agent 工具，把任意帧签名定位到定义（类名收窄 + 回退裸名）。
-- 入口：`POST /diagnose`（`{backtrace, log}`）+ MCP 工具 `diagnose_crash`。agent 拿到「逐帧候选 + 原始栈」后读代码综合分析。
-- 实测：真实 gameserver 崩溃栈，2/3 帧定位（`??` 帧无符号），agent 正确识别 `this=0x0` 空指针、定位成员访问、结合调用链给根因与修复建议。
+**已落地（backtrace 诊断 + 日志反查）**
+- `diagnose.py`：
+  - 解析 gdb 风格 backtrace → 逐帧提取函数 → 复用符号索引（`index_query`）映射到 `file:line`；带类名（`SceneMgr::Update`）时自动收窄同名候选（实测 50 个 → 1 个），含 `c++filt` demangle。
+  - **日志反查**（`find_log_source`）：运行时日志是「填好值的格式串」，剥掉时间戳/级别前缀、按数字/地址切分、取最长固定文本片段去 FTS 搜格式串 → 定位打印点。实测带变量/带时间戳的真实日志均精准命中。
+- agent 工具：`resolve_frame`（帧→定义，类名收窄）、`find_log_source`（日志→打印点）。
+- 入口：`POST /diagnose`（`{backtrace, log}`，两者可单独或组合）+ MCP 工具 `diagnose_crash`。诊断时会预先反查日志打印点写进 prompt，agent 再读代码综合分析。
+- 实测：(a) 真实崩溃栈 2/3 帧定位，agent 识别 `this=0x0` 空指针给根因；(b) 纯日志诊断，反查到打印点后 agent 追到 `ASSERT_FALSE` 断言根因。
 
 **未做（后续）**
-- 日志反查工具 `find_log_source`（格式串归一化 + FTS 反查打印点）。
 - 按 build 版本绑定行号（栈对应的代码版本）；release 缺符号/inline 的处理。
-- 崩溃模式知识沉淀（与方案 3 结合，相似栈直接命中历史诊断）。
+- 崩溃模式知识沉淀（与方案 3 结合，相似栈/日志直接命中历史诊断）。
 
 **典型输入与产出**
 - coredump backtrace（`gdb bt` / 信号栈）→ 逐帧映射到 `file:line` + 函数解释 + 最可能的崩溃原因（空指针/越界/竞态…）+ 涉及的相关代码。

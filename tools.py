@@ -229,6 +229,35 @@ def resolve_frame(frame: str) -> str:
     return find_symbol(bare) if bare else f"no resolution for {frame!r}"
 
 
+def find_log_source(message: str) -> str:
+    """Locate the code that prints a given runtime log line.
+
+    The log line is a format string with its values filled in; this strips the
+    timestamp/level prefix and runtime values, then full-text-searches the
+    fixed text against the codebase.
+    """
+    if not message:
+        raise ToolError("message is required")
+    try:
+        import diagnose
+
+        hits = diagnose.find_log_source(message)
+    except Exception:
+        hits = []
+    if hits:
+        return "\n".join(f"{h['path']}:{h['line']}: {h['text']}" for h in hits)
+    # Fall back to a literal grep of the longest fixed fragment, if any.
+    try:
+        import diagnose
+
+        runs = diagnose._literal_runs(message)
+    except Exception:
+        runs = []
+    if runs:
+        return grep_code(runs[0], ".")
+    return f"no log source found for {message!r}"
+
+
 # --- Filesystem traversal helper ------------------------------------------
 
 _SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", ".idea"}
@@ -337,6 +366,23 @@ TOOL_SCHEMAS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "find_log_source",
+            "description": "根据一条运行时日志（含具体变量值）反查打印它的代码位置；会自动剥掉时间戳并把变量归一化为格式串再检索。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "description": "运行时看到的日志行（可含时间戳/级别前缀和变量值）",
+                    }
+                },
+                "required": ["message"],
+            },
+        },
+    },
 ]
 
 # Maps tool name -> implementation. The agent loop calls through this registry.
@@ -346,6 +392,7 @@ TOOL_REGISTRY = {
     "list_dir": list_dir,
     "find_symbol": find_symbol,
     "resolve_frame": resolve_frame,
+    "find_log_source": find_log_source,
 }
 
 
