@@ -99,6 +99,7 @@ litellm 的 tool-calling 循环（最多 `MAX_ITERATIONS` 轮）。设计借鉴 
 | `indexer.py` | 离线建索引：tree-sitter 解析 C++ → SQLite 符号表 + FTS5 |
 | `index_query.py` | 索引只读查询层（无索引返回 None 让工具回退） |
 | `diagnose.py` | 运行时诊断：backtrace 解析 + 帧→符号映射 + 日志反查打印点 + 跑 agent（方向 F） |
+| `knowledge.py` | 知识飞轮（方案 3）：问答沉淀 SQLite/FTS + 召回（含失效检查） |
 | `agent.py` | 后端分发 + custom 循环（`CodeAgent`：事件历史/stuck/重试） |
 | `events.py` | custom 循环的 `Action`/`Observation` 事件模型 |
 | `agent_sdk.py` | sdk（Claude Agent SDK）后端 |
@@ -111,5 +112,6 @@ litellm 的 tool-calling 循环（最多 `MAX_ITERATIONS` 轮）。设计借鉴 
 
 1. **当前（方案 1）**：LLM + 实时代码搜索，每次查询走 tool call。
 2. **方案 2（符号索引已落地）**：`indexer.py` 用 tree-sitter 解析 C++ → SQLite 符号表 + FTS5 全文索引；`tools.find_symbol`/`grep_code` 优先走索引（快、精确），无索引则回退 live scan。`tools.py` 作为唯一接触文件的层，索引顶替其实现而 `agent.py` 不动。构建：`scripts/index.sh`。向量库/语义检索推迟到方案 3。
+3. **方案 3（知识飞轮已落地，默认关）**：`knowledge.py` 把每次问答沉淀进 SQLite/FTS，下次相似问题召回作线索注入（`USE_KNOWLEDGE=1` 开启）。**失效机制**是核心：召回时重算引用文件哈希，变了标 stale 并降级为"需重新核实"，agent 用工具二次核实而非直接采信。语义召回留待 V3。
 
 > 已落地优化、明确舍弃的设计、以及更细的后续方向（服务治理、缓存、评测等）见 [roadmap.md](roadmap.md)。

@@ -40,6 +40,7 @@ The agent is a **tool-calling loop**: the LLM is given four code-search tools an
 - `find_symbol(name)` — locate a class/function definition
 - `resolve_frame(frame)` — map a backtrace frame to its definition (方向 F; class-aware narrowing)
 - `find_log_source(message)` — reverse-lookup the code that prints a runtime log line (方向 F; value/prefix normalization → FTS)
+- `recall_knowledge(query)` — recall past Q&A leads (方案 3; only advertised when `USE_KNOWLEDGE=1`)
 
 Intended module responsibilities:
 
@@ -50,6 +51,7 @@ Intended module responsibilities:
 | `indexer.py` | Build the offline index (tree-sitter C++ → SQLite symbols + FTS5) |
 | `index_query.py` | Read-only index queries (returns None when no index → tools fall back) |
 | `diagnose.py` | Runtime diagnosis (方向 F): parse backtrace, map frames to code via index, run agent |
+| `knowledge.py` | Knowledge flywheel (方案 3): precipitate Q&A → SQLite/FTS, recall with staleness check |
 | `agent.py` | Backend dispatch + custom loop (`CodeAgent`: event history, stuck detection, retries) |
 | `events.py` | `Action`/`Observation` event model for the custom loop |
 | `agent_sdk.py` | Claude Agent SDK backend (used when `AGENT_BACKEND=sdk`) |
@@ -124,6 +126,7 @@ LLM access goes through **litellm** to the mushigen proxy — do not call the mo
 ## Roadmap (informs design decisions)
 
 1. **方案 1 (done):** LLM + live code search, every query goes through tool calls.
-2. **方案 2 (symbol index landed):** `indexer.py` builds a tree-sitter C++ → SQLite symbol table + FTS5 index; `find_symbol`/`grep_code` use it and fall back to live scan. Vector/semantic search deferred to 方案 3. See [docs/roadmap.md](docs/roadmap.md).
+2. **方案 2 (symbol index landed):** `indexer.py` builds a tree-sitter C++ → SQLite symbol table + FTS5 index; `find_symbol`/`grep_code` use it and fall back to live scan.
+3. **方案 3 (knowledge flywheel landed, off by default):** `knowledge.py` precipitates each Q&A and recalls related leads (with staleness check) on later questions. Toggle `USE_KNOWLEDGE=1`. Semantic recall deferred to V3. See [docs/roadmap.md](docs/roadmap.md).
 
 Keep the tool layer separable so the future index can back the same tools.

@@ -57,6 +57,7 @@ class CodeAgent:
         self.verbose = verbose
         self.question = ""
         self.history: list = []  # list[Action | Observation]
+        self.recalled = ""       # knowledge recalled for this question (方案 3)
 
     # --- LLM ---------------------------------------------------------------
 
@@ -78,7 +79,7 @@ class CodeAgent:
             num_retries=config.LLM_NUM_RETRIES,
         )
         if with_tools:
-            kwargs["tools"] = tools.TOOL_SCHEMAS
+            kwargs["tools"] = tools.active_schemas()
             kwargs["tool_choice"] = "auto"
         return litellm.completion(**kwargs)
 
@@ -92,8 +93,11 @@ class CodeAgent:
         message keyed by tool_call_id. This is the one place that has to keep
         request/result pairing consistent.
         """
+        system = config.SYSTEM_PROMPT
+        if self.recalled:
+            system = system + "\n\n" + self.recalled
         messages: list[dict] = [
-            {"role": "system", "content": config.SYSTEM_PROMPT},
+            {"role": "system", "content": system},
             {"role": "user", "content": self.question},
         ]
         # Observation masking: keep the last OBS_KEEP_FULL tool outputs verbatim;
@@ -184,12 +188,69 @@ class CodeAgent:
         first = action_key(recent[0])
         return all(action_key(a) == first for a in recent[1:])
 
+    # --- knowledge flywheel (方案 3) ---------------------------------------
+
+    def _recalled_context(self, question: str) -> str:
+        """Knowledge recalled for this question, formatted as a system hint.
+
+        Returns "" when the flywheel is off or nothing is recalled. Stale entries
+        are downgraded so the agent treats them as leads to re-verify, not facts.
+        """
+        if not config.USE_KNOWLEDGE:
+            return ""
+        try:
+            import knowledge
+
+            hits = knowledge.recall(question)
+        except Exception:
+            return ""
+        if not hits:
+            return ""
+        lines = ["以下是历史问答沉淀的相关线索（仅供参考，请用工具二次核实后再采信）："]
+        for h in hits:
+            tag = "（⚠️ 引用文件已变更，可能过时，务必重新核实）" if h["stale"] else ""
+            refs = ("，涉及 " + ", ".join(h["refs"])) if h["refs"] else ""
+            lines.append(f"- 旧问题：{h['question']}{refs}{tag}\n  旧结论：{h['answer'][:500]}")
+        return "\n".join(lines)
+
+    def _referenced_files(self) -> list[str]:
+        """Repo-relative files the agent consulted (from read_file etc.)."""
+        import json as _json
+
+        paths: list[str] = []
+        for ev in self.history:
+            if isinstance(ev, Action) and ev.name in ("read_file",):
+                try:
+                    args = _json.loads(ev.raw_arguments or "{}")
+                except (ValueError, TypeError):
+                    continue
+                p = args.get("path")
+                if p:
+                    paths.append(p)
+        return paths
+
+    def _precipitate(self, answer: str) -> None:
+        """Store this Q&A into the knowledge base (best-effort, never raises)."""
+        if not config.USE_KNOWLEDGE or not answer:
+            return
+        try:
+            import knowledge
+
+            knowledge.store(self.question, answer, self._referenced_files())
+        except Exception:
+            pass
+
     # --- main loop ---------------------------------------------------------
 
     def run(self, question: str) -> str:
         self.question = question
         self.history = []
+        self.recalled = self._recalled_context(question)
+        answer = self._loop()
+        self._precipitate(answer)
+        return answer
 
+    def _loop(self) -> str:
         for _ in range(config.MAX_ITERATIONS):
             response = self._llm_call(with_tools=True)
             msg = response.choices[0].message

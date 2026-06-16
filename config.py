@@ -82,6 +82,18 @@ INDEX_DB_PATH = os.environ.get(
 # Set USE_INDEX=0 to force the live-scan fallback even if an index exists.
 USE_INDEX = os.environ.get("USE_INDEX", "1") not in ("0", "false", "False")
 
+# --- Knowledge flywheel (方案 3) -------------------------------------------
+# Precipitate answered questions into a SQLite knowledge base and recall related
+# entries (as leads, re-verified) on later questions. Separate DB since it's
+# written incrementally at query time.
+KNOWLEDGE_DB_PATH = os.environ.get(
+    "KNOWLEDGE_DB_PATH",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "index", "knowledge.db"),
+)
+# Master switch for the flywheel. Off by default until the recall hit-rate is
+# validated (roadmap 方案 3 MVP); set USE_KNOWLEDGE=1 to enable.
+USE_KNOWLEDGE = os.environ.get("USE_KNOWLEDGE", "0") not in ("0", "false", "False")
+
 # --- Service ---------------------------------------------------------------
 SERVICE_PORT = int(os.environ.get("SERVICE_PORT", "8900"))
 SERVICE_HOST = os.environ.get("SERVICE_HOST", "0.0.0.0")

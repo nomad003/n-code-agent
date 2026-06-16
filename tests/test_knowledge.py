@@ -1,0 +1,121 @@
+"""Tests for the knowledge flywheel (方案 3): store, recall, staleness."""
+import config
+import knowledge
+import pytest
+
+
+@pytest.fixture
+def kb(tmp_path, monkeypatch):
+    """Isolated knowledge DB + a temp target codebase to hash refs against."""
+    root = tmp_path / "src"
+    root.mkdir()
+    (root / "scene.cpp").write_text("// SceneMgr impl v1\n", encoding="utf-8")
+    monkeypatch.setattr(config, "TARGET_CODE_PATH", str(root))
+    monkeypatch.setattr(config, "KNOWLEDGE_DB_PATH", str(tmp_path / "kb.db"))
+    monkeypatch.setattr(config, "USE_KNOWLEDGE", True)
+    return root
+
+
+# --- store / recall --------------------------------------------------------
+
+
+def test_store_and_recall(kb):
+    rid = knowledge.store("SceneMgr 是做什么的？", "场景管理器", ["scene.cpp"])
+    assert rid is not None
+    hits = knowledge.recall("SceneMgr")
+    assert len(hits) == 1
+    assert hits[0]["answer"] == "场景管理器"
+    assert hits[0]["refs"] == ["scene.cpp"]
+    assert hits[0]["stale"] is False
+
+
+def test_store_rejects_empty(kb):
+    assert knowledge.store("", "ans", []) is None
+    assert knowledge.store("q", "", []) is None
+
+
+def test_recall_no_match(kb):
+    knowledge.store("foo question", "bar", [])
+    assert knowledge.recall("completely unrelated xyz") == []
+
+
+def test_recall_without_db_returns_empty(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "KNOWLEDGE_DB_PATH", str(tmp_path / "none.db"))
+    assert knowledge.recall("anything") == []
+
+
+def test_stats(kb):
+    assert knowledge.stats()["entries"] == 0
+    knowledge.store("q1", "a1", [])
+    knowledge.store("q2", "a2", [])
+    assert knowledge.stats()["entries"] == 2
+
+
+# --- staleness (the make-or-break mechanism) -------------------------------
+
+
+def test_recall_flags_stale_when_ref_changes(kb):
+    knowledge.store("SceneMgr 作用", "旧结论", ["scene.cpp"])
+    # mutate the referenced file -> hash changes -> entry must be flagged stale
+    (kb / "scene.cpp").write_text("// SceneMgr impl v2 CHANGED\n", encoding="utf-8")
+    hits = knowledge.recall("SceneMgr")
+    assert hits[0]["stale"] is True
+    assert "scene.cpp" in hits[0]["stale_refs"]
+
+
+def test_recall_stale_when_ref_deleted(kb):
+    knowledge.store("q about file", "ans", ["scene.cpp"])
+    (kb / "scene.cpp").unlink()
+    hits = knowledge.recall("file")
+    assert hits[0]["stale"] is True
+
+
+def test_no_refs_never_stale(kb):
+    knowledge.store("general q", "general ans", [])
+    assert knowledge.recall("general")[0]["stale"] is False
+
+
+# --- agent integration -----------------------------------------------------
+
+
+def test_agent_precipitates_after_answer(kb, monkeypatch):
+    import agent
+
+    a = agent.CodeAgent()
+    # stub the loop so no LLM is called; pretend it read scene.cpp
+    import json
+    from events import Action
+
+    def fake_loop():
+        a.history = [Action("c1", "read_file", json.dumps({"path": "scene.cpp"}))]
+        return "这是答案"
+
+    monkeypatch.setattr(a, "_loop", fake_loop)
+    out = a.run("解释 scene")
+    assert out == "这是答案"
+    # the Q&A must have been precipitated, with the read file as a ref
+    hits = knowledge.recall("scene")
+    assert hits and hits[0]["refs"] == ["scene.cpp"]
+
+
+def test_agent_recalls_into_system_prompt(kb, monkeypatch):
+    import agent
+
+    knowledge.store("旧问题 SceneMgr", "旧结论内容", ["scene.cpp"])
+    a = agent.CodeAgent()
+    a.recalled = a._recalled_context("SceneMgr 怎么用")
+    assert "旧结论内容" in a.recalled
+    # recalled context is injected into the system message
+    msgs = a._build_messages(with_tools=True)
+    assert "旧结论内容" in msgs[0]["content"]
+
+
+def test_flywheel_off_no_recall_no_store(kb, monkeypatch):
+    import agent
+
+    monkeypatch.setattr(config, "USE_KNOWLEDGE", False)
+    a = agent.CodeAgent()
+    assert a._recalled_context("anything") == ""
+    a.question = "q"
+    a._precipitate("some answer")
+    assert knowledge.stats()["entries"] == 0  # nothing stored when off

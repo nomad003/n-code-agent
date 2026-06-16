@@ -139,6 +139,15 @@ def test_dispatch_bad_arguments(target_code):
     assert tools.dispatch("read_file", {"wrong": 1}).startswith("error:")
 
 
-def test_tool_registry_matches_schemas():
-    schema_names = {s["function"]["name"] for s in tools.TOOL_SCHEMAS}
+def test_tool_registry_matches_schemas(monkeypatch):
+    import config
+
+    # recall_knowledge is advertised only when the flywheel is on; with it
+    # enabled, active_schemas() must exactly cover the registry.
+    monkeypatch.setattr(config, "USE_KNOWLEDGE", True)
+    schema_names = {s["function"]["name"] for s in tools.active_schemas()}
     assert schema_names == set(tools.TOOL_REGISTRY)
+    # ...and recall_knowledge is hidden when the flywheel is off.
+    monkeypatch.setattr(config, "USE_KNOWLEDGE", False)
+    off_names = {s["function"]["name"] for s in tools.active_schemas()}
+    assert "recall_knowledge" not in off_names

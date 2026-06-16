@@ -258,6 +258,31 @@ def find_log_source(message: str) -> str:
     return f"no log source found for {message!r}"
 
 
+def recall_knowledge(query: str) -> str:
+    """Recall related knowledge precipitated from past Q&A (方案 3).
+
+    Returns historical conclusions as *leads* — they may be stale (the code may
+    have changed since), so verify with read_file before relying on them. Empty
+    when the flywheel is off or nothing matches.
+    """
+    if not query:
+        raise ToolError("query is required")
+    try:
+        import knowledge
+
+        hits = knowledge.recall(query)
+    except Exception:
+        hits = []
+    if not hits:
+        return "no related knowledge found"
+    out = []
+    for h in hits:
+        tag = " [⚠️已过时，需重新核实]" if h["stale"] else ""
+        refs = (" 涉及: " + ", ".join(h["refs"])) if h["refs"] else ""
+        out.append(f"Q: {h['question']}{tag}{refs}\nA: {h['answer'][:500]}")
+    return "\n\n".join(out)
+
+
 # --- Filesystem traversal helper ------------------------------------------
 
 _SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", ".idea"}
@@ -385,6 +410,31 @@ TOOL_SCHEMAS = [
     },
 ]
 
+# recall_knowledge is advertised only when the flywheel is enabled (方案 3), so
+# the model doesn't see a tool that always returns "nothing".
+_RECALL_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "recall_knowledge",
+        "description": "检索历史问答沉淀的相关结论作为线索（可能已过时，需用 read_file 二次核实）。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "要检索的问题/关键词"}
+            },
+            "required": ["query"],
+        },
+    },
+}
+
+
+def active_schemas() -> list[dict]:
+    """Tool schemas to advertise, adjusted for runtime config (方案 3)."""
+    if config.USE_KNOWLEDGE:
+        return TOOL_SCHEMAS + [_RECALL_SCHEMA]
+    return TOOL_SCHEMAS
+
+
 # Maps tool name -> implementation. The agent loop calls through this registry.
 TOOL_REGISTRY = {
     "grep_code": grep_code,
@@ -393,6 +443,7 @@ TOOL_REGISTRY = {
     "find_symbol": find_symbol,
     "resolve_frame": resolve_frame,
     "find_log_source": find_log_source,
+    "recall_knowledge": recall_knowledge,
 }
 
 
