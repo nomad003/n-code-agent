@@ -146,6 +146,50 @@ def test_stuck_disabled(stub_llm, tmp_path, monkeypatch):
 # --- iteration cap ---------------------------------------------------------
 
 
+def _obs_history(n):
+    """n Action/Observation pairs with distinct, sizeable observation content."""
+    hist = []
+    for i in range(n):
+        am = {"role": "assistant", "tool_calls": [{"id": f"c{i}"}]}
+        hist.append(Action(f"c{i}", "grep_code", f'{{"pattern":"p{i}"}}', assistant_message=am))
+        hist.append(Observation(f"c{i}", "grep_code", f"完整输出-{i}\n" + "x" * 500))
+    return hist
+
+
+def test_masking_keeps_only_recent(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "TARGET_CODE_PATH", str(tmp_path))
+    monkeypatch.setattr(config, "OBS_KEEP_FULL", 2)
+    a = agent.CodeAgent()
+    a.question = "Q"
+    a.history = _obs_history(5)  # 5 observations, keep last 2 full
+    tool_msgs = [m for m in a._build_messages(with_tools=True) if m.get("role") == "tool"]
+    assert len(tool_msgs) == 5
+    # first 3 masked, last 2 full
+    assert all(m["content"].startswith("[省略") for m in tool_msgs[:3])
+    assert tool_msgs[3]["content"].startswith("完整输出-3")
+    assert tool_msgs[4]["content"].startswith("完整输出-4")
+
+
+def test_masking_disabled_keeps_all(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "TARGET_CODE_PATH", str(tmp_path))
+    monkeypatch.setattr(config, "OBS_KEEP_FULL", 0)
+    a = agent.CodeAgent()
+    a.question = "Q"
+    a.history = _obs_history(4)
+    tool_msgs = [m for m in a._build_messages(with_tools=True) if m.get("role") == "tool"]
+    assert all(not m["content"].startswith("[省略") for m in tool_msgs)
+
+
+def test_masking_under_threshold_no_mask(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "TARGET_CODE_PATH", str(tmp_path))
+    monkeypatch.setattr(config, "OBS_KEEP_FULL", 6)
+    a = agent.CodeAgent()
+    a.question = "Q"
+    a.history = _obs_history(3)  # fewer than keep -> nothing masked
+    tool_msgs = [m for m in a._build_messages(with_tools=True) if m.get("role") == "tool"]
+    assert all(not m["content"].startswith("[省略") for m in tool_msgs)
+
+
 def test_iteration_cap_triggers_final_answer(stub_llm, tmp_path, monkeypatch):
     monkeypatch.setattr(config, "MAX_ITERATIONS", 2)
     monkeypatch.setattr(config, "STUCK_REPEAT_THRESHOLD", 0)  # don't short-circuit

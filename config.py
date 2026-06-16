@@ -61,6 +61,11 @@ LLM_NUM_RETRIES = int(os.environ.get("LLM_NUM_RETRIES", "3"))
 # times in a row (e.g. grepping the same pattern, or repeated errors). 0 = off.
 STUCK_REPEAT_THRESHOLD = int(os.environ.get("STUCK_REPEAT_THRESHOLD", "3"))
 
+# Observation masking: keep only the most recent N tool outputs in full when
+# rebuilding messages; older ones are replaced with a one-line summary to keep
+# the context from growing unbounded over a long session. 0 = keep everything.
+OBS_KEEP_FULL = int(os.environ.get("OBS_KEEP_FULL", "6"))
+
 # --- Tool output limits (keep tool results from blowing the context) -------
 MAX_READ_BYTES = int(os.environ.get("MAX_READ_BYTES", "20000"))
 MAX_GREP_MATCHES = int(os.environ.get("MAX_GREP_MATCHES", "100"))

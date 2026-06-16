@@ -54,7 +54,10 @@ litellm 的 tool-calling 循环（最多 `MAX_ITERATIONS` 轮）。设计借鉴 
    （防只读 agent 反复 grep 同一 pattern / 反复撞同一错误烧 token）。
 5. **LLM 重试**：`litellm.completion(num_retries=LLM_NUM_RETRIES)` 对限流/超时/服务端错误做
    指数退避。
-6. **收尾**：超过 `MAX_ITERATIONS` 或检测到 stuck → 不带工具再调一次，要求基于现有信息作答。
+6. **观测遮蔽**：重建消息时只保留最近 `OBS_KEEP_FULL`（默认 6）次工具输出的完整内容，
+   更早的用一行摘要（工具名 + 大小 + 首行）替代——确定性、不烧 LLM，防长会话 context 膨胀
+   （对应 OpenHands 的 `ObservationMaskingCondenser`）。模型仍知道调用发生过，必要时可重跑。
+7. **收尾**：超过 `MAX_ITERATIONS` 或检测到 stuck → 不带工具再调一次，要求基于现有信息作答。
 
 **代理路由要点**：litellm 按模型名前缀选客户端。直接用 `vertex_ai/...` 会触发它的原生 Google Cloud 认证（失败且不走代理）。所以 `_routed_model()` 给模型名加 `openai/` 前缀，强制走 OpenAI 兼容路径；代理收到的仍是真实模型名。
 

@@ -96,6 +96,13 @@ class CodeAgent:
             {"role": "system", "content": config.SYSTEM_PROMPT},
             {"role": "user", "content": self.question},
         ]
+        # Observation masking: keep the last OBS_KEEP_FULL tool outputs verbatim;
+        # replace older ones with a one-line summary so a long session's context
+        # stays bounded. Deterministic, no extra LLM call. 0 = keep everything.
+        keep = config.OBS_KEEP_FULL
+        observations = [e for e in self.history if isinstance(e, Observation)]
+        mask_before = len(observations) - keep if keep > 0 else 0
+        obs_index = 0
         seen_assistant_ids: set[int] = set()
         for event in self.history:
             if isinstance(event, Action):
@@ -105,12 +112,16 @@ class CodeAgent:
                     messages.append(event.assistant_message)
                     seen_assistant_ids.add(msg_id)
             elif isinstance(event, Observation):
+                content = event.content
+                if obs_index < mask_before:
+                    content = self._mask(event)
+                obs_index += 1
                 messages.append(
                     {
                         "role": "tool",
                         "tool_call_id": event.tool_call_id,
                         "name": event.name,
-                        "content": event.content,
+                        "content": content,
                     }
                 )
         if not with_tools:
@@ -122,6 +133,16 @@ class CodeAgent:
                 }
             )
         return messages
+
+    @staticmethod
+    def _mask(obs: Observation) -> str:
+        """One-line stand-in for an older observation (call + size, not content).
+
+        The model still sees that the call happened and roughly how big the
+        result was, so it can re-run the tool if it needs the detail again.
+        """
+        first = obs.content.splitlines()[0] if obs.content else ""
+        return f"[省略较早的 {obs.name} 输出，约 {len(obs.content)} 字；首行: {first[:80]}]"
 
     # --- tool execution ----------------------------------------------------
 
