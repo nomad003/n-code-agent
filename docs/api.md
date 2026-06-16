@@ -76,7 +76,7 @@ curl -X POST http://localhost:8900/ask \
 }
 ```
 
-`plain=true` 时额外返回一句面向非技术同学的白话摘要（多一次 LLM 调用）。coredump-monitor 的 `code-agent` provider 就用它同时拿技术分析 + 白话。
+`backtrace` 和 `log` 可单独或组合提供，但不能同时为空。`plain=true` 时额外返回一句面向非技术同学的白话摘要（多一次 LLM 调用）。coredump-monitor 的 `code-agent` provider 就用它同时拿技术分析 + 白话。
 
 **响应**
 
@@ -96,7 +96,7 @@ curl -X POST http://localhost:8900/diagnose \
   -d '{"backtrace": "#0 0x55ab in SceneMgr::Update (this=0x0) at scene/scenemgr.cpp:142\n#1 0x55cd in Process::Update () at process.cpp:211"}'
 ```
 
-逐帧用符号索引（方案 2）映射到 `file:line`；带类名的帧（`SceneMgr::Update`）自动收窄同名候选。`log` 字段（可选）会被反查到打印它的代码位置（剥时间戳 + 变量归一化 → FTS）。`backtrace` 与 `log` 可单独或组合提供。空 backtrace 返回 400。
+逐帧用符号索引（方案 2）映射到 `file:line`；带类名的帧（`SceneMgr::Update`）自动收窄同名候选。`log` 字段会被反查到打印它的代码位置（剥时间戳 + 变量归一化 → FTS）。`backtrace` 与 `log` 可单独或组合提供；两者同时为空返回 400。
 
 ### 并发治理
 

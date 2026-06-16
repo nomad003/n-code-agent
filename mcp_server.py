@@ -95,20 +95,26 @@ def ask_codebase(question: str) -> str:
 
 @mcp.tool()
 def diagnose_crash(backtrace: str, log_snippet: str = "") -> str:
-    """分析崩溃栈（coredump backtrace），结合代码库定位根因。
+    """分析崩溃栈或日志片段，结合代码库定位根因。
 
-    逐帧把函数映射到代码定义（复用符号索引，自动收窄同名候选），再用 agent
-    读取相关代码、分析最可能的崩溃原因与排查方向。
+    有 backtrace 时逐帧把函数映射到代码定义（复用符号索引，自动收窄同名候选）；
+    有日志片段时反查打印点。随后用 agent 读取相关代码、分析最可能的根因与排查方向。
 
     Args:
-        backtrace: gdb 风格的崩溃栈文本（如 `gdb bt` 输出）。
-        log_snippet: 可选的相关日志片段，作为额外上下文。
+        backtrace: 可选，gdb 风格的崩溃栈文本（如 `gdb bt` 输出）。
+        log_snippet: 可选，相关日志片段。可单独提供，用于纯日志诊断。
     """
-    if not (backtrace or "").strip():
-        return "backtrace 不能为空。"
+    backtrace = backtrace or ""
+    log_snippet = log_snippet or ""
+    if not backtrace.strip() and not log_snippet.strip():
+        return "backtrace 和 log_snippet 不能同时为空。"
     import diagnose as diag
 
-    log.info("diagnose_crash | 收到 backtrace (%d 字)", len(backtrace))
+    log.info(
+        "diagnose_crash | 收到 backtrace (%d 字), log_snippet (%d 字)",
+        len(backtrace),
+        len(log_snippet),
+    )
     start = time.monotonic()
     try:
         result = diag.diagnose(backtrace, extra_log=log_snippet)

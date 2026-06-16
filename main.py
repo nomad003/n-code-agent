@@ -156,8 +156,8 @@ async def ask(req: AskRequest) -> AskResponse:
 @app.post("/diagnose", response_model=DiagnoseResponse)
 async def diagnose_endpoint(req: DiagnoseRequest) -> DiagnoseResponse:
     """Analyze a coredump backtrace (+ optional log) against the codebase."""
-    if not req.backtrace.strip():
-        raise HTTPException(status_code=400, detail="backtrace 不能为空")
+    if not req.backtrace.strip() and not req.log.strip():
+        raise HTTPException(status_code=400, detail="backtrace 和 log 不能同时为空")
     import diagnose as diag
 
     try:

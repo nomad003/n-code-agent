@@ -5,7 +5,7 @@
 - 传输：**streamable-http**（当前 MCP 的 HTTP 传输）。
 - 暴露工具：
   - **`ask_codebase(question: str) -> str`** —— 高层问答，内部跑完整 agent 循环（grep/read/list/find_symbol + LLM），返回自然语言答案。
-  - **`diagnose_crash(backtrace: str, log_snippet: str = "") -> str`** —— 分析崩溃栈/日志，逐帧映射代码 + 日志反查打印点定位根因（方向 F）。
+  - **`diagnose_crash(backtrace: str = "", log_snippet: str = "") -> str`** —— 分析崩溃栈或日志；可只传日志，逐帧映射代码 + 日志反查打印点定位根因（方向 F）。
 - 实现：`mcp_server.py`，是 `agent.answer()` 的薄封装，沿用同一套 `AGENT_BACKEND`、沙箱工具、目标代码库。
 
 ## 启动
@@ -45,7 +45,7 @@ async def main():
     async with streamablehttp_client("http://localhost:8901/mcp") as (r, w, _):
         async with ClientSession(r, w) as s:
             await s.initialize()
-            print([t.name for t in (await s.list_tools()).tools])   # ['ask_codebase']
+            print([t.name for t in (await s.list_tools()).tools])   # ['ask_codebase', 'diagnose_crash']
             res = await s.call_tool("ask_codebase", {"question": "SceneMgr 有哪些方法？"})
             print("".join(c.text for c in res.content if hasattr(c, "text")))
 

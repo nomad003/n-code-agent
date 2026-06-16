@@ -25,11 +25,47 @@ def test_ask_codebase_empty_question(monkeypatch):
     assert called["n"] == 0  # never reaches the agent
 
 
+def test_diagnose_crash_accepts_log_without_backtrace(monkeypatch):
+    import diagnose
+
+    captured = {}
+
+    def fake_diagnose(backtrace, *, extra_log="", verbose=False, with_plain=False):
+        captured["backtrace"] = backtrace
+        captured["extra_log"] = extra_log
+        return {
+            "answer": "日志诊断结论",
+            "frames": [],
+            "resolved": 0,
+            "total_frames": 0,
+        }
+
+    monkeypatch.setattr(diagnose, "diagnose", fake_diagnose)
+    assert mcp_server.diagnose_crash("", "ERROR player not found") == "日志诊断结论"
+    assert captured == {"backtrace": "", "extra_log": "ERROR player not found"}
+
+
+def test_diagnose_crash_rejects_empty_input(monkeypatch):
+    import diagnose
+
+    called = {"n": 0}
+
+    def fake_diagnose(*args, **kwargs):
+        called["n"] += 1
+        return {"answer": "x", "frames": [], "resolved": 0, "total_frames": 0}
+
+    monkeypatch.setattr(diagnose, "diagnose", fake_diagnose)
+    assert mcp_server.diagnose_crash(" ", " ") == "backtrace 和 log_snippet 不能同时为空。"
+    assert called["n"] == 0
+
+
 @pytest.mark.anyio
 async def test_tool_is_registered():
     tools = await mcp_server.mcp.list_tools()
     names = [t.name for t in tools]
     assert "ask_codebase" in names
+    assert "diagnose_crash" in names
+    assert set(names) == {"ask_codebase", "diagnose_crash"}
 
 
 @pytest.fixture
