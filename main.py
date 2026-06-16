@@ -66,7 +66,8 @@ class AskResponse(BaseModel):
 
 class DiagnoseRequest(BaseModel):
     backtrace: str
-    log: str = ""  # optional related log snippet
+    log: str = ""           # optional related log snippet
+    plain: bool = False     # also return a one-sentence non-technical summary
 
 
 class DiagnoseResponse(BaseModel):
@@ -74,6 +75,7 @@ class DiagnoseResponse(BaseModel):
     frames: list[str]      # parsed frame summaries
     resolved: int          # frames mapped to code via the index
     total_frames: int
+    plain: str = ""        # non-technical summary (only when requested)
 
 
 @app.get("/health")
@@ -114,7 +116,7 @@ async def diagnose_endpoint(req: DiagnoseRequest) -> DiagnoseResponse:
 
     try:
         result = await _run_governed(
-            lambda: diag.diagnose(req.backtrace, extra_log=req.log)
+            lambda: diag.diagnose(req.backtrace, extra_log=req.log, with_plain=req.plain)
         )
     except HTTPException:
         raise

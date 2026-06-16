@@ -228,11 +228,24 @@ _DIAGNOSIS_PROMPT = """\
 {raw}
 """
 
+# One-sentence plain-language summary for non-technical readers (QA/策划).
+_PLAIN_PROMPT = """\
+请基于以上技术分析，用一句话（35~70字）的白话讲清楚「主要原因」和「业务影响」，
+面向非技术同学。禁止出现代码、函数名、堆栈、内存地址、英文缩写等技术黑话；
+按证据判断真实主因，证据不足就只说到“数据异常”这一级，不要编造细节。
+只输出这一句话，不要分点、不要建议、不要解释过程。
 
-def diagnose(backtrace: str, *, extra_log: str = "", verbose: bool = False) -> dict:
+技术分析：
+{technical}"""
+
+
+def diagnose(
+    backtrace: str, *, extra_log: str = "", verbose: bool = False, with_plain: bool = False
+) -> dict:
     """Parse + resolve a backtrace, then let the agent analyze it.
 
-    Returns {"answer", "frames": [...summary...], "resolved": int}.
+    Returns {"answer", "frames", "resolved", "total_frames"}; when ``with_plain``
+    is set, also a "plain" one-sentence non-technical summary (one extra LLM call).
     """
     import agent
 
@@ -257,9 +270,19 @@ def diagnose(backtrace: str, *, extra_log: str = "", verbose: bool = False) -> d
             prompt += "\n\n日志打印位置（已反查）：\n" + "\n".join(log_sources)
 
     answer = agent.answer(prompt, verbose=verbose)
-    return {
+    result = {
         "answer": answer,
         "frames": [f.short() for f in frames],
         "resolved": resolved,
         "total_frames": len(frames),
     }
+    if with_plain:
+        # Plain summary is a pure rewrite of the technical answer — no tools, no
+        # code search needed, so call the LLM directly (cheap, one round).
+        try:
+            result["plain"] = agent.answer(
+                _PLAIN_PROMPT.format(technical=answer), verbose=verbose
+            ).strip()
+        except Exception:
+            result["plain"] = ""
+    return result

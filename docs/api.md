@@ -71,9 +71,12 @@ curl -X POST http://localhost:8900/ask \
 ```json
 {
   "backtrace": "#0 0x... in SceneMgr::Update (this=0x0) at scene/scenemgr.cpp:142\n#1 ...",
-  "log": "可选：相关日志片段"
+  "log": "可选：相关日志片段",
+  "plain": false
 }
 ```
+
+`plain=true` 时额外返回一句面向非技术同学的白话摘要（多一次 LLM 调用）。coredump-monitor 的 `code-agent` provider 就用它同时拿技术分析 + 白话。
 
 **响应**
 
@@ -83,6 +86,7 @@ curl -X POST http://localhost:8900/ask \
 | `frames` | 解析出的栈帧摘要列表 |
 | `resolved` | 成功映射到代码的帧数 |
 | `total_frames` | 解析出的总帧数 |
+| `plain` | 白话摘要（仅 `plain=true` 时非空） |
 
 **示例**
 

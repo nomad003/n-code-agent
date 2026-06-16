@@ -175,3 +175,30 @@ def test_diagnose_no_frames_still_answers(indexed, monkeypatch):
     assert result["total_frames"] == 0
     # prompt should note that no frames were parsed
     assert "未能解析" in captured["prompt"]
+
+
+def test_diagnose_with_plain_summary(indexed, monkeypatch):
+    import agent
+
+    calls = []
+
+    def fake_answer(prompt, *, verbose=False):
+        calls.append(prompt)
+        # 1st call: technical analysis; 2nd: plain summary rewrite
+        return "技术：空指针" if len(calls) == 1 else "服务器崩了，玩家掉线"
+
+    monkeypatch.setattr(agent, "answer", fake_answer)
+    result = diagnose.diagnose("#0 main() at m.cpp:1", with_plain=True)
+    assert result["answer"] == "技术：空指针"
+    assert result["plain"] == "服务器崩了，玩家掉线"
+    assert len(calls) == 2  # technical + plain
+    # the plain prompt is fed the technical answer
+    assert "技术：空指针" in calls[1]
+
+
+def test_diagnose_without_plain_has_no_plain_key(indexed, monkeypatch):
+    import agent
+
+    monkeypatch.setattr(agent, "answer", lambda p, *, verbose=False: "技术分析")
+    result = diagnose.diagnose("#0 main() at m.cpp:1")
+    assert "plain" not in result  # default: no extra LLM call
