@@ -91,3 +91,29 @@ def test_failure_is_not_cached(monkeypatch):
     r = c.post("/ask", json={"question": "Q"})
     assert r.status_code == 200
     assert r.json() == {"answer": "ok now", "cached": False}
+
+
+def test_cache_is_lru_bounded(monkeypatch):
+    import config
+
+    main._CACHE.clear()
+    monkeypatch.setattr(config, "CACHE_MAX_ENTRIES", 3)
+    monkeypatch.setattr(agent, "answer", lambda q, *, verbose=False: f"a:{q}")
+    c = TestClient(main.app)
+    for i in range(5):
+        c.post("/ask", json={"question": f"q{i}"})
+    # never exceeds the cap
+    assert len(main._CACHE) == 3
+    # oldest (q0, q1) evicted; newest kept
+    assert "q0" not in main._CACHE and "q4" in main._CACHE
+
+
+def test_cache_disabled_when_max_zero(monkeypatch):
+    import config
+
+    main._CACHE.clear()
+    monkeypatch.setattr(config, "CACHE_MAX_ENTRIES", 0)
+    monkeypatch.setattr(agent, "answer", lambda q, *, verbose=False: "x")
+    c = TestClient(main.app)
+    c.post("/ask", json={"question": "q"})
+    assert len(main._CACHE) == 0  # nothing cached

@@ -21,6 +21,7 @@
 - `/ask` 失败返回干净 502（非 500 栈），失败不入缓存。
 - MCP 调用日志 → `logs/mcp.log`（轮转）；`serve.sh`/`mcp.sh` 支持 `start/stop/restart/status`。
 - 全量环境变量配置（`.env` / `.env.example`）、离线单元测试套件（见 [testing.md](testing.md)）。
+- **测试前 code-review 修复**（7 项）：知识库 CJK 召回（trigram 分词 + shingle，原 unicode61 对中文整体成一 token 几乎不召回）；并发闸门改有界线程池（原信号量在 504 超时后误放槽、并发上限被架空）；`grep_code` 多词改 AND 预过滤 + 逐行确认（原整串短语匹配漏匹配）；`shortcut` 锚定行尾（原复合问句被误短路）；`/ask` 缓存改有界 LRU（原无界增长）；backtrace `operator()`/析构/模板符号名解析；日志短文本片段回退（原 <8 字静默空）。
 
 ## 二、明确舍弃（对只读问答属过度设计）
 

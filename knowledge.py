@@ -43,8 +43,12 @@ def _init_schema(conn: sqlite3.Connection) -> None:
             refs TEXT NOT NULL DEFAULT '[]',   -- JSON: [{path, hash}]
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
+        -- trigram tokenizer: substring matching that works for CJK (the default
+        -- unicode61 tokenizer treats a whole space-less Chinese run as one token,
+        -- so keyword/synonym recall on Chinese questions never fires).
         CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_fts
-            USING fts5(question, answer, content='knowledge', content_rowid='id');
+            USING fts5(question, answer, content='knowledge', content_rowid='id',
+                       tokenize='trigram');
         -- keep the FTS index in sync with the base table
         CREATE TRIGGER IF NOT EXISTS knowledge_ai AFTER INSERT ON knowledge BEGIN
             INSERT INTO knowledge_fts(rowid, question, answer)
@@ -114,25 +118,44 @@ for _grp in _SYNONYMS:
         _SYNONYM_INDEX[_w] = _grp
 
 
-def _fts_or_query(query: str) -> str:
-    """Build an FTS5 OR-of-terms query from free text, with synonym expansion.
+def _shingles(run: str, n: int = 3) -> list[str]:
+    """Sliding-window n-grams of a CJK run, matching the trigram tokenizer.
 
-    Recall should fire when the new question shares *keywords or synonyms* with
-    a stored one, not only on an exact phrase. We tokenize (Latin words + CJK
-    runs), expand each token through small synonym groups, quote each term (so
-    punctuation/operators can't break FTS5 syntax), and OR them together.
+    The trigram FTS tokenizer indexes 3-char windows, so a CJK query term must
+    also be broken into 3-char windows to match a substring of a stored answer.
+    Runs shorter than n are returned as-is (best effort; may not match).
+    """
+    if len(run) < n:
+        return [run]
+    return [run[i : i + n] for i in range(len(run) - n + 1)]
+
+
+def _fts_or_query(query: str) -> str:
+    """Build an FTS5 (trigram) OR-of-terms query from free text.
+
+    Recall should fire when the new question shares keywords/substrings with a
+    stored one. We tokenize into Latin words and CJK runs; Latin words are used
+    whole, CJK runs are broken into trigram shingles (so '场景管理器的作用' matches a
+    stored '...场景管理...'); synonym groups are also shingled in. Every term is
+    quoted so punctuation/operators can't break FTS5 syntax.
     """
     tokens = re.findall(r"[A-Za-z_][A-Za-z0-9_]+|[一-鿿]+", query)
-    tokens = [t for t in tokens if len(t) >= 2]  # single CJK chars too noisy
-    if not tokens:
-        return ""
-    expanded: list[str] = []
+    terms: list[str] = []
     for t in tokens:
-        expanded.append(t)
-        expanded.extend(_SYNONYM_INDEX.get(t, ()))
-        expanded.extend(_SYNONYM_INDEX.get(t.lower(), ()))
-    # FTS5 ranks by relevance (rank) already; more matching terms => better rank.
-    return " OR ".join(f'"{t}"' for t in dict.fromkeys(expanded))
+        if re.match(r"[A-Za-z_]", t):
+            if len(t) >= 2:  # single Latin chars too noisy
+                terms.append(t)
+            # whole-word synonyms (e.g. class/function) still apply
+            for syn in _SYNONYM_INDEX.get(t.lower(), ()):
+                terms.extend(_shingles(syn) if re.search(r"[一-鿿]", syn) else [syn])
+        else:  # CJK run → trigram shingles, plus synonyms of exact-word matches
+            terms.extend(_shingles(t))
+            for syn in _SYNONYM_INDEX.get(t, ()):
+                terms.extend(_shingles(syn) if re.search(r"[一-鿿]", syn) else [syn])
+    terms = [t for t in dict.fromkeys(terms) if t.strip()]
+    if not terms:
+        return ""
+    return " OR ".join(f'"{t}"' for t in terms)
 
 
 def _stale_refs(refs: list[dict]) -> list[str]:

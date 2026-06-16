@@ -109,6 +109,9 @@ MAX_CONCURRENCY = int(os.environ.get("MAX_CONCURRENCY", "4"))
 MAX_QUEUE = int(os.environ.get("MAX_QUEUE", "8"))
 REQUEST_TIMEOUT = float(os.environ.get("REQUEST_TIMEOUT", "180"))
 
+# Bound the in-memory /ask answer cache (LRU). 0 disables caching entirely.
+CACHE_MAX_ENTRIES = int(os.environ.get("CACHE_MAX_ENTRIES", "512"))
+
 def require_api_key() -> str:
     """Return LLM_API_KEY or raise a clear error if it isn't configured.
 

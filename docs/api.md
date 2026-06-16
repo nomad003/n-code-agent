@@ -55,11 +55,11 @@ curl -X POST http://localhost:8900/ask \
 
 ### 缓存说明
 
-缓存是 `main.py` 里的进程内字典（问题 → 答案）：
+缓存是 `main.py` 里的**有界 LRU**（问题 → 答案，上限 `CACHE_MAX_ENTRIES`，超出淘汰最久未用）：
 
-- `use_cache=true` 且问题问过 → 直接返回缓存，`cached:true`，**不调 LLM**（省时省 token）。
-- 重启服务即清空。
-- 缓存层位于 agent 之上，将来（方案 2）可替换为离线索引而不动 agent。
+- `use_cache=true` 且问题问过 → 直接返回缓存，`cached:true`，**不调 LLM**（省时省 token），且不占并发槽。
+- 命中即提到最新位置（LRU）；超过上限淘汰最旧；`CACHE_MAX_ENTRIES=0` 禁用缓存。
+- 重启服务即清空；失败的请求不入缓存。
 - 空问题返回 `{"answer":"问题不能为空。","cached":false}`。
 
 ### `POST /diagnose`
@@ -109,7 +109,7 @@ curl -X POST http://localhost:8900/diagnose \
 | 服务繁忙（并发 + 排队已满，`MAX_CONCURRENCY`/`MAX_QUEUE`） | 503 |
 | 单请求超时（`REQUEST_TIMEOUT`，默认 180s） | 504 |
 
-缓存命中不占并发槽，直接返回。阈值见 [configuration.md](configuration.md)。
+闸门是一个有界线程池（`MAX_CONCURRENCY` 个 worker）：504 超时无法杀死线程，但该线程仍占用 worker，所以真实并发不会被架空（槽位在线程真正结束时才释放）。缓存命中不占并发槽，直接返回。阈值见 [configuration.md](configuration.md)。
 
 ## 命令行（`cli.py`）
 

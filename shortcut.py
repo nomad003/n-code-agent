@@ -18,10 +18,15 @@ import config
 # Question patterns that ask only "where is <symbol> defined / which file".
 # Each must capture the symbol name in group 1. Kept tight to avoid hijacking
 # questions that actually need explanation ("X 是做什么的" must NOT match).
+# All patterns are anchored to end-of-string (allowing only trailing
+# filler/punctuation like 文件/里/呢/?) so compound questions such as
+# "where is X defined and how does it work" do NOT short-circuit — those need
+# the full agent. Trailing tail allowed: 个/一个/文件/里/中/呢/吗/。/?/？/空白.
+_TAIL = r"(?:个|一个|文件|里|中|呢|吗)*\s*[?？。.]*\s*$"
 _PATTERNS = [
-    re.compile(r"^\s*([A-Za-z_]\w*)\s*(?:类|结构体|函数|方法)?\s*(?:的)?\s*定义\s*在\s*哪", re.I),
-    re.compile(r"^\s*([A-Za-z_]\w*)\s*(?:类|结构体|函数|方法)?\s*在\s*哪(?:个|一个)?\s*文件", re.I),
-    re.compile(r"^\s*(?:where\s+is\s+)([A-Za-z_]\w*)\s+(?:defined|declared)\b", re.I),
+    re.compile(r"^\s*([A-Za-z_]\w*)\s*(?:类|结构体|函数|方法)?\s*(?:的)?\s*定义\s*在\s*哪" + _TAIL, re.I),
+    re.compile(r"^\s*([A-Za-z_]\w*)\s*(?:类|结构体|函数|方法)?\s*在\s*哪(?:个|一个)?\s*文件" + _TAIL, re.I),
+    re.compile(r"^\s*(?:where\s+is\s+)([A-Za-z_]\w*)\s+(?:defined|declared)\s*[?？.]*\s*$", re.I),
     re.compile(r"^\s*(?:find|locate)\s+(?:the\s+)?(?:definition\s+of\s+)?([A-Za-z_]\w*)\s*$", re.I),
     re.compile(r"^\s*([A-Za-z_]\w*)\s*(?:的)?\s*(?:定义|声明)\s*(?:位置|在哪里)?\s*[?？]?\s*$", re.I),
 ]

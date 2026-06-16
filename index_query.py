@@ -58,12 +58,20 @@ def search_fts(query: str, *, limit: int = 100) -> list[dict] | None:
     conn = _connect()
     if conn is None:
         return None
+    fts_query = _fts_prefilter(query)
+    if fts_query is None:
+        # No usable tokens (e.g. punctuation-only) → can't prefilter via FTS;
+        # signal "no index path" so the caller falls back to a live scan.
+        conn.close()
+        return None
     try:
-        # FTS5 MATCH wants a query string; quote it as a phrase to treat the
-        # user's text literally (avoids FTS operator surprises).
-        fts_query = '"' + query.replace('"', '""') + '"'
+        # FTS is only a FILE prefilter (AND of the query's tokens): any line
+        # literally containing the query implies its file contains all tokens.
+        # The authoritative grep match is the per-line substring scan below, so
+        # tokens needn't be adjacent (fixes multi-word queries that an adjacent-
+        # phrase MATCH would miss).
         file_rows = conn.execute(
-            "SELECT path, content FROM files_fts WHERE files_fts MATCH ? LIMIT 500",
+            "SELECT path, content FROM files_fts WHERE files_fts MATCH ? LIMIT 1000",
             (fts_query,),
         ).fetchall()
     except sqlite3.Error:
@@ -80,6 +88,22 @@ def search_fts(query: str, *, limit: int = 100) -> list[dict] | None:
                 if len(out) >= limit:
                     return out
     return out
+
+
+def _fts_prefilter(query: str) -> str | None:
+    """AND-of-tokens FTS query for ``query``; None if it has no usable tokens.
+
+    Tokenizes like unicode61 (alphanumeric runs) so it matches how files_fts
+    indexed the content. ANDing tokens keeps the prefilter a correct superset of
+    the literal-substring matches the per-line scan then confirms.
+    """
+    import re
+
+    tokens = re.findall(r"\w+", query, re.UNICODE)
+    tokens = [t for t in tokens if t]
+    if not tokens:
+        return None
+    return " AND ".join(f'"{t}"' for t in dict.fromkeys(tokens))
 
 
 def meta_root() -> str | None:

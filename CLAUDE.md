@@ -124,7 +124,7 @@ LLM access goes through **litellm** to the mushigen proxy — do not call the mo
 `POST /diagnose` — body `{"backtrace": str, "log": str}` → `{"answer", "frames", "resolved", "total_frames"}` (方向 F).
 `GET /health` → `{"status": "ok"}`.
 
-`/ask` and `/diagnose` are async and run the blocking agent loop through a concurrency gate (`main._run_governed`): `MAX_CONCURRENCY` slots + `MAX_QUEUE` queue (overflow → 503) + `REQUEST_TIMEOUT` (→ 504). Cache hits bypass the gate.
+`/ask` and `/diagnose` are async and run the blocking agent loop through a concurrency gate (`main._run_governed`): a bounded `ThreadPoolExecutor` (`MAX_CONCURRENCY` workers) is the real gate — a 504-timed-out request can't kill its thread, but the thread keeps occupying a worker so the cap holds (slot freed only when the thread actually finishes, decrement marshalled to the loop). `_inflight` (running+queued) admits up to `MAX_CONCURRENCY + MAX_QUEUE`, else 503. The `/ask` answer cache is a bounded LRU (`CACHE_MAX_ENTRIES`); cache hits bypass the gate.
 
 `use_cache`/`cached` imply a caching layer for repeated questions — implement this in or behind `main.py`.
 

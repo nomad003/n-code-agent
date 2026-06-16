@@ -32,9 +32,10 @@ cp .env.example .env     # 填入 LLM_API_KEY，按需改 TARGET_CODE_PATH / AGE
 | `USE_KNOWLEDGE` | `0` | 是否启用知识沉淀飞轮（沉淀+召回），默认关 |
 | `SERVICE_HOST` | `0.0.0.0` | HTTP 监听地址 |
 | `SERVICE_PORT` | `8900` | HTTP 端口 |
-| `MAX_CONCURRENCY` | `4` | `/ask`+`/diagnose` 最大并发数 |
+| `MAX_CONCURRENCY` | `4` | `/ask`+`/diagnose` 最大并发数（线程池 worker 数） |
 | `MAX_QUEUE` | `8` | 超出并发时最多排队数，再多返回 503 |
 | `REQUEST_TIMEOUT` | `180` | 单请求超时秒数，超时返回 504 |
+| `CACHE_MAX_ENTRIES` | `512` | `/ask` 答案缓存上限（LRU 淘汰），0=禁用缓存 |
 
 > `SYSTEM_PROMPT` 只在 `config.py` 里改（无对应环境变量）。
 

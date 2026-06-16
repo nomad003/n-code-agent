@@ -65,17 +65,33 @@ def _demangle(name: str) -> str:
 def _base_function(func: str) -> str:
     """Reduce a frame's function text to a bare symbol name for index lookup.
 
-    'SceneMgr::Update(int, float)' -> 'Update'
-    'game::Foo<T>::bar() const'    -> 'bar'
+    'SceneMgr::Update(int, float)'  -> 'Update'
+    'game::Foo<T>::bar() const'     -> 'bar'
+    'Foo::~Foo()'                   -> '~Foo'
+    'Buf::operator[](int)'          -> 'operator[]'
+    'Fn::operator()(int)'           -> 'operator()'
     """
     func = func.strip()
-    # Drop argument list and everything after the first '('.
+    # Strip template params first so their '<...>' / '(...)' can't confuse us.
+    func = re.sub(r"<[^<>]*>", "", func)
+
+    # operator overloads contain their own parens/brackets — handle before any
+    # paren-stripping. Match the specific operator token forms so the arg-list
+    # '(' that follows isn't swallowed (e.g. 'operator()(int)' -> 'operator()').
+    m = re.search(
+        r"\boperator\s*(\(\)|\[\]|new\b|delete\b|<<=?|>>=?|->\*?|&&|\|\||"
+        r"[-+*/%^&|~!=<>]=?|,)",
+        func,
+    )
+    if m:
+        return "operator" + m.group(1).strip()
+
+    # Drop the argument list (everything from the first '(').
     paren = func.find("(")
     if paren != -1:
         func = func[:paren]
-    # Drop template params at the tail of each segment.
-    func = re.sub(r"<[^<>]*>", "", func)
-    # Take the last :: segment (the method/function name itself).
+    # Take the last :: segment (the method/function name itself); preserves a
+    # leading '~' for destructors.
     if "::" in func:
         func = func.split("::")[-1]
     return func.strip()
@@ -170,7 +186,9 @@ _LOG_PREFIX_RE = re.compile(
     r"^\s*(?:\[[^\]]*\]\s*)+|^\s*\d{4}[-/]\d\d[-/]\d\d[ T]\d\d:\d\d:\d\d\S*\s*"
 )
 # Runtime values that replace printf-style placeholders: ints, hex, floats.
-_VALUE_RE = re.compile(r"0x[0-9a-fA-F]+|[-+]?\d+\.\d+|[-+]?\d+")
+# Anchored so a number is only split out when it's a standalone token (not the
+# digits inside an identifier like 'abc123def', which is part of fixed text).
+_VALUE_RE = re.compile(r"(?<![\w])(?:0x[0-9a-fA-F]+|[-+]?\d+\.\d+|[-+]?\d+)(?![\w])")
 
 
 def _literal_runs(message: str, *, min_len: int = 8) -> list[str]:
@@ -180,12 +198,18 @@ def _literal_runs(message: str, *, min_len: int = 8) -> list[str]:
     The text *between* placeholders appears verbatim in the source, so we strip
     the timestamp prefix, split on runtime values, and keep the long literal
     runs — these are reliable FTS queries against the format string.
+
+    Falls back to a shorter min length when no long run exists, so short log
+    lines still produce a (less selective) query instead of silently nothing.
     """
     msg = _LOG_PREFIX_RE.sub("", message).strip()
     parts = _VALUE_RE.split(msg)
-    runs = [p.strip(" \t:,;=()[]{}\"'") for p in parts]
-    runs = [r for r in runs if len(r) >= min_len]
-    return sorted(set(runs), key=len, reverse=True)
+    candidates = [p.strip(" \t:,;=()[]{}\"'") for p in parts]
+    for threshold in (min_len, 4):  # prefer long, reliable runs; then relax
+        runs = sorted({r for r in candidates if len(r) >= threshold}, key=len, reverse=True)
+        if runs:
+            return runs
+    return []
 
 
 def find_log_source(message: str, *, limit: int = 10) -> list[dict]:

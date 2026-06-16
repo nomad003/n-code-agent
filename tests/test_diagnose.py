@@ -31,6 +31,29 @@ def test_base_function():
     assert diagnose._base_function("global_func") == "global_func"
 
 
+def test_base_function_operator_and_destructor():
+    # operator overloads must not be truncated at their own parens/brackets
+    assert diagnose._base_function("Fn::operator()(int)") == "operator()"
+    assert diagnose._base_function("Buf::operator[](int)") == "operator[]"
+    assert diagnose._base_function("A::operator==(const A&)") == "operator=="
+    # destructors keep their leading ~
+    assert diagnose._base_function("Foo::~Foo()") == "~Foo"
+    # templated container method
+    assert diagnose._base_function("std::vector<int>::push_back(int)") == "push_back"
+
+
+def test_literal_runs_keeps_identifier_with_digits():
+    # digits inside an identifier must NOT split the fixed text
+    runs = diagnose._literal_runs("loading module abc123def now ok")
+    assert any("abc123def" in r for r in runs)
+
+
+def test_literal_runs_short_line_fallback():
+    # no >=8 run, but the relaxed threshold still yields something
+    runs = diagnose._literal_runs("init done 5")
+    assert runs  # not silently empty
+
+
 def test_class_of():
     assert diagnose._class_of("SceneMgr::Update(int)") == "SceneMgr"
     assert diagnose._class_of("ns::Cls::method()") == "Cls"
