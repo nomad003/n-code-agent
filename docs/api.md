@@ -62,6 +62,38 @@ curl -X POST http://localhost:8900/ask \
 - 缓存层位于 agent 之上，将来（方案 2）可替换为离线索引而不动 agent。
 - 空问题返回 `{"answer":"问题不能为空。","cached":false}`。
 
+### `POST /diagnose`
+
+分析崩溃栈（coredump backtrace），结合代码库定位根因（方向 F）。
+
+**请求体**
+
+```json
+{
+  "backtrace": "#0 0x... in SceneMgr::Update (this=0x0) at scene/scenemgr.cpp:142\n#1 ...",
+  "log": "可选：相关日志片段"
+}
+```
+
+**响应**
+
+| 字段 | 说明 |
+|------|------|
+| `answer` | 诊断结论（根因 + 排查方向） |
+| `frames` | 解析出的栈帧摘要列表 |
+| `resolved` | 成功映射到代码的帧数 |
+| `total_frames` | 解析出的总帧数 |
+
+**示例**
+
+```bash
+curl -X POST http://localhost:8900/diagnose \
+  -H "Content-Type: application/json" \
+  -d '{"backtrace": "#0 0x55ab in SceneMgr::Update (this=0x0) at scene/scenemgr.cpp:142\n#1 0x55cd in Process::Update () at process.cpp:211"}'
+```
+
+逐帧用符号索引（方案 2）映射到 `file:line`；带类名的帧（`SceneMgr::Update`）自动收窄同名候选。空 backtrace 返回 400。
+
 ## 命令行（`cli.py`）
 
 ```bash

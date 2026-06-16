@@ -38,6 +38,7 @@ The agent is a **tool-calling loop**: the LLM is given four code-search tools an
 - `read_file(path, start, end)` — read a file slice
 - `list_dir(path)` — list a directory
 - `find_symbol(name)` — locate a class/function definition
+- `resolve_frame(frame)` — map a backtrace frame to its definition (方向 F; class-aware narrowing)
 
 Intended module responsibilities:
 
@@ -47,6 +48,7 @@ Intended module responsibilities:
 | `tools.py` | The four search-tool implementations + schemas (index-backed, fall back to live scan) |
 | `indexer.py` | Build the offline index (tree-sitter C++ → SQLite symbols + FTS5) |
 | `index_query.py` | Read-only index queries (returns None when no index → tools fall back) |
+| `diagnose.py` | Runtime diagnosis (方向 F): parse backtrace, map frames to code via index, run agent |
 | `agent.py` | Backend dispatch + custom loop (`CodeAgent`: event history, stuck detection, retries) |
 | `events.py` | `Action`/`Observation` event model for the custom loop |
 | `agent_sdk.py` | Claude Agent SDK backend (used when `AGENT_BACKEND=sdk`) |
@@ -113,6 +115,7 @@ LLM access goes through **litellm** to the mushigen proxy — do not call the mo
 ## API
 
 `POST /ask` — body `{"question": str, "use_cache": bool}` → `{"answer": str, "cached": bool}`.
+`POST /diagnose` — body `{"backtrace": str, "log": str}` → `{"answer", "frames", "resolved", "total_frames"}` (方向 F).
 `GET /health` → `{"status": "ok"}`.
 
 `use_cache`/`cached` imply a caching layer for repeated questions — implement this in or behind `main.py`.

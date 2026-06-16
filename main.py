@@ -30,6 +30,18 @@ class AskResponse(BaseModel):
     cached: bool
 
 
+class DiagnoseRequest(BaseModel):
+    backtrace: str
+    log: str = ""  # optional related log snippet
+
+
+class DiagnoseResponse(BaseModel):
+    answer: str
+    frames: list[str]      # parsed frame summaries
+    resolved: int          # frames mapped to code via the index
+    total_frames: int
+
+
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
@@ -54,6 +66,20 @@ def ask(req: AskRequest) -> AskResponse:
     if req.use_cache:
         _CACHE[question] = result
     return AskResponse(answer=result, cached=False)
+
+
+@app.post("/diagnose", response_model=DiagnoseResponse)
+def diagnose_endpoint(req: DiagnoseRequest) -> DiagnoseResponse:
+    """Analyze a coredump backtrace (+ optional log) against the codebase."""
+    if not req.backtrace.strip():
+        raise HTTPException(status_code=400, detail="backtrace 不能为空")
+    import diagnose as diag
+
+    try:
+        result = diag.diagnose(req.backtrace, extra_log=req.log)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"诊断失败: {exc}")
+    return DiagnoseResponse(**result)
 
 
 if __name__ == "__main__":

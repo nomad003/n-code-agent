@@ -203,6 +203,32 @@ def find_symbol(name: str) -> str:
     return result
 
 
+def resolve_frame(frame: str) -> str:
+    """Map a backtrace frame's function to its definition(s).
+
+    Accepts a full frame signature like ``SceneMgr::Update(int, float)`` and
+    uses the class name (if any) to narrow same-name candidates. Falls back to
+    a plain ``find_symbol`` on the bare name.
+    """
+    if not frame:
+        raise ToolError("frame is required")
+    try:
+        import diagnose
+
+        frames = diagnose.resolve_frames([
+            diagnose.Frame(num=0, func_raw=frame, func=frame)
+        ])
+    except Exception:
+        frames = []
+    if frames and frames[0].candidates:
+        cands = frames[0].candidates
+        lines = [f"{c['path']}:{c['line']}: [{c['kind']}] {c['name']}" for c in cands]
+        return "\n".join(lines)
+    # No index hit: fall back to the bare-name symbol search.
+    bare = frame.split("(")[0].split("::")[-1].strip()
+    return find_symbol(bare) if bare else f"no resolution for {frame!r}"
+
+
 # --- Filesystem traversal helper ------------------------------------------
 
 _SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", ".idea"}
@@ -294,6 +320,23 @@ TOOL_SCHEMAS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "resolve_frame",
+            "description": "把崩溃栈某一帧的函数（如 'SceneMgr::Update(int)'）定位到代码定义；带类名时会自动收窄同名候选。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "frame": {
+                        "type": "string",
+                        "description": "栈帧的函数签名，可含类名/命名空间/参数",
+                    }
+                },
+                "required": ["frame"],
+            },
+        },
+    },
 ]
 
 # Maps tool name -> implementation. The agent loop calls through this registry.
@@ -302,6 +345,7 @@ TOOL_REGISTRY = {
     "read_file": read_file,
     "list_dir": list_dir,
     "find_symbol": find_symbol,
+    "resolve_frame": resolve_frame,
 }
 
 

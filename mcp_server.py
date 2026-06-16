@@ -93,6 +93,36 @@ def ask_codebase(question: str) -> str:
     return answer
 
 
+@mcp.tool()
+def diagnose_crash(backtrace: str, log_snippet: str = "") -> str:
+    """分析崩溃栈（coredump backtrace），结合代码库定位根因。
+
+    逐帧把函数映射到代码定义（复用符号索引，自动收窄同名候选），再用 agent
+    读取相关代码、分析最可能的崩溃原因与排查方向。
+
+    Args:
+        backtrace: gdb 风格的崩溃栈文本（如 `gdb bt` 输出）。
+        log_snippet: 可选的相关日志片段，作为额外上下文。
+    """
+    if not (backtrace or "").strip():
+        return "backtrace 不能为空。"
+    import diagnose as diag
+
+    log.info("diagnose_crash | 收到 backtrace (%d 字)", len(backtrace))
+    start = time.monotonic()
+    try:
+        result = diag.diagnose(backtrace, extra_log=log_snippet)
+    except Exception as exc:
+        log.warning("diagnose_crash | 失败 (%.1fs): %s", time.monotonic() - start, exc)
+        raise
+    elapsed = time.monotonic() - start
+    log.info(
+        "diagnose_crash | 完成 (%.1fs, %d/%d 帧已定位)",
+        elapsed, result["resolved"], result["total_frames"],
+    )
+    return result["answer"]
+
+
 def main() -> None:
     print(
         f"[mcp] code-agent MCP server (backend={config.AGENT_BACKEND}) "

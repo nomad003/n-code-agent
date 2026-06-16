@@ -98,6 +98,7 @@ litellm 的 tool-calling 循环（最多 `MAX_ITERATIONS` 轮）。设计借鉴 
 | `tools.py` | 4 个沙箱工具 + 工具 schema + `dispatch()` 注册表（索引优先，回退 live scan） |
 | `indexer.py` | 离线建索引：tree-sitter 解析 C++ → SQLite 符号表 + FTS5 |
 | `index_query.py` | 索引只读查询层（无索引返回 None 让工具回退） |
+| `diagnose.py` | 运行时诊断：解析 backtrace + 帧→符号映射 + 跑 agent（方向 F） |
 | `agent.py` | 后端分发 + custom 循环（`CodeAgent`：事件历史/stuck/重试） |
 | `events.py` | custom 循环的 `Action`/`Observation` 事件模型 |
 | `agent_sdk.py` | sdk（Claude Agent SDK）后端 |
