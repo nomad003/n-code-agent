@@ -32,7 +32,7 @@ def test_answer_dispatches_to_custom(monkeypatch):
     import agent
 
     monkeypatch.setattr(config, "AGENT_BACKEND", "custom")
-    monkeypatch.setattr(agent, "_answer_custom", lambda q, *, verbose=False: f"custom:{q}")
+    monkeypatch.setattr(agent.CodeAgent, "run", lambda self, q: f"custom:{q}")
     assert agent.answer("hi") == "custom:hi"
 
 

@@ -27,7 +27,7 @@ HTTP POST /ask  →  FastAPI (main.py)  →  LLM agent loop (agent.py)
 
 `agent.answer()` dispatches on the `AGENT_BACKEND` env var:
 
-- **`custom`** (default) — the litellm tool-calling loop in `agent.py` (`_answer_custom`). Provider-agnostic; routes through the mushigen `/v1` proxy with the `openai/` prefix. Model = `LLM_MODEL`.
+- **`custom`** (default) — the litellm tool-calling loop in `agent.py` (`CodeAgent`). Provider-agnostic; routes through the `/v1` proxy with the `openai/` prefix. Model = `LLM_MODEL`. Keeps an `Action`/`Observation` event history (`events.py`), builds messages in one place (`_build_messages`), retries transient LLM errors (`LLM_NUM_RETRIES`), and stops early on repeated identical tool calls (`STUCK_REPEAT_THRESHOLD`).
 - **`sdk`** — the Claude Agent SDK loop in `agent_sdk.py` (imported lazily). Uses `claude-agent-sdk` + the Claude Code CLI, routed to **Bedrock** via env vars (`CLAUDE_CODE_USE_BEDROCK`, `ANTHROPIC_BEDROCK_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, …). Model = `SDK_MODEL` (falls back to `ANTHROPIC_MODEL`).
 
 **Both backends share the same `tools.py` and `config.SYSTEM_PROMPT`.** The SDK backend wraps the existing sandboxed tools as `@tool`/SDK-MCP tools that delegate to `tools.dispatch()` — so the path sandbox and output caps are identical — and disables the SDK's built-in Read/Grep/Bash so the model is confined to our four tools. `max_turns = MAX_ITERATIONS`.
@@ -45,7 +45,8 @@ Intended module responsibilities:
 |------|----------------|
 | `config.py` | Model id, API base/key, target-code path, system prompt |
 | `tools.py` | The four search-tool implementations + their tool-call schemas |
-| `agent.py` | LLM interaction loop (tool calling) |
+| `agent.py` | Backend dispatch + custom loop (`CodeAgent`: event history, stuck detection, retries) |
+| `events.py` | `Action`/`Observation` event model for the custom loop |
 | `agent_sdk.py` | Claude Agent SDK backend (used when `AGENT_BACKEND=sdk`) |
 | `main.py` | FastAPI service (`POST /ask`, `GET /health`), runs on port **8900** |
 | `mcp_server.py` | MCP server exposing `ask_codebase` over streamable-http, port **8901** |

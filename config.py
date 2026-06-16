@@ -53,6 +53,14 @@ MAX_ITERATIONS = int(os.environ.get("AGENT_MAX_ITERATIONS", "12"))
 LLM_TEMPERATURE = float(os.environ.get("LLM_TEMPERATURE", "0"))
 LLM_TIMEOUT = float(os.environ.get("LLM_TIMEOUT", "120"))
 
+# Retry transient LLM failures (rate limit / timeout / empty response) with
+# litellm's built-in exponential backoff. 0 disables retries.
+LLM_NUM_RETRIES = int(os.environ.get("LLM_NUM_RETRIES", "3"))
+
+# Stuck detection: stop early if the agent repeats the same tool call this many
+# times in a row (e.g. grepping the same pattern, or repeated errors). 0 = off.
+STUCK_REPEAT_THRESHOLD = int(os.environ.get("STUCK_REPEAT_THRESHOLD", "3"))
+
 # --- Tool output limits (keep tool results from blowing the context) -------
 MAX_READ_BYTES = int(os.environ.get("MAX_READ_BYTES", "20000"))
 MAX_GREP_MATCHES = int(os.environ.get("MAX_GREP_MATCHES", "100"))

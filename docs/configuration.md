@@ -19,6 +19,8 @@ cp .env.example .env     # 填入 LLM_API_KEY，按需改 TARGET_CODE_PATH / AGE
 | `AGENT_BACKEND` | `custom` | 后端：`custom`（litellm）或 `sdk`（Claude Agent SDK） |
 | `TARGET_CODE_PATH` | `./target_code` | **被分析的目标代码库路径** |
 | `AGENT_MAX_ITERATIONS` | `12` | Agent 最多调几轮工具 |
+| `LLM_NUM_RETRIES` | `3` | LLM 调用失败重试次数（限流/超时/服务端错误），0=关闭 |
+| `STUCK_REPEAT_THRESHOLD` | `3` | 连续相同工具调用判定卡住、提前收尾，0=关闭（仅 custom） |
 | `MAX_READ_BYTES` | `20000` | 单次读文件上限（字节） |
 | `MAX_GREP_MATCHES` | `100` | grep 最多返回条数 |
 | `MAX_LIST_ENTRIES` | `300` | 列目录最多条数 |

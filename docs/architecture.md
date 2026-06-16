@@ -38,15 +38,23 @@ agent.answer(question)      按 AGENT_BACKEND 分发
 | 模型 | `LLM_MODEL` | `SDK_MODEL`（默认取 `ANTHROPIC_MODEL`） |
 | 循环上限 | `MAX_ITERATIONS` 轮 | `max_turns = MAX_ITERATIONS` |
 
-### custom 后端
+### custom 后端（`CodeAgent`）
 
-litellm 的 tool-calling 循环（最多 `MAX_ITERATIONS` 轮）：
+litellm 的 tool-calling 循环（最多 `MAX_ITERATIONS` 轮）。设计借鉴 OpenHands
+`CodeActAgent`，但为只读问答场景做了精简：
 
-1. 组装 `system`（角色 + 工具说明）+ `user`（问题）消息。
-2. 调 `litellm.completion(...)`，带上 4 个工具的 schema（`tool_choice="auto"`）。
-3. 若返回 `tool_calls` → 用 `tools.dispatch()` 执行，结果以 `role:"tool"` 消息回喂，继续循环。
-4. 若无 `tool_calls` → 模型已能作答，返回文本。
-5. 超过 `MAX_ITERATIONS` 仍未收敛 → 追加"已达上限，请基于现有信息作答"，强制要一个最终回答。
+1. **事件历史**：每次工具调用建模成一对 `Action`/`Observation`（`events.py`），
+   历史就是一个 `list[Event]`。无事件总线、无持久化、无订阅者——单进程一个列表即可。
+2. **集中渲染消息**：`CodeAgent._build_messages()` 是「事件 → LLM messages」的唯一入口，
+   负责把 assistant 的 tool_call 请求与对应的 `tool` 结果按 `tool_call_id` 正确配对
+   （对应 OpenHands 的 `ConversationMemory.process_events`）。
+3. **循环**：调 `litellm.completion(...)`（带 4 个工具 schema、`tool_choice="auto"`）；
+   有 `tool_calls` → `tools.dispatch()` 执行成 `Observation` 回喂；无 → 直接作答返回。
+4. **stuck 检测**：连续 `STUCK_REPEAT_THRESHOLD`（默认 3）次相同工具+相同参数 → 提前收尾
+   （防只读 agent 反复 grep 同一 pattern / 反复撞同一错误烧 token）。
+5. **LLM 重试**：`litellm.completion(num_retries=LLM_NUM_RETRIES)` 对限流/超时/服务端错误做
+   指数退避。
+6. **收尾**：超过 `MAX_ITERATIONS` 或检测到 stuck → 不带工具再调一次，要求基于现有信息作答。
 
 **代理路由要点**：litellm 按模型名前缀选客户端。直接用 `vertex_ai/...` 会触发它的原生 Google Cloud 认证（失败且不走代理）。所以 `_routed_model()` 给模型名加 `openai/` 前缀，强制走 OpenAI 兼容路径；代理收到的仍是真实模型名。
 
@@ -83,7 +91,8 @@ litellm 的 tool-calling 循环（最多 `MAX_ITERATIONS` 轮）：
 |------|------|
 | `config.py` | 全局配置（环境变量驱动）、system prompt、`require_api_key()` |
 | `tools.py` | 4 个沙箱工具 + 工具 schema + `dispatch()` 注册表 |
-| `agent.py` | 后端分发 + custom（litellm）循环 |
+| `agent.py` | 后端分发 + custom 循环（`CodeAgent`：事件历史/stuck/重试） |
+| `events.py` | custom 循环的 `Action`/`Observation` 事件模型 |
 | `agent_sdk.py` | sdk（Claude Agent SDK）后端 |
 | `main.py` | FastAPI 服务（`/ask`、`/health`）+ 问答缓存（端口 8900） |
 | `mcp_server.py` | MCP server，暴露 `ask_codebase`（streamable-http，端口 8901，见 [mcp.md](mcp.md)） |
