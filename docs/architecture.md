@@ -106,3 +106,5 @@ litellm 的 tool-calling 循环（最多 `MAX_ITERATIONS` 轮）。设计借鉴 
 
 1. **当前（方案 1）**：LLM + 实时代码搜索，每次查询走 tool call。
 2. **下一步（方案 2）**：离线建索引（tree-sitter AST → SQLite 符号表 + 向量库），精确查询不走 LLM 直接返回。`tools.py` 被刻意做成唯一接触文件的层，就是为了让索引顶替这些实现而上层不动。
+
+> 已落地优化、明确舍弃的设计、以及更细的后续方向（服务治理、缓存、评测等）见 [roadmap.md](roadmap.md)。
