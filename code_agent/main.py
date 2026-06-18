@@ -9,6 +9,7 @@ without changing the agent.
 """
 import asyncio
 import concurrent.futures
+import datetime as _dt
 import os
 import re
 from collections import OrderedDict
@@ -165,6 +166,16 @@ class KnowledgeSaveRequest(BaseModel):
     content: str
 
 
+class KnowledgePrecipitateRequest(BaseModel):
+    repo: str
+    name: str
+    title: str
+    question: str
+    answer: str
+    tags: str = ""
+    refs: list[str] = []
+
+
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
@@ -300,12 +311,14 @@ def knowledge_list(repo: str | None = None) -> dict:
             path = os.path.join(root, name)
             if not os.path.isfile(path):
                 continue
+            content = open(path, "r", encoding="utf-8").read()
             card = module_knowledge._read_card(path)
             cards.append(
                 {
                     "name": name,
                     "title": card.title if card else name[:-3],
                     "tags": card.tags if card else [],
+                    "meta": _knowledge_frontmatter(content)[0],
                     "size": os.path.getsize(path),
                     "mtime": int(os.path.getmtime(path)),
                 }
@@ -322,11 +335,14 @@ def knowledge_read(repo: str, name: str) -> dict:
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="knowledge card not found")
     card = module_knowledge._read_card(path)
+    meta, body = _knowledge_frontmatter(content)
     return {
         "repo": repo_name,
         "name": os.path.basename(path),
         "title": card.title if card else os.path.basename(path)[:-3],
         "tags": card.tags if card else [],
+        "meta": meta,
+        "body": body,
         "content": content,
     }
 
@@ -339,6 +355,92 @@ def knowledge_save(req: KnowledgeSaveRequest) -> dict:
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(req.content.rstrip() + "\n")
     return {"repo": repo_name, "name": os.path.basename(path), "saved": True}
+
+
+@app.get("/knowledge/api/graph")
+def knowledge_graph(repo: str | None = None) -> dict:
+    repo_name = _resolve_request_repo(repo)
+    root = _knowledge_repo_dir(repo_name)
+    nodes: list[dict] = []
+    edges: list[dict] = []
+    concept_ids: set[str] = set()
+    cards: dict[str, dict] = {}
+    if os.path.isdir(root):
+        for name in sorted(os.listdir(root)):
+            if not name.endswith(".md"):
+                continue
+            path = os.path.join(root, name)
+            if not os.path.isfile(path):
+                continue
+            text = open(path, "r", encoding="utf-8").read()
+            meta, body = _knowledge_frontmatter(text)
+            card = module_knowledge._read_card(path)
+            node_id = name
+            concept_ids.add(node_id)
+            cards[node_id] = {"meta": meta, "body": body}
+            nodes.append(
+                {
+                    "id": node_id,
+                    "kind": "concept",
+                    "title": card.title if card else meta.get("title", name[:-3]),
+                    "type": meta.get("type", "Concept"),
+                    "description": meta.get("description", ""),
+                    "resource": meta.get("resource", ""),
+                    "tags": _meta_list(meta.get("tags", "")),
+                }
+            )
+    tag_ids: set[str] = set()
+    for node in list(nodes):
+        if node["kind"] != "concept":
+            continue
+        for tag in node.get("tags", []):
+            tag_id = f"tag:{tag}"
+            if tag_id not in tag_ids:
+                tag_ids.add(tag_id)
+                nodes.append({"id": tag_id, "kind": "tag", "title": tag, "type": "Tag"})
+            edges.append(
+                {
+                    "source": node["id"],
+                    "target": tag_id,
+                    "relation": "tagged_with",
+                }
+            )
+    for source, data in cards.items():
+        for target in _knowledge_links(data["body"]):
+            if target in concept_ids:
+                edges.append(
+                    {
+                        "source": source,
+                        "target": target,
+                        "relation": "links_to",
+                    }
+                )
+    return {"repo": repo_name, "nodes": nodes, "edges": edges}
+
+
+@app.get("/knowledge/api/qa")
+def knowledge_qa_recent(repo: str | None = None, limit: int = 20) -> dict:
+    repo_name = _resolve_request_repo(repo)
+    from . import knowledge
+
+    with config.use_repo(repo_name):
+        return {"repo": repo_name, "items": knowledge.recent(limit=limit)}
+
+
+@app.post("/knowledge/api/precipitate")
+def knowledge_precipitate(req: KnowledgePrecipitateRequest) -> dict:
+    repo_name = _resolve_request_repo(req.repo)
+    content = _knowledge_card_from_qa(req, repo_name)
+    path = _knowledge_card_path(repo_name, req.name)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(content.rstrip() + "\n")
+    return {
+        "repo": repo_name,
+        "name": os.path.basename(path),
+        "saved": True,
+        "content": content,
+    }
 
 
 _CARD_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*\.md$")
@@ -362,6 +464,88 @@ def _knowledge_card_path(repo: str, name: str) -> str:
     if path != root and not path.startswith(root + os.sep):
         raise HTTPException(status_code=400, detail="invalid card path")
     return path
+
+
+def _knowledge_frontmatter(text: str) -> tuple[dict[str, str], str]:
+    if not text.startswith("---\n"):
+        return {}, text
+    end = text.find("\n---", 4)
+    if end == -1:
+        return {}, text
+    raw = text[4:end].strip()
+    body = text[end + 4 :].lstrip()
+    meta: dict[str, str] = {}
+    for line in raw.splitlines():
+        key, sep, val = line.partition(":")
+        if sep and key.strip():
+            meta[key.strip()] = val.strip().strip('"')
+    return meta, body
+
+
+def _meta_list(value: str) -> list[str]:
+    raw = (value or "").strip().strip("[]")
+    return [item.strip().strip("'\"") for item in re.split(r"[,，]", raw) if item.strip()]
+
+
+def _knowledge_links(markdown: str) -> list[str]:
+    out: list[str] = []
+    for href in re.findall(r"\[[^\]]+\]\(([^)]+)\)", markdown or ""):
+        if href.startswith(("http://", "https://", "#")):
+            continue
+        target = href.split("#", 1)[0].split("?", 1)[0].strip()
+        if not target:
+            continue
+        base = os.path.basename(target)
+        if base.endswith(".md"):
+            out.append(base)
+    return list(dict.fromkeys(out))
+
+
+def _knowledge_card_from_qa(req: KnowledgePrecipitateRequest, repo: str) -> str:
+    title = (req.title or req.question[:40] or "问答沉淀").strip()
+    name = os.path.basename(req.name if req.name.endswith(".md") else req.name + ".md")
+    tags = ", ".join(_yaml_value(tag) for tag in _meta_list(req.tags)) if req.tags else "qa, curated"
+    refs = [r for r in dict.fromkeys(req.refs) if r.strip()]
+    today = _dt.date.today().isoformat()
+    source_refs = "\n".join(f"- `{ref}`" for ref in refs) if refs else "- 暂无引用文件记录"
+    return f"""---
+type: Code Playbook
+title: {_yaml_value(title)}
+description: 从后台管理问答沉淀的知识卡片，需要持续用工具核实当前代码。
+repo: {repo}
+module: curated/{name[:-3]}
+resource: docs/code-knowledge/{repo}/{name}
+tags: {tags}
+question_types: general, feature_impl, config_impl, outage_log, crash_stack
+updated_at: {today}
+---
+
+# {title}
+
+这张卡来自后台管理问答沉淀。它记录已验证过的问答结论，后续回答时仍需用工具核实当前代码。
+
+## 原始问题
+
+{req.question.strip()}
+
+## 沉淀结论
+
+{req.answer.strip()}
+
+## 引用线索
+
+{source_refs}
+
+## 后续维护
+
+- 如果代码或配置发生变化，更新本卡结论。
+- 如果这个问题反复出现，把排查步骤补成可执行清单。
+- 如果涉及具体日志或断言，把日志关键字加入 frontmatter 的 `logs` / `asserts` 字段。
+"""
+
+
+def _yaml_value(value: str) -> str:
+    return re.sub(r"\s+", " ", str(value or "")).strip().replace('"', "'")
 
 
 @app.get("/admin/llm-traces", response_class=HTMLResponse)

@@ -135,10 +135,21 @@
         selectedTrace: "",
         traceRows: [],
         knowledge: {
+          mode: "cards",
           cards: [],
           name: "",
           content: "",
+          meta: {},
           editing: false,
+          graph: { nodes: [], edges: [] },
+          qaItems: [],
+          qa: null,
+          qaDraft: {
+            title: "",
+            name: "",
+            tags: "qa, curated",
+            answer: "",
+          },
         },
       };
     },
@@ -200,6 +211,46 @@
       },
       renderedKnowledge() {
         return renderMarkdown(this.knowledge.content);
+      },
+      knowledgeMetaRows() {
+        return Object.entries(this.knowledge.meta || {}).map(([key, value]) => ({
+          key,
+          value,
+        }));
+      },
+      graphNodes() {
+        const nodes = this.knowledge.graph.nodes || [];
+        if (!nodes.length) return [];
+        const centerX = 480;
+        const centerY = 280;
+        const radius = 210;
+        return nodes.map((node, index) => {
+          const angle = (Math.PI * 2 * index) / nodes.length - Math.PI / 2;
+          const r = node.kind === "tag" ? radius + 65 : radius;
+          return {
+            ...node,
+            x: Math.round(centerX + Math.cos(angle) * r),
+            y: Math.round(centerY + Math.sin(angle) * r),
+          };
+        });
+      },
+      graphEdges() {
+        const byId = new Map(this.graphNodes.map((node) => [node.id, node]));
+        return (this.knowledge.graph.edges || [])
+          .map((edge, index) => {
+            const source = byId.get(edge.source);
+            const target = byId.get(edge.target);
+            if (!source || !target) return null;
+            return {
+              id: `${edge.source}->${edge.target}-${index}`,
+              relation: edge.relation || "links_to",
+              x1: source.x,
+              y1: source.y,
+              x2: target.x,
+              y2: target.y,
+            };
+          })
+          .filter(Boolean);
       },
     },
     mounted() {
@@ -324,6 +375,8 @@
           if (this.knowledge.cards.length && !this.knowledge.name) {
             await this.loadCard(this.knowledge.cards[0].name);
           }
+          if (this.knowledge.mode === "graph") await this.loadKnowledgeGraph();
+          if (this.knowledge.mode === "qa") await this.loadKnowledgeQa();
         });
       },
       async loadCard(name) {
@@ -332,12 +385,16 @@
           const data = await this.apiJson(url);
           this.knowledge.name = data.name || name;
           this.knowledge.content = data.content || "";
+          this.knowledge.meta = data.meta || {};
           this.knowledge.editing = false;
+          this.knowledge.mode = "cards";
         });
       },
       newCard() {
         this.knowledge.name = "new-module.md";
-        this.knowledge.content = "---\ntitle: 新模块\ntags: \n---\n\n# 新模块\n\n## 框架\n\n## 关键流程\n\n## 常见问题\n";
+        this.knowledge.meta = {};
+        this.knowledge.content = "---\ntype: Code Module\ntitle: 新模块\ntags: \n---\n\n# 新模块\n\n## 框架\n\n## 关键流程\n\n## 常见问题\n";
+        this.knowledge.mode = "cards";
         this.knowledge.editing = true;
       },
       async saveCard() {
@@ -353,6 +410,58 @@
           });
           await this.loadKnowledge();
           this.knowledge.editing = false;
+        });
+      },
+      async setKnowledgeMode(mode) {
+        this.knowledge.mode = mode;
+        if (mode === "graph") await this.loadKnowledgeGraph();
+        if (mode === "qa") await this.loadKnowledgeQa();
+      },
+      async loadKnowledgeGraph() {
+        await this.withLoading("加载图谱", async () => {
+          const data = await this.apiJson("/knowledge/api/graph?repo=" + encodeURIComponent(this.selectedRepo));
+          this.knowledge.graph = {
+            nodes: data.nodes || [],
+            edges: data.edges || [],
+          };
+        });
+      },
+      async loadKnowledgeQa() {
+        await this.withLoading("加载问答", async () => {
+          const data = await this.apiJson("/knowledge/api/qa?repo=" + encodeURIComponent(this.selectedRepo));
+          this.knowledge.qaItems = data.items || [];
+          if (!this.knowledge.qa && this.knowledge.qaItems.length) this.selectQa(this.knowledge.qaItems[0]);
+        });
+      },
+      selectQa(item) {
+        this.knowledge.qa = item;
+        const title = item.question.length > 28 ? item.question.slice(0, 28) : item.question;
+        const slug = "qa-" + String(item.id || Date.now()) + ".md";
+        this.knowledge.qaDraft = {
+          title,
+          name: slug,
+          tags: "qa, curated",
+          answer: item.answer || "",
+        };
+      },
+      async precipitateQa() {
+        if (!this.knowledge.qa) return;
+        await this.withLoading("沉淀知识", async () => {
+          const data = await this.apiJson("/knowledge/api/precipitate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              repo: this.selectedRepo,
+              name: this.knowledge.qaDraft.name,
+              title: this.knowledge.qaDraft.title,
+              question: this.knowledge.qa.question,
+              answer: this.knowledge.qaDraft.answer,
+              tags: this.knowledge.qaDraft.tags,
+              refs: this.knowledge.qa.refs || [],
+            }),
+          });
+          await this.loadKnowledge();
+          await this.loadCard(data.name);
         });
       },
     },

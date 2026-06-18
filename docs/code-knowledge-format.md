@@ -28,6 +28,77 @@ code-agent 每次回答都从零遍历代码。它服务四类高频问题：
 - 当前实现的模块知识卡读取器还是轻量解析器，不依赖完整 YAML 库；frontmatter 要保持简单。
 - 代码知识卡必须持续提示“具体结论仍需用工具核实”，不能把卡片当作最终事实。
 
+## OKF-style 标准
+
+这里的 OKF-style 不是完整复制上游 OKF v0.1，而是固定一组可执行约定：
+
+### 知识包 Bundle
+
+`docs/code-knowledge/<repo>/` 是一个知识包。它包含多个 Markdown 概念文件和一个可选
+`index.md`。整个目录可被 git review、被前端浏览、被 agent 召回。
+
+### 概念 Concept
+
+每个非保留 `.md` 文件是一条概念。概念可以是：
+
+- `Code Module`：代码模块，如场景、关卡、Buff、ECS。
+- `Config Chain`：配置链路，如怪物技能配置、tableload。
+- `Code Playbook`：从优秀问答沉淀的排查手册。
+- `Reference`：外部或跨模块参考资料。
+
+概念 ID 当前使用文件名，例如 `combat-framework.md`。如果未来改成分层目录，概念 ID
+会使用 bundle 内相对路径。
+
+### 实体 Entity
+
+实体是概念正文或 header 中被描述的具体对象。代码知识库常见实体：
+
+- 模块路径：`gameserver/combat`
+- 类/函数/符号：`CombatEnemy`、`SkillConfig::GetEnemySkillConfigX`
+- 配置表/字段：`SkillListForEnemy`、`SkillStatisticsID`
+- 日志/断言：`enemy conf skill`、`CHECK_COND(false)`
+- 资源路径：`gameserver/unit/enemy.cpp`
+
+第一阶段实体不单独建文件；它们记录在 frontmatter 字段和正文里。图谱会把概念和标签可视化，
+后续可把高价值实体提升为单独节点。
+
+### 关系 Relation
+
+关系有两种来源：
+
+- 显式关系：Markdown 内部链接，例如 `[单位、属性与技能](unit-skill-attr.md)`。
+- 派生关系：frontmatter 中的 tags、resource、symbols 等字段。
+
+当前图谱落地两类边：
+
+- `links_to`：概念通过 Markdown 内部链接指向另一个概念。
+- `tagged_with`：概念带有某个 tag。
+
+后续可以增加 `depends_on`、`uses_config`、`owns_symbol`、`emits_log`、`checks_assert`。
+
+### 文件 Header / Frontmatter
+
+每个概念文件应以 YAML-like frontmatter 开头：
+
+```yaml
+---
+type: Code Module
+title: 战斗框架
+description: 战斗管理、目标选择、伤害效果和战斗单位的模块地图
+repo: marvel
+module: gameserver/combat
+resource: gameserver/combat
+tags: combat, battle, unit, skill
+symbols: XCombat, CombatUnit, SkillMgr
+logs: Combat, UnitLogErr
+asserts: CHECK_COND
+question_types: crash_stack, outage_log, feature_impl, config_impl
+updated_at: 2026-06-18
+---
+```
+
+前端卡片预览会展示 header；agent 召回会读取 `title/tags/body`，后续索引会读取更多字段。
+
 ## 文件布局
 
 当前落地使用平铺目录：

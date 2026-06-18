@@ -51,6 +51,15 @@ def test_stats(kb):
     assert knowledge.stats()["entries"] == 2
 
 
+def test_recent_lists_newest_first(kb):
+    first = knowledge.store("q1", "a1", ["scene.cpp"])
+    second = knowledge.store("q2", "a2", [])
+    rows = knowledge.recent(limit=10)
+    assert [r["id"] for r in rows[:2]] == [second, first]
+    assert rows[0]["question"] == "q2"
+    assert rows[1]["refs"] == ["scene.cpp"]
+
+
 # --- staleness (the make-or-break mechanism) -------------------------------
 
 

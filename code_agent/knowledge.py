@@ -212,6 +212,42 @@ def recall(query: str, *, limit: int = 3) -> list[dict]:
     return out
 
 
+def recent(*, limit: int = 20) -> list[dict]:
+    """Return recent Q&A entries for manual curation in the admin UI."""
+    if not os.path.isfile(config.current_knowledge_db_path()):
+        return []
+    limit = max(1, min(int(limit or 20), 100))
+    try:
+        conn = _connect(write=False)
+        rows = conn.execute(
+            "SELECT id, question, answer, refs, created_at "
+            "FROM knowledge ORDER BY id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        conn.close()
+    except sqlite3.Error:
+        return []
+    out = []
+    for rid, q, a, refs_json, created_at in rows:
+        try:
+            refs = json.loads(refs_json)
+        except (json.JSONDecodeError, TypeError):
+            refs = []
+        stale = _stale_refs(refs)
+        out.append(
+            {
+                "id": rid,
+                "question": q,
+                "answer": a,
+                "refs": [r.get("path", "") for r in refs if r.get("path")],
+                "stale": bool(stale),
+                "stale_refs": stale,
+                "created_at": created_at,
+            }
+        )
+    return out
+
+
 def stats() -> dict:
     """Quick counts for diagnostics/eval (total entries)."""
     if not os.path.isfile(config.current_knowledge_db_path()):

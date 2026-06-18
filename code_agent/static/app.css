@@ -447,6 +447,122 @@ summary {
   line-height: 1.35;
 }
 
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.segmented button {
+  padding: 7px 8px;
+  font-size: 12px;
+}
+
+.segmented button.active {
+  border-color: var(--accent);
+  background: #ecfdf5;
+  color: var(--accent-strong);
+}
+
+.meta-grid {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 12px;
+}
+
+.meta-grid div {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 8px 10px;
+  background: #f8fafc;
+  min-width: 0;
+}
+
+.meta-grid span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.meta-grid strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.graph-wrap {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+  overflow: hidden;
+}
+
+.graph-wrap svg {
+  width: 100%;
+  min-height: 520px;
+  display: block;
+}
+
+.edge {
+  stroke: #9aa8b6;
+  stroke-width: 1.2;
+}
+
+.edge.tagged_with {
+  stroke: #b6c2cf;
+  stroke-dasharray: 4 5;
+}
+
+.node {
+  stroke: #ffffff;
+  stroke-width: 2;
+  cursor: pointer;
+}
+
+.node.concept {
+  fill: var(--accent);
+}
+
+.node.tag {
+  fill: #94a3b8;
+}
+
+.graph-wrap text {
+  fill: #17202a;
+  font-size: 12px;
+  paint-order: stroke;
+  stroke: #fbfcfd;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.qa-layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 14px;
+}
+
+.qa-list {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  max-height: 620px;
+  overflow: auto;
+}
+
+.qa-draft {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.qa-draft textarea {
+  min-height: 320px;
+}
+
 .trace-dir {
   color: var(--muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
@@ -564,7 +680,9 @@ summary {
 
   .form-grid,
   .metrics,
-  .nav {
+  .nav,
+  .qa-layout,
+  .meta-grid {
     display: grid;
     grid-template-columns: 1fr;
   }

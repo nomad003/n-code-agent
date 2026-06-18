@@ -151,13 +151,18 @@
               </option>
             </select>
           </label>
+          <div class="segmented">
+            <button :class="{ active: knowledge.mode === 'cards' }" @click="setKnowledgeMode('cards')">卡片</button>
+            <button :class="{ active: knowledge.mode === 'graph' }" @click="setKnowledgeMode('graph')">图谱</button>
+            <button :class="{ active: knowledge.mode === 'qa' }" @click="setKnowledgeMode('qa')">问答沉淀</button>
+          </div>
           <button v-for="card in knowledge.cards" :key="card.name" class="list-item" :class="{ active: knowledge.name === card.name }" @click="loadCard(card.name)">
             <span>{{ card.title }}</span>
             <small>{{ card.name }} · {{ (card.tags || []).join(', ') || 'no tags' }}</small>
           </button>
         </div>
 
-        <div class="panel editor">
+        <div v-if="knowledge.mode === 'cards'" class="panel editor">
           <div class="panel-head">
             <h2>模块卡片</h2>
             <div class="actions compact">
@@ -170,8 +175,66 @@
             <input v-model="knowledge.name" placeholder="monster-config.md">
           </label>
           <textarea v-if="knowledge.editing" v-model="knowledge.content" spellcheck="false"></textarea>
-          <article v-else class="markdown-preview" v-html="renderedKnowledge"></article>
+          <div v-else>
+            <div class="meta-grid" v-if="knowledgeMetaRows.length">
+              <div v-for="row in knowledgeMetaRows" :key="row.key">
+                <span>{{ row.key }}</span>
+                <strong>{{ row.value }}</strong>
+              </div>
+            </div>
+            <article class="markdown-preview" v-html="renderedKnowledge"></article>
+          </div>
           <div class="hint">默认展示 Markdown 预览；编辑后保存为原始 .md 卡片。</div>
+        </div>
+
+        <div v-if="knowledge.mode === 'graph'" class="panel">
+          <div class="panel-head">
+            <h2>知识图谱</h2>
+            <button class="ghost" @click="loadKnowledgeGraph">刷新</button>
+          </div>
+          <div class="graph-wrap">
+            <svg viewBox="0 0 960 560" role="img" aria-label="知识图谱">
+              <line v-for="edge in graphEdges" :key="edge.id" :x1="edge.x1" :y1="edge.y1" :x2="edge.x2" :y2="edge.y2" :class="'edge ' + edge.relation"></line>
+              <g v-for="node in graphNodes" :key="node.id" :transform="'translate(' + node.x + ',' + node.y + ')'" @click="node.kind === 'concept' && loadCard(node.id)">
+                <circle :r="node.kind === 'concept' ? 25 : 16" :class="'node ' + node.kind"></circle>
+                <text text-anchor="middle" :y="node.kind === 'concept' ? 42 : 31">{{ node.title }}</text>
+              </g>
+            </svg>
+          </div>
+          <div class="hint">圆点是知识概念，浅色小点是标签；实线表示 Markdown 内部链接，虚线表示标签关系。</div>
+        </div>
+
+        <div v-if="knowledge.mode === 'qa'" class="panel qa-panel">
+          <div class="panel-head">
+            <h2>问答沉淀</h2>
+            <button class="ghost" @click="loadKnowledgeQa">刷新</button>
+          </div>
+          <div class="qa-layout">
+            <div class="qa-list">
+              <button v-for="item in knowledge.qaItems" :key="item.id" class="list-item" :class="{ active: knowledge.qa && knowledge.qa.id === item.id }" @click="selectQa(item)">
+                <span>{{ item.question }}</span>
+                <small>{{ item.created_at || '-' }} · {{ (item.refs || []).join(', ') || 'no refs' }}</small>
+              </button>
+              <p class="hint" v-if="!knowledge.qaItems.length">没有历史问答。开启 USE_KNOWLEDGE=1 后，后台问答会写入这里。</p>
+            </div>
+            <div class="qa-draft">
+              <label>卡片标题
+                <input v-model="knowledge.qaDraft.title">
+              </label>
+              <label>文件名
+                <input v-model="knowledge.qaDraft.name">
+              </label>
+              <label>标签
+                <input v-model="knowledge.qaDraft.tags" placeholder="qa, curated, module">
+              </label>
+              <label>沉淀结论
+                <textarea v-model="knowledge.qaDraft.answer" spellcheck="false"></textarea>
+              </label>
+              <div class="actions">
+                <button class="primary" @click="precipitateQa" :disabled="loading || !knowledge.qa">落地为知识卡</button>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
     </main>
