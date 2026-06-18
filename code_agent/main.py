@@ -9,6 +9,8 @@ without changing the agent.
 """
 import asyncio
 import concurrent.futures
+import os
+import re
 from collections import OrderedDict
 
 import uvicorn
@@ -19,6 +21,7 @@ from pydantic import BaseModel
 from . import agent
 from . import config
 from . import llm_trace
+from . import module_knowledge
 from . import operation_modes
 from . import question_intent
 from . import response_policy
@@ -153,6 +156,12 @@ class DiagnoseResponse(BaseModel):
     plain: str = ""        # non-technical summary (only when requested)
 
 
+class KnowledgeSaveRequest(BaseModel):
+    repo: str
+    name: str
+    content: str
+
+
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
@@ -271,6 +280,87 @@ def ask_ui() -> HTMLResponse:
     return HTMLResponse(_ASK_UI_HTML)
 
 
+@app.get("/knowledge", response_class=HTMLResponse)
+def knowledge_page() -> HTMLResponse:
+    return HTMLResponse(_KNOWLEDGE_HTML)
+
+
+@app.get("/knowledge/api")
+def knowledge_list(repo: str | None = None) -> dict:
+    repo_name = _resolve_request_repo(repo)
+    root = _knowledge_repo_dir(repo_name)
+    cards = []
+    if os.path.isdir(root):
+        for name in sorted(os.listdir(root)):
+            if not name.endswith(".md"):
+                continue
+            path = os.path.join(root, name)
+            if not os.path.isfile(path):
+                continue
+            card = module_knowledge._read_card(path)
+            cards.append(
+                {
+                    "name": name,
+                    "title": card.title if card else name[:-3],
+                    "tags": card.tags if card else [],
+                    "size": os.path.getsize(path),
+                    "mtime": int(os.path.getmtime(path)),
+                }
+            )
+    return {"repo": repo_name, "cards": cards}
+
+
+@app.get("/knowledge/api/{repo}/{name}")
+def knowledge_read(repo: str, name: str) -> dict:
+    repo_name = _resolve_request_repo(repo)
+    path = _knowledge_card_path(repo_name, name)
+    try:
+        content = open(path, "r", encoding="utf-8").read()
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="knowledge card not found")
+    card = module_knowledge._read_card(path)
+    return {
+        "repo": repo_name,
+        "name": os.path.basename(path),
+        "title": card.title if card else os.path.basename(path)[:-3],
+        "tags": card.tags if card else [],
+        "content": content,
+    }
+
+
+@app.post("/knowledge/api")
+def knowledge_save(req: KnowledgeSaveRequest) -> dict:
+    repo_name = _resolve_request_repo(req.repo)
+    path = _knowledge_card_path(repo_name, req.name)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(req.content.rstrip() + "\n")
+    return {"repo": repo_name, "name": os.path.basename(path), "saved": True}
+
+
+_CARD_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*\.md$")
+
+
+def _knowledge_repo_dir(repo: str) -> str:
+    root = os.path.join(config.PROJECT_ROOT, "docs", "code-knowledge", repo)
+    return os.path.abspath(root)
+
+
+def _knowledge_card_path(repo: str, name: str) -> str:
+    base = os.path.basename(name or "")
+    if not base.endswith(".md"):
+        base += ".md"
+    if base != name and name.endswith(".md"):
+        raise HTTPException(status_code=400, detail="invalid card name")
+    if not _CARD_NAME_RE.match(base):
+        raise HTTPException(status_code=400, detail="invalid card name")
+    root = _knowledge_repo_dir(repo)
+    path = os.path.abspath(os.path.join(root, base))
+    if path != root and not path.startswith(root + os.sep):
+        raise HTTPException(status_code=400, detail="invalid card path")
+    return path
+
+
 @app.get("/admin/llm-traces", response_class=HTMLResponse)
 def llm_traces_page() -> HTMLResponse:
     """Visualize per-request LLM trace files under logs/llm."""
@@ -308,6 +398,9 @@ _ASK_UI_HTML = r"""<!doctype html>
     header { height:56px; display:flex; align-items:center; justify-content:space-between; padding:0 18px; border-bottom:1px solid var(--line); background:#fbfbf8; }
     h1 { margin:0; font-size:18px; font-weight:700; }
     a { color:var(--accent2); text-decoration:none; }
+    nav { display:flex; gap:8px; align-items:center; }
+    nav a { border:1px solid var(--line); border-radius:6px; padding:5px 9px; background:#fff; color:var(--muted); font-size:13px; }
+    nav a.active { color:#fff; background:var(--accent); border-color:var(--accent); }
     .layout { display:grid; grid-template-columns:360px minmax(0,1fr); min-height:calc(100vh - 56px); }
     aside { border-right:1px solid var(--line); background:#fbfbf8; padding:16px; overflow:auto; }
     main { padding:18px; overflow:auto; }
@@ -342,7 +435,11 @@ _ASK_UI_HTML = r"""<!doctype html>
 <body>
   <header>
     <h1>Code Agent 提问测试</h1>
-    <nav><a href="/admin/llm-traces" target="_blank">Trace Viewer</a></nav>
+    <nav>
+      <a class="active" href="/ui">提问</a>
+      <a href="/admin/llm-traces">Trace</a>
+      <a href="/knowledge">知识库</a>
+    </nav>
   </header>
   <div class="layout">
     <aside>
@@ -532,6 +629,180 @@ qtypeEl.value = templates.outage.type;
 """
 
 
+_KNOWLEDGE_HTML = r"""<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Code Agent 知识库</title>
+  <style>
+    :root { --bg:#f6f7f4; --panel:#fff; --line:#d7dad2; --text:#1f2420; --muted:#687066; --accent:#0f6b5d; --accent2:#174f8a; --error:#a5332f; --soft:#eef4f1; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font:14px/1.48 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    header { height:56px; display:flex; align-items:center; justify-content:space-between; padding:0 18px; border-bottom:1px solid var(--line); background:#fbfbf8; }
+    h1 { margin:0; font-size:18px; font-weight:700; }
+    nav { display:flex; gap:8px; align-items:center; }
+    nav a { border:1px solid var(--line); border-radius:6px; padding:5px 9px; background:#fff; color:var(--muted); font-size:13px; text-decoration:none; }
+    nav a.active { color:#fff; background:var(--accent); border-color:var(--accent); }
+    .layout { display:grid; grid-template-columns:320px minmax(0,1fr); height:calc(100vh - 56px); }
+    aside { border-right:1px solid var(--line); background:#fbfbf8; overflow:auto; padding:14px; }
+    main { overflow:auto; padding:16px; }
+    label { display:block; margin:10px 0 6px; color:var(--muted); font-size:12px; font-weight:650; }
+    select, input, textarea { width:100%; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--text); font:inherit; }
+    select, input { height:36px; padding:0 9px; }
+    textarea { min-height:calc(100vh - 250px); resize:vertical; padding:12px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px; line-height:1.5; }
+    button { height:36px; border:1px solid var(--line); border-radius:6px; padding:0 12px; background:#fff; cursor:pointer; font-weight:650; }
+    button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .actions { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; }
+    .card { padding:10px; border:1px solid var(--line); border-radius:7px; background:#fff; margin:8px 0; cursor:pointer; }
+    .card.active, .card:hover { background:var(--soft); border-color:#a8c9bf; }
+    .card-title { font-weight:700; }
+    .meta { color:var(--muted); font-size:12px; margin-top:4px; display:flex; gap:6px; flex-wrap:wrap; }
+    .pill { border:1px solid var(--line); border-radius:999px; padding:1px 7px; background:#fff; }
+    .status { color:var(--muted); margin:0 0 10px; }
+    .editor-head { display:grid; grid-template-columns:220px minmax(0,1fr); gap:10px; }
+    .hint { color:var(--muted); font-size:12px; margin-top:8px; }
+    @media (max-width:900px) { .layout { grid-template-columns:1fr; height:auto; } aside { border-right:0; border-bottom:1px solid var(--line); } .editor-head { grid-template-columns:1fr; } textarea { min-height:420px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Code Agent 知识库</h1>
+    <nav>
+      <a href="/ui">提问</a>
+      <a href="/admin/llm-traces">Trace</a>
+      <a class="active" href="/knowledge">知识库</a>
+    </nav>
+  </header>
+  <div class="layout">
+    <aside>
+      <label for="repo">仓库</label>
+      <select id="repo"></select>
+      <div class="actions">
+        <button id="newCard">新建卡片</button>
+        <button id="reload">刷新</button>
+      </div>
+      <div id="cards"></div>
+      <div class="hint">知识卡保存在 <code>docs/code-knowledge/&lt;repo&gt;/*.md</code>。保存后下一次提问会按关键词自动召回。</div>
+    </aside>
+    <main>
+      <p class="status" id="status">选择或新建一张知识卡。</p>
+      <div class="editor-head">
+        <div>
+          <label for="name">文件名</label>
+          <input id="name" placeholder="monster-config.md">
+        </div>
+        <div>
+          <label for="title">标题预览</label>
+          <input id="title" disabled>
+        </div>
+      </div>
+      <label for="content">Markdown 内容</label>
+      <textarea id="content" spellcheck="false"></textarea>
+      <div class="actions">
+        <button class="primary" id="save">保存</button>
+      </div>
+    </main>
+  </div>
+<script>
+const repoEl = document.getElementById('repo');
+const cardsEl = document.getElementById('cards');
+const nameEl = document.getElementById('name');
+const titleEl = document.getElementById('title');
+const contentEl = document.getElementById('content');
+const statusEl = document.getElementById('status');
+let currentName = '';
+let cards = [];
+
+function setStatus(s) { statusEl.textContent = s; }
+function cardTitle(content, fallback) {
+  const m = content.match(/^#\s+(.+)$/m);
+  return m ? m[1].trim() : fallback.replace(/\.md$/, '');
+}
+async function loadRepos() {
+  const res = await fetch('/repos');
+  const data = await res.json();
+  repoEl.innerHTML = '';
+  for (const r of data.repos || []) {
+    const o = document.createElement('option');
+    o.value = r.name;
+    o.textContent = r.name + (r.name === data.default ? ' (default)' : '');
+    repoEl.appendChild(o);
+  }
+  repoEl.value = data.default || (data.repos && data.repos[0] && data.repos[0].name) || '';
+}
+function renderCards() {
+  cardsEl.innerHTML = '';
+  if (!cards.length) {
+    cardsEl.innerHTML = '<div class="hint">暂无知识卡。</div>';
+    return;
+  }
+  for (const c of cards) {
+    const div = document.createElement('div');
+    div.className = 'card' + (c.name === currentName ? ' active' : '');
+    div.onclick = () => openCard(c.name);
+    const tags = (c.tags || []).slice(0, 6).map(t => `<span class="pill">${t}</span>`).join('');
+    div.innerHTML = `<div class="card-title">${c.title || c.name}</div><div class="meta"><span>${c.name}</span>${tags}</div>`;
+    cardsEl.appendChild(div);
+  }
+}
+async function loadCards() {
+  setStatus('加载知识卡...');
+  const res = await fetch('/knowledge/api?repo=' + encodeURIComponent(repoEl.value));
+  const data = await res.json();
+  cards = data.cards || [];
+  renderCards();
+  setStatus(`已加载 ${cards.length} 张知识卡。`);
+}
+async function openCard(name) {
+  currentName = name;
+  renderCards();
+  setStatus('读取 ' + name + ' ...');
+  const res = await fetch(`/knowledge/api/${encodeURIComponent(repoEl.value)}/${encodeURIComponent(name)}`);
+  const data = await res.json();
+  nameEl.value = data.name || name;
+  titleEl.value = data.title || '';
+  contentEl.value = data.content || '';
+  setStatus('正在编辑 ' + nameEl.value);
+}
+function newCard() {
+  currentName = '';
+  renderCards();
+  nameEl.value = 'new-module.md';
+  titleEl.value = '';
+  contentEl.value = `---\ntitle: 新模块知识卡\ntags: 模块, 配置, 排查\n---\n\n# 新模块知识卡\n\n## 核心概念\n\n## 主链路\n\n## 常见问题\n\n## 推荐排查顺序\n`;
+  setStatus('新建知识卡，填写后保存。');
+}
+async function saveCard() {
+  const body = {repo: repoEl.value, name: nameEl.value, content: contentEl.value};
+  setStatus('保存中...');
+  const res = await fetch('/knowledge/api', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    setStatus('保存失败：' + (data.detail || res.status));
+    return;
+  }
+  currentName = data.name;
+  titleEl.value = cardTitle(contentEl.value, data.name);
+  await loadCards();
+  setStatus('已保存 ' + data.name);
+}
+repoEl.onchange = loadCards;
+document.getElementById('reload').onclick = loadCards;
+document.getElementById('newCard').onclick = newCard;
+document.getElementById('save').onclick = saveCard;
+contentEl.addEventListener('input', () => { titleEl.value = cardTitle(contentEl.value, nameEl.value || ''); });
+loadRepos().then(loadCards);
+</script>
+</body>
+</html>
+"""
+
+
 _LLM_TRACES_HTML = r"""<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -544,6 +815,10 @@ _LLM_TRACES_HTML = r"""<!doctype html>
     body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
     header { height:56px; display:flex; align-items:center; justify-content:space-between; padding:0 18px; border-bottom:1px solid var(--line); background:#fbfbf8; }
     h1 { margin:0; font-size:18px; font-weight:650; }
+    nav { display:flex; gap:8px; align-items:center; }
+    nav a { border:1px solid var(--line); border-radius:6px; padding:5px 9px; background:#fff; color:var(--muted); font-size:13px; text-decoration:none; }
+    nav a.active { color:#fff; background:var(--accent); border-color:var(--accent); }
+    .top-actions { display:flex; gap:10px; align-items:center; }
     button { border:1px solid var(--line); background:#fff; height:32px; padding:0 10px; border-radius:6px; cursor:pointer; }
     button:hover { border-color:#a8aaa2; }
     .layout { display:grid; grid-template-columns:300px 280px minmax(0,1fr); height:calc(100vh - 56px); }
@@ -631,7 +906,14 @@ _LLM_TRACES_HTML = r"""<!doctype html>
 <body>
   <header>
     <h1>LLM Trace Viewer</h1>
-    <button id="refresh">刷新</button>
+    <div class="top-actions">
+      <nav>
+        <a href="/ui">提问</a>
+        <a class="active" href="/admin/llm-traces">Trace</a>
+        <a href="/knowledge">知识库</a>
+      </nav>
+      <button id="refresh">刷新</button>
+    </div>
   </header>
   <div class="layout">
     <aside id="files"><div class="empty">加载中...</div></aside>
