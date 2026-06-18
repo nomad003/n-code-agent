@@ -198,15 +198,41 @@
             <div><strong>{{ graphStats.tags }}</strong><span>标签</span></div>
             <div><strong>{{ graphStats.edges }}</strong><span>关系</span></div>
           </div>
-          <div class="graph-wrap">
-            <div class="notice" v-if="!graphNodes.length">当前仓库没有可展示的知识图谱节点。请切换到 {{ defaultRepo || '默认聚合仓库' }}，或先新增知识卡片。</div>
-            <svg viewBox="0 0 960 560" role="img" aria-label="知识图谱">
-              <line v-for="edge in graphEdges" :key="edge.id" :x1="edge.x1" :y1="edge.y1" :x2="edge.x2" :y2="edge.y2" :class="'edge ' + edge.relation"></line>
-              <g v-for="node in graphNodes" :key="node.id" :transform="'translate(' + node.x + ',' + node.y + ')'" @click="node.kind === 'concept' && loadCard(node.id)">
-                <circle :r="node.kind === 'concept' ? 25 : 16" :class="'node ' + node.kind"></circle>
-                <text text-anchor="middle" :y="node.kind === 'concept' ? 42 : 31">{{ node.title }}</text>
-              </g>
-            </svg>
+          <div class="graph-tools">
+            <label>搜索
+              <input v-model="knowledge.graphSearch" placeholder="模块、标签、文件名">
+            </label>
+            <label>关系
+              <select v-model="knowledge.graphRelation">
+                <option value="all">全部关系</option>
+                <option value="links_to">内部链接</option>
+                <option value="tagged_with">标签关系</option>
+              </select>
+            </label>
+            <button class="ghost" @click="resetGraphView">重置视图</button>
+          </div>
+          <div class="graph-stage">
+            <div class="graph-wrap">
+              <div class="notice" v-if="!graphNodes.length">当前仓库没有可展示的知识图谱节点。请切换到 {{ defaultRepo || '默认聚合仓库' }}，或先新增知识卡片。</div>
+              <svg viewBox="0 0 960 560" role="img" aria-label="知识图谱" @wheel.prevent="zoomGraph" @pointerdown.self="panGraphStart" @pointermove="moveGraphPointer" @pointerup="endGraphPointer" @pointerleave="endGraphPointer">
+                <g :transform="'translate(' + knowledge.graphView.x + ',' + knowledge.graphView.y + ') scale(' + knowledge.graphView.scale + ')'">
+                  <line v-for="edge in graphEdges" :key="edge.id" :x1="edge.x1" :y1="edge.y1" :x2="edge.x2" :y2="edge.y2" :class="'edge ' + edge.relation + (edge.dim ? ' dim' : '')"></line>
+                  <g v-for="node in graphNodes" :key="node.id" :transform="'translate(' + node.x + ',' + node.y + ')'" :class="'graph-node ' + (node.active ? 'active' : '') + (node.dim ? ' dim' : '')" @pointerdown.stop="startNodeDrag(node, $event)" @click.stop="selectGraphNode(node)">
+                    <circle :r="node.radius" :class="'node ' + node.kind"></circle>
+                    <text text-anchor="middle" :y="node.radius + 16">{{ node.title }}</text>
+                  </g>
+                </g>
+              </svg>
+            </div>
+            <aside class="graph-detail">
+              <div class="section-label">选中节点</div>
+              <h3>{{ selectedGraphNode ? selectedGraphNode.title : '未选择' }}</h3>
+              <p>{{ selectedGraphNode ? (selectedGraphNode.description || selectedGraphNode.type || selectedGraphNode.id) : '点击概念节点查看说明，双击列表项可打开知识卡。' }}</p>
+              <div class="tag-row" v-if="selectedGraphNode && selectedGraphNode.tags">
+                <span v-for="tag in selectedGraphNode.tags" :key="tag">{{ tag }}</span>
+              </div>
+              <button class="primary" v-if="selectedGraphNode && selectedGraphNode.kind === 'concept'" @click="loadCard(selectedGraphNode.id)">打开知识卡</button>
+            </aside>
           </div>
           <div class="graph-list">
             <button v-for="node in graphConcepts" :key="node.id" class="list-item" @click="loadCard(node.id)">

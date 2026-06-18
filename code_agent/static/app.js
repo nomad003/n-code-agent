@@ -144,6 +144,13 @@
           editing: false,
           graph: { nodes: [], edges: [] },
           graphSourceRepo: "",
+          graphPositions: {},
+          graphSearch: "",
+          graphRelation: "all",
+          graphSelectedId: "",
+          graphDrag: null,
+          graphPan: null,
+          graphView: { x: 0, y: 0, scale: 1 },
           qaItems: [],
           qa: null,
           curateQuestion: "",
@@ -225,22 +232,35 @@
       graphNodes() {
         const nodes = this.knowledge.graph.nodes || [];
         if (!nodes.length) return [];
-        const centerX = 480;
-        const centerY = 280;
-        const radius = 210;
-        return nodes.map((node, index) => {
-          const angle = (Math.PI * 2 * index) / nodes.length - Math.PI / 2;
-          const r = node.kind === "tag" ? radius + 65 : radius;
+        const query = this.knowledge.graphSearch.trim().toLowerCase();
+        const linked = new Set();
+        for (const edge of this.filteredGraphEdgesRaw) {
+          linked.add(edge.source);
+          linked.add(edge.target);
+        }
+        return nodes.map((node) => {
+          const pos = this.knowledge.graphPositions[node.id] || { x: 480, y: 280 };
+          const text = [node.id, node.title, node.type, node.description, ...(node.tags || [])].join(" ").toLowerCase();
+          const matches = !query || text.includes(query);
+          const active = node.id === this.knowledge.graphSelectedId || matches && query;
           return {
             ...node,
-            x: Math.round(centerX + Math.cos(angle) * r),
-            y: Math.round(centerY + Math.sin(angle) * r),
+            x: Math.round(pos.x),
+            y: Math.round(pos.y),
+            radius: node.kind === "concept" ? 18 + Math.min((node.tags || []).length, 8) : 11,
+            active,
+            dim: Boolean(query && !matches && !linked.has(node.id)),
           };
         });
       },
+      filteredGraphEdgesRaw() {
+        const relation = this.knowledge.graphRelation;
+        return (this.knowledge.graph.edges || []).filter((edge) => relation === "all" || edge.relation === relation);
+      },
       graphEdges() {
         const byId = new Map(this.graphNodes.map((node) => [node.id, node]));
-        return (this.knowledge.graph.edges || [])
+        const query = this.knowledge.graphSearch.trim().toLowerCase();
+        return this.filteredGraphEdgesRaw
           .map((edge, index) => {
             const source = byId.get(edge.source);
             const target = byId.get(edge.target);
@@ -252,6 +272,7 @@
               y1: source.y,
               x2: target.x,
               y2: target.y,
+              dim: Boolean(query && source.dim && target.dim),
             };
           })
           .filter(Boolean);
@@ -265,7 +286,16 @@
         };
       },
       graphConcepts() {
-        return (this.knowledge.graph.nodes || []).filter((node) => node.kind === "concept");
+        const query = this.knowledge.graphSearch.trim().toLowerCase();
+        return (this.knowledge.graph.nodes || [])
+          .filter((node) => node.kind === "concept")
+          .filter((node) => {
+            if (!query) return true;
+            return [node.id, node.title, node.type, node.description, ...(node.tags || [])].join(" ").toLowerCase().includes(query);
+          });
+      },
+      selectedGraphNode() {
+        return (this.knowledge.graph.nodes || []).find((node) => node.id === this.knowledge.graphSelectedId) || null;
       },
     },
     mounted() {
@@ -452,7 +482,124 @@
             edges: data.edges || [],
           };
           this.knowledge.graphSourceRepo = repo;
+          this.layoutGraph();
         });
+      },
+      layoutGraph() {
+        const nodes = this.knowledge.graph.nodes || [];
+        const edges = this.knowledge.graph.edges || [];
+        const positions = {};
+        const width = 960;
+        const height = 560;
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const concepts = nodes.filter((node) => node.kind === "concept");
+        const tags = nodes.filter((node) => node.kind === "tag");
+        concepts.forEach((node, index) => {
+          const angle = (Math.PI * 2 * index) / Math.max(1, concepts.length);
+          positions[node.id] = {
+            x: centerX + Math.cos(angle) * 180,
+            y: centerY + Math.sin(angle) * 150,
+          };
+        });
+        tags.forEach((node, index) => {
+          const angle = (Math.PI * 2 * index) / Math.max(1, tags.length);
+          positions[node.id] = {
+            x: centerX + Math.cos(angle) * 320,
+            y: centerY + Math.sin(angle) * 230,
+          };
+        });
+        for (let tick = 0; tick < 140; tick += 1) {
+          const force = {};
+          nodes.forEach((node) => {
+            force[node.id] = { x: (centerX - positions[node.id].x) * 0.002, y: (centerY - positions[node.id].y) * 0.002 };
+          });
+          for (let i = 0; i < nodes.length; i += 1) {
+            for (let j = i + 1; j < nodes.length; j += 1) {
+              const a = nodes[i];
+              const b = nodes[j];
+              const pa = positions[a.id];
+              const pb = positions[b.id];
+              const dx = pa.x - pb.x;
+              const dy = pa.y - pb.y;
+              const dist2 = Math.max(dx * dx + dy * dy, 80);
+              const strength = (a.kind === "tag" || b.kind === "tag") ? 900 : 1500;
+              const push = strength / dist2;
+              force[a.id].x += dx * push;
+              force[a.id].y += dy * push;
+              force[b.id].x -= dx * push;
+              force[b.id].y -= dy * push;
+            }
+          }
+          for (const edge of edges) {
+            const source = positions[edge.source];
+            const target = positions[edge.target];
+            if (!source || !target) continue;
+            const dx = target.x - source.x;
+            const dy = target.y - source.y;
+            const desired = edge.relation === "links_to" ? 145 : 105;
+            const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
+            const pull = (dist - desired) * 0.006;
+            const fx = (dx / dist) * pull;
+            const fy = (dy / dist) * pull;
+            force[edge.source].x += fx;
+            force[edge.source].y += fy;
+            force[edge.target].x -= fx;
+            force[edge.target].y -= fy;
+          }
+          nodes.forEach((node) => {
+            const pos = positions[node.id];
+            pos.x = Math.max(35, Math.min(width - 35, pos.x + force[node.id].x));
+            pos.y = Math.max(35, Math.min(height - 35, pos.y + force[node.id].y));
+          });
+        }
+        this.knowledge.graphPositions = positions;
+        if (!this.knowledge.graphSelectedId && concepts.length) this.knowledge.graphSelectedId = concepts[0].id;
+      },
+      selectGraphNode(node) {
+        this.knowledge.graphSelectedId = node.id;
+      },
+      startNodeDrag(node, event) {
+        this.knowledge.graphSelectedId = node.id;
+        this.knowledge.graphDrag = {
+          id: node.id,
+          startX: event.clientX,
+          startY: event.clientY,
+          origin: { ...(this.knowledge.graphPositions[node.id] || { x: node.x, y: node.y }) },
+        };
+      },
+      panGraphStart(event) {
+        this.knowledge.graphPan = {
+          startX: event.clientX,
+          startY: event.clientY,
+          origin: { ...this.knowledge.graphView },
+        };
+      },
+      moveGraphPointer(event) {
+        if (this.knowledge.graphDrag) {
+          const drag = this.knowledge.graphDrag;
+          const scale = this.knowledge.graphView.scale || 1;
+          this.knowledge.graphPositions[drag.id] = {
+            x: drag.origin.x + (event.clientX - drag.startX) / scale,
+            y: drag.origin.y + (event.clientY - drag.startY) / scale,
+          };
+        } else if (this.knowledge.graphPan) {
+          const pan = this.knowledge.graphPan;
+          this.knowledge.graphView.x = pan.origin.x + event.clientX - pan.startX;
+          this.knowledge.graphView.y = pan.origin.y + event.clientY - pan.startY;
+        }
+      },
+      endGraphPointer() {
+        this.knowledge.graphDrag = null;
+        this.knowledge.graphPan = null;
+      },
+      zoomGraph(event) {
+        const next = this.knowledge.graphView.scale * (event.deltaY > 0 ? 0.9 : 1.1);
+        this.knowledge.graphView.scale = Math.max(0.55, Math.min(2.4, next));
+      },
+      resetGraphView() {
+        this.knowledge.graphView = { x: 0, y: 0, scale: 1 };
+        this.layoutGraph();
       },
       async loadKnowledgeQa() {
         await this.withLoading("加载问答", async () => {
