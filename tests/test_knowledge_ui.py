@@ -18,9 +18,9 @@ def knowledge_env(tmp_path, monkeypatch):
 
 def test_knowledge_page_smoke():
     html = main.knowledge_page().body.decode("utf-8")
-    assert "Code Agent 知识库" in html
+    assert "Code Agent Workbench" in html
     assert "/knowledge/api" in html
-    assert "提问" in html and "模型调用分析" in html
+    assert "调查" in html and "复盘" in html and "知识" in html
     assert "markdown-preview" in html
 
 

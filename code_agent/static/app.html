@@ -14,14 +14,14 @@
       <div class="brand">
         <div class="brand-mark">CA</div>
         <div>
-          <div class="brand-title">Code Agent</div>
-          <div class="brand-subtitle">问答 / 调用分析 / 知识库</div>
+          <div class="brand-title">Code Agent Workbench</div>
+          <div class="brand-subtitle">代码调查 / 调用复盘 / 知识沉淀</div>
         </div>
       </div>
       <nav class="nav">
-        <button :class="{ active: view === 'ask' }" @click="go('ask', '/ui')">提问</button>
-        <button :class="{ active: view === 'traces' }" @click="go('traces', '/admin/llm-traces')">模型调用分析</button>
-        <button :class="{ active: view === 'knowledge' }" @click="go('knowledge', '/knowledge')">知识库</button>
+        <button :class="{ active: view === 'ask' }" @click="go('ask', '/ui')">调查</button>
+        <button :class="{ active: view === 'traces' }" @click="go('traces', '/admin/llm-traces')">复盘</button>
+        <button :class="{ active: view === 'knowledge' }" @click="go('knowledge', '/knowledge')">知识</button>
       </nav>
       <div class="side-note">
         <div class="label">当前仓库</div>
@@ -45,7 +45,7 @@
       <section v-if="view === 'ask'" class="workspace two-col">
         <div class="panel">
           <div class="panel-head">
-            <h2>问题输入</h2>
+            <h2>问题材料</h2>
             <button class="ghost" @click="fillExample">填入日志样例</button>
           </div>
           <div class="form-grid">
@@ -83,7 +83,7 @@
 
         <div class="panel output">
           <div class="panel-head">
-            <h2>回答</h2>
+            <h2>分析结果</h2>
             <button class="ghost" @click="clearAskOutput">清空</button>
           </div>
           <pre>{{ ask.answer || '等待提交问题。' }}</pre>
@@ -109,7 +109,7 @@
 
         <div class="panel">
           <div class="panel-head">
-            <h2>调用过程</h2>
+            <h2>证据链</h2>
             <span class="pill">{{ traceRows.length }} events</span>
           </div>
           <div class="metrics">
@@ -141,7 +141,7 @@
       <section v-if="view === 'knowledge'" class="workspace knowledge-layout">
         <div class="panel list-panel">
           <div class="panel-head">
-            <h2>Code Agent 知识库</h2>
+            <h2>知识工作集</h2>
             <button class="ghost" @click="newCard">新增</button>
           </div>
           <label>仓库

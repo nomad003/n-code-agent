@@ -159,14 +159,14 @@
     },
     computed: {
       viewTitle() {
-        if (this.view === "traces") return "模型调用分析";
-        if (this.view === "knowledge") return "知识库维护";
-        return "提问测试";
+        if (this.view === "traces") return "调用复盘";
+        if (this.view === "knowledge") return "知识工作台";
+        return "代码调查";
       },
       viewSubtitle() {
-        if (this.view === "traces") return "复盘每轮模型输入、工具调用和最终回答，快速发现上下文不足的问题。";
-        if (this.view === "knowledge") return "维护模块框架、关键配置和排查细节，问答时自动注入相关上下文。";
-        return "按 crash 堆栈、宕机日志、功能实现、配置实现选择对应答疑路径。";
+        if (this.view === "traces") return "沿着每轮模型输入、工具调用和最终回答复盘证据链。";
+        if (this.view === "knowledge") return "维护模块地图、排查手册和可被问答自动召回的沉淀知识。";
+        return "把 crash 堆栈、宕机日志、功能实现和配置实现放进同一个调查台。";
       },
       tracePretty() {
         return this.traceRows.map((row) => JSON.stringify(row, null, 2)).join("\n");
