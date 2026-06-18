@@ -19,6 +19,98 @@
     return row.answer || row.content || row.text || row.output || row.error || "";
   }
 
+  function escapeHtml(text) {
+    return String(text || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function renderInline(text) {
+    return escapeHtml(text)
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
+  }
+
+  function stripFrontMatter(markdown) {
+    const text = String(markdown || "");
+    if (!text.startsWith("---\n")) return text;
+    const end = text.indexOf("\n---", 4);
+    if (end < 0) return text;
+    return text.slice(end + 4).replace(/^\s+/, "");
+  }
+
+  function renderMarkdown(markdown) {
+    const lines = stripFrontMatter(markdown).split(/\r?\n/);
+    const html = [];
+    let inCode = false;
+    let code = [];
+    let list = [];
+    let paragraph = [];
+
+    function flushParagraph() {
+      if (!paragraph.length) return;
+      html.push("<p>" + paragraph.map(renderInline).join("<br>") + "</p>");
+      paragraph = [];
+    }
+
+    function flushList() {
+      if (!list.length) return;
+      html.push("<ul>" + list.map((item) => "<li>" + renderInline(item) + "</li>").join("") + "</ul>");
+      list = [];
+    }
+
+    function flushCode() {
+      html.push("<pre><code>" + escapeHtml(code.join("\n")) + "</code></pre>");
+      code = [];
+    }
+
+    for (const line of lines) {
+      if (line.trim().startsWith("```")) {
+        if (inCode) {
+          flushCode();
+          inCode = false;
+        } else {
+          flushParagraph();
+          flushList();
+          inCode = true;
+        }
+        continue;
+      }
+      if (inCode) {
+        code.push(line);
+        continue;
+      }
+      if (!line.trim()) {
+        flushParagraph();
+        flushList();
+        continue;
+      }
+      const heading = /^(#{1,4})\s+(.+)$/.exec(line);
+      if (heading) {
+        flushParagraph();
+        flushList();
+        const level = heading[1].length;
+        html.push(`<h${level}>${renderInline(heading[2])}</h${level}>`);
+        continue;
+      }
+      const bullet = /^\s*[-*]\s+(.+)$/.exec(line);
+      if (bullet) {
+        flushParagraph();
+        list.push(bullet[1]);
+        continue;
+      }
+      paragraph.push(line);
+    }
+    if (inCode) flushCode();
+    flushParagraph();
+    flushList();
+    return html.join("\n") || '<p class="empty">选择或新建一个知识卡片。</p>';
+  }
+
   const app = Vue.createApp({
     data() {
       return {
@@ -45,6 +137,7 @@
           cards: [],
           name: "",
           content: "",
+          editing: false,
         },
       };
     },
@@ -103,6 +196,9 @@
           findings,
           roundDetails,
         };
+      },
+      renderedKnowledge() {
+        return renderMarkdown(this.knowledge.content);
       },
     },
     mounted() {
@@ -235,11 +331,13 @@
           const data = await this.apiJson(url);
           this.knowledge.name = data.name || name;
           this.knowledge.content = data.content || "";
+          this.knowledge.editing = false;
         });
       },
       newCard() {
         this.knowledge.name = "new-module.md";
         this.knowledge.content = "---\ntitle: 新模块\ntags: \n---\n\n# 新模块\n\n## 框架\n\n## 关键流程\n\n## 常见问题\n";
+        this.knowledge.editing = true;
       },
       async saveCard() {
         await this.withLoading("保存卡片", async () => {
@@ -253,6 +351,7 @@
             }),
           });
           await this.loadKnowledge();
+          this.knowledge.editing = false;
         });
       },
     },

@@ -19,6 +19,7 @@ def test_knowledge_page_smoke():
     assert "Code Agent 知识库" in html
     assert "/knowledge/api" in html
     assert "提问" in html and "模型调用分析" in html
+    assert "markdown-preview" in html
 
 
 def test_knowledge_save_list_read(knowledge_env):

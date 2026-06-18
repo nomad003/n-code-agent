@@ -160,13 +160,18 @@
         <div class="panel editor">
           <div class="panel-head">
             <h2>模块卡片</h2>
-            <button class="primary" @click="saveCard" :disabled="loading || !knowledge.name.trim()">保存</button>
+            <div class="actions compact">
+              <button class="ghost" v-if="!knowledge.editing" @click="knowledge.editing = true">编辑</button>
+              <button class="ghost" v-if="knowledge.editing" @click="knowledge.editing = false">预览</button>
+              <button class="primary" v-if="knowledge.editing" @click="saveCard" :disabled="loading || !knowledge.name.trim()">保存</button>
+            </div>
           </div>
-          <label>文件名
+          <label v-if="knowledge.editing">文件名
             <input v-model="knowledge.name" placeholder="monster-config.md">
           </label>
-          <textarea v-model="knowledge.content" spellcheck="false"></textarea>
-          <div class="hint">Front matter 支持 title / tags；问答时会按问题命中相关模块卡片并注入上下文。</div>
+          <textarea v-if="knowledge.editing" v-model="knowledge.content" spellcheck="false"></textarea>
+          <article v-else class="markdown-preview" v-html="renderedKnowledge"></article>
+          <div class="hint">默认展示 Markdown 预览；编辑后保存为原始 .md 卡片。</div>
         </div>
       </section>
     </main>
