@@ -6,8 +6,16 @@
 
 ### `GET /ui`
 
-浏览器测试界面。可选择 repo、回答模式、问题类型，支持提交 `/ask` 和 `/diagnose`，
-并展示请求体、原始响应、耗时和缓存命中状态。
+Vue 统一控制台的提问页。可选择 repo、回答模式、问题类型，支持提交 `/ask` 和
+`/diagnose`，并展示回答和原始响应。
+
+同一个 Vue 前端也承载：
+
+| 页面 | 说明 |
+|------|------|
+| `GET /ui` | 提问 / 诊断测试 |
+| `GET /admin/llm-traces` | LLM trace 最佳实践视图 |
+| `GET /knowledge` | 模块知识库维护 |
 
 ### `GET /health`
 

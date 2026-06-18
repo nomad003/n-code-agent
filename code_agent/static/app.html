@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Code Agent Console</title>
+  <meta name="code-agent-apis" content="/ask /diagnose /repos /knowledge/api /admin/llm-traces/api">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+</head>
+<body>
+  <div id="app" v-cloak>
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">CA</div>
+        <div>
+          <div class="brand-title">Code Agent</div>
+          <div class="brand-subtitle">提问 / Trace / 知识库</div>
+        </div>
+      </div>
+      <nav class="nav">
+        <button :class="{ active: view === 'ask' }" @click="go('ask', '/ui')">提问测试</button>
+        <button :class="{ active: view === 'traces' }" @click="go('traces', '/admin/llm-traces')">LLM Trace Viewer</button>
+        <button :class="{ active: view === 'knowledge' }" @click="go('knowledge', '/knowledge')">知识库维护</button>
+      </nav>
+      <div class="side-note">
+        <div class="label">当前仓库</div>
+        <strong>{{ selectedRepo || '加载中' }}</strong>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1>{{ viewTitle }}</h1>
+          <p>{{ viewSubtitle }}</p>
+        </div>
+        <div class="status" :class="{ busy: loading }">{{ loading ? '处理中' : statusText }}</div>
+      </header>
+
+      <section v-if="!vueReady" class="notice danger">
+        Vue 没有加载成功，请检查浏览器是否能访问 Vue CDN，或改成本地 vendored Vue 文件。
+      </section>
+
+      <section v-if="view === 'ask'" class="workspace two-col">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Code Agent 提问测试</h2>
+            <button class="ghost" @click="fillExample">填入日志样例</button>
+          </div>
+          <div class="form-grid">
+            <label>仓库
+              <select v-model="selectedRepo">
+                <option v-for="repo in repos" :key="repo.name" :value="repo.name">
+                  {{ repo.name }} - {{ repo.path }}
+                </option>
+              </select>
+            </label>
+            <label>模式
+              <select v-model="ask.mode">
+                <option value="plain">plain</option>
+                <option value="technical">technical</option>
+              </select>
+            </label>
+            <label>问题类型
+              <select v-model="ask.question_type">
+                <option value="general">通用问题</option>
+                <option value="crash_stack">程序 crash 堆栈</option>
+                <option value="outage_log">宕机 / 错误日志</option>
+                <option value="feature_impl">功能实现</option>
+                <option value="config_impl">配置实现</option>
+              </select>
+            </label>
+            <label class="check"><input type="checkbox" v-model="ask.use_cache"> 使用缓存</label>
+          </div>
+          <textarea v-model="ask.question" spellcheck="false" placeholder="粘贴 crash 堆栈、宕机日志，或描述要查询的功能 / 配置实现。"></textarea>
+          <div class="actions">
+            <button class="primary" @click="submitAsk" :disabled="loading || !ask.question.trim()">提交提问</button>
+            <button @click="submitDiagnose" :disabled="loading || !ask.question.trim()">按诊断分析</button>
+            <label class="check"><input type="checkbox" v-model="ask.plain"> 诊断输出 plain</label>
+          </div>
+        </div>
+
+        <div class="panel output">
+          <div class="panel-head">
+            <h2>回答</h2>
+            <button class="ghost" @click="clearAskOutput">清空</button>
+          </div>
+          <pre>{{ ask.answer || '等待提交问题。' }}</pre>
+          <details v-if="ask.raw">
+            <summary>原始响应</summary>
+            <pre>{{ ask.raw }}</pre>
+          </details>
+        </div>
+      </section>
+
+      <section v-if="view === 'traces'" class="workspace trace-layout">
+        <div class="panel list-panel">
+          <div class="panel-head">
+            <h2>Trace 文件</h2>
+            <button class="ghost" @click="loadTraces">刷新</button>
+          </div>
+          <div class="trace-dir">{{ traceDir || 'logs/llm' }}</div>
+          <button v-for="file in traceFiles" :key="file.file" class="list-item" :class="{ active: selectedTrace === file.file }" @click="loadTrace(file.file)">
+            <span>{{ file.file }}</span>
+            <small>{{ file.last_event || '-' }} · {{ file.question || '无问题文本' }}</small>
+          </button>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h2>最佳实践视图</h2>
+            <span class="pill">{{ traceRows.length }} events</span>
+          </div>
+          <div class="metrics">
+            <div><strong>{{ traceSummary.rounds }}</strong><span>LLM 轮次</span></div>
+            <div><strong>{{ traceSummary.tools }}</strong><span>工具调用</span></div>
+            <div><strong>{{ traceSummary.findings.length }}</strong><span>检查项</span></div>
+          </div>
+          <div class="notice" v-if="traceSummary.findings.length">
+            <strong>Trace 检查</strong>
+            <ul>
+              <li v-for="item in traceSummary.findings" :key="item">{{ item }}</li>
+            </ul>
+          </div>
+          <div class="round" v-for="round in traceSummary.roundDetails" :key="round.id">
+            <div class="round-title">Round {{ round.id }}</div>
+            <div class="tool-chain">
+              <span v-for="tool in round.tools" :key="tool">{{ tool }}</span>
+              <em v-if="!round.tools.length">未调用工具</em>
+            </div>
+            <pre v-if="round.answer">{{ round.answer }}</pre>
+          </div>
+          <details>
+            <summary>原始事件</summary>
+            <pre>{{ tracePretty }}</pre>
+          </details>
+        </div>
+      </section>
+
+      <section v-if="view === 'knowledge'" class="workspace knowledge-layout">
+        <div class="panel list-panel">
+          <div class="panel-head">
+            <h2>Code Agent 知识库</h2>
+            <button class="ghost" @click="newCard">新增</button>
+          </div>
+          <label>仓库
+            <select v-model="selectedRepo" @change="loadKnowledge">
+              <option v-for="repo in repos" :key="repo.name" :value="repo.name">
+                {{ repo.name }}
+              </option>
+            </select>
+          </label>
+          <button v-for="card in knowledge.cards" :key="card.name" class="list-item" :class="{ active: knowledge.name === card.name }" @click="loadCard(card.name)">
+            <span>{{ card.title }}</span>
+            <small>{{ card.name }} · {{ (card.tags || []).join(', ') || 'no tags' }}</small>
+          </button>
+        </div>
+
+        <div class="panel editor">
+          <div class="panel-head">
+            <h2>模块卡片</h2>
+            <button class="primary" @click="saveCard" :disabled="loading || !knowledge.name.trim()">保存</button>
+          </div>
+          <label>文件名
+            <input v-model="knowledge.name" placeholder="monster-config.md">
+          </label>
+          <textarea v-model="knowledge.content" spellcheck="false"></textarea>
+          <div class="hint">Front matter 支持 title / tags；问答时会按问题命中相关模块卡片并注入上下文。</div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script>
+    window.__CODE_AGENT_VUE_READY__ = Boolean(window.Vue);
+  </script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
