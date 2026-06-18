@@ -97,7 +97,12 @@ def _read_card(path: str) -> Card | None:
                 if key.strip() == "title" and val.strip():
                     title = val.strip()
                 elif key.strip() == "tags":
-                    tags = [t.strip() for t in re.split(r"[,，]", val) if t.strip()]
+                    raw = val.strip().strip("[]")
+                    tags = [
+                        t.strip().strip("'\"")
+                        for t in re.split(r"[,，]", raw)
+                        if t.strip()
+                    ]
     if title == os.path.splitext(os.path.basename(path))[0]:
         m = re.search(r"^#\s+(.+)$", body, re.MULTILINE)
         if m:
@@ -124,6 +129,10 @@ def _terms(text: str) -> list[str]:
     for term in terms:
         low = term.lower()
         expanded.append(low)
+        if re.fullmatch(r"[一-鿿]{3,}", term):
+            for size in (2, 3, 4):
+                for i in range(0, len(term) - size + 1):
+                    expanded.append(term[i : i + size])
         expanded.extend(_SYNONYMS.get(low, ()))
     return list(dict.fromkeys(t for t in expanded if len(t) >= 2))
 
@@ -133,11 +142,26 @@ _SYNONYMS = {
     "怪": ["monster", "enemy"],
     "敌人": ["enemy", "monster"],
     "配置": ["config", "conf", "table"],
+    "表": ["table", "config", "conf"],
     "技能": ["skill", "skilllistforenemy"],
     "宕机": ["crash", "error", "assert"],
     "日志": ["log", "error"],
+    "场景": ["scene", "scenemgr"],
+    "关卡": ["level", "spawner"],
+    "战斗": ["combat", "battle"],
+    "单位": ["unit", "combatunit"],
+    "角色": ["role", "combatrole"],
+    "buff": ["xbuff", "增益"],
+    "ai": ["agent", "node", "skill"],
+    "ecs": ["xecs", "component", "system"],
     "monster": ["怪物", "enemy"],
     "enemy": ["怪物", "monster"],
     "skill": ["技能", "skilllistforenemy"],
     "config": ["配置", "conf", "table"],
+    "scene": ["场景", "scenemgr"],
+    "level": ["关卡", "spawner"],
+    "combat": ["战斗", "battle"],
+    "unit": ["单位", "combatunit"],
+    "role": ["角色", "combatrole"],
+    "xecs": ["ecs", "component", "system"],
 }

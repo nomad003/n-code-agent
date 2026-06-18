@@ -1,6 +1,16 @@
 ---
+type: Config Chain
 title: 怪物配置与敌人技能配置链路
+description: 怪物配置、CombatEnemy 初始化、SkillListForEnemy 查询和 enemy skill not find 排查。
+repo: marvel
+module: gameserver/unit + gameserver/tableload
+resource: gameserver/unit/enemy.cpp
 tags: 怪物, monster, enemy, 配置, 技能, SkillListForEnemy, GetEnemySkillConfigX, InitEnemySkill, CombatEnemy
+symbols: CombatEnemy, SkillMgr, SkillCore, SkillConfig::GetEnemySkillConfigX
+logs: enemy conf skill, skill not find in conf, Check cond failed
+asserts: CHECK_COND(false)
+question_types: outage_log, config_impl, feature_impl
+updated_at: 2026-06-18
 ---
 
 # 怪物配置与敌人技能配置链路
