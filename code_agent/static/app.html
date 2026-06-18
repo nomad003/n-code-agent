@@ -15,13 +15,13 @@
         <div class="brand-mark">CA</div>
         <div>
           <div class="brand-title">Code Agent</div>
-          <div class="brand-subtitle">提问 / Trace / 知识库</div>
+          <div class="brand-subtitle">问答 / 调用分析 / 知识库</div>
         </div>
       </div>
       <nav class="nav">
-        <button :class="{ active: view === 'ask' }" @click="go('ask', '/ui')">提问测试</button>
-        <button :class="{ active: view === 'traces' }" @click="go('traces', '/admin/llm-traces')">LLM Trace Viewer</button>
-        <button :class="{ active: view === 'knowledge' }" @click="go('knowledge', '/knowledge')">知识库维护</button>
+        <button :class="{ active: view === 'ask' }" @click="go('ask', '/ui')">提问</button>
+        <button :class="{ active: view === 'traces' }" @click="go('traces', '/admin/llm-traces')">模型调用分析</button>
+        <button :class="{ active: view === 'knowledge' }" @click="go('knowledge', '/knowledge')">知识库</button>
       </nav>
       <div class="side-note">
         <div class="label">当前仓库</div>
@@ -45,7 +45,7 @@
       <section v-if="view === 'ask'" class="workspace two-col">
         <div class="panel">
           <div class="panel-head">
-            <h2>Code Agent 提问测试</h2>
+            <h2>问题输入</h2>
             <button class="ghost" @click="fillExample">填入日志样例</button>
           </div>
           <div class="form-grid">
@@ -97,7 +97,7 @@
       <section v-if="view === 'traces'" class="workspace trace-layout">
         <div class="panel list-panel">
           <div class="panel-head">
-            <h2>Trace 文件</h2>
+            <h2>请求记录</h2>
             <button class="ghost" @click="loadTraces">刷新</button>
           </div>
           <div class="trace-dir">{{ traceDir || 'logs/llm' }}</div>
@@ -109,16 +109,16 @@
 
         <div class="panel">
           <div class="panel-head">
-            <h2>最佳实践视图</h2>
+            <h2>调用过程</h2>
             <span class="pill">{{ traceRows.length }} events</span>
           </div>
           <div class="metrics">
-            <div><strong>{{ traceSummary.rounds }}</strong><span>LLM 轮次</span></div>
+            <div><strong>{{ traceSummary.rounds }}</strong><span>模型轮次</span></div>
             <div><strong>{{ traceSummary.tools }}</strong><span>工具调用</span></div>
             <div><strong>{{ traceSummary.findings.length }}</strong><span>检查项</span></div>
           </div>
           <div class="notice" v-if="traceSummary.findings.length">
-            <strong>Trace 检查</strong>
+            <strong>质量检查</strong>
             <ul>
               <li v-for="item in traceSummary.findings" :key="item">{{ item }}</li>
             </ul>

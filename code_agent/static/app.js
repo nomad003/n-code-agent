@@ -50,14 +50,14 @@
     },
     computed: {
       viewTitle() {
-        if (this.view === "traces") return "LLM Trace Viewer";
+        if (this.view === "traces") return "模型调用分析";
         if (this.view === "knowledge") return "知识库维护";
-        return "Code Agent 提问测试";
+        return "提问测试";
       },
       viewSubtitle() {
-        if (this.view === "traces") return "按最佳实践检查每次 LLM 调用、工具调用和最终回答。";
-        if (this.view === "knowledge") return "维护大模块的框架、关键配置、排查细节，供问答时提前注入。";
-        return "针对 crash 堆栈、宕机日志、功能实现、配置实现选择不同答疑路径。";
+        if (this.view === "traces") return "复盘每轮模型输入、工具调用和最终回答，快速发现上下文不足的问题。";
+        if (this.view === "knowledge") return "维护模块框架、关键配置和排查细节，问答时自动注入相关上下文。";
+        return "按 crash 堆栈、宕机日志、功能实现、配置实现选择对应答疑路径。";
       },
       tracePretty() {
         return this.traceRows.map((row) => JSON.stringify(row, null, 2)).join("\n");
