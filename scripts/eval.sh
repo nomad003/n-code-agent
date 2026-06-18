@@ -11,4 +11,4 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 ensure_venv
 dataset="${1:-eval/dataset.sample.jsonl}"
 shift || true
-run_py evaluate.py "$dataset" "$@"
+run_py -m code_agent.evaluate "$dataset" "$@"

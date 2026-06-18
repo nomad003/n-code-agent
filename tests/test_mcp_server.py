@@ -3,20 +3,22 @@
 The tool is registered on FastMCP; we exercise it both directly (the wrapped
 function) and through the MCP server's tool registry to prove it's discoverable.
 """
-import agent
-import mcp_server
+from code_agent import agent
+from code_agent import config
+from code_agent import mcp_server
 import pytest
 
 
 def test_ask_codebase_delegates_to_agent(monkeypatch):
-    monkeypatch.setattr(agent, "answer", lambda q, *, verbose=False: f"A: {q}")
+    monkeypatch.setattr(config, "AGENT_ALLOWED_MODES", ("plain",))
+    monkeypatch.setattr(agent, "answer", lambda q, *, verbose=False, mode=None, repo=None: f"A: {q}")
     assert mcp_server.ask_codebase("什么是 SceneMgr？") == "A: 什么是 SceneMgr？"
 
 
 def test_ask_codebase_empty_question(monkeypatch):
     called = {"n": 0}
 
-    def spy(q, *, verbose=False):
+    def spy(q, *, verbose=False, mode=None, repo=None):
         called["n"] += 1
         return "x"
 
@@ -25,8 +27,37 @@ def test_ask_codebase_empty_question(monkeypatch):
     assert called["n"] == 0  # never reaches the agent
 
 
+def test_ask_codebase_rejects_disabled_mode(monkeypatch):
+    called = {"n": 0}
+
+    def spy(q, *, verbose=False, mode=None, repo=None):
+        called["n"] += 1
+        return "x"
+
+    monkeypatch.setattr(config, "AGENT_ALLOWED_MODES", ("plain",))
+    monkeypatch.setattr(agent, "answer", spy)
+    out = mcp_server.ask_codebase("Q", mode="technical")
+    assert "模式不可用" in out
+    assert called["n"] == 0
+
+
+def test_ask_codebase_passes_enabled_mode(monkeypatch):
+    captured = {}
+
+    def fake_answer(q, *, verbose=False, mode=None, repo=None):
+        captured["mode"] = mode
+        captured["repo"] = repo
+        return "ok"
+
+    monkeypatch.setattr(config, "AGENT_ALLOWED_MODES", ("plain", "technical"))
+    monkeypatch.setattr(agent, "answer", fake_answer)
+    assert mcp_server.ask_codebase("Q", mode="technical") == "ok"
+    assert captured["mode"] == "technical"
+    assert captured["repo"] == "default"
+
+
 def test_diagnose_crash_accepts_log_without_backtrace(monkeypatch):
-    import diagnose
+    from code_agent import diagnose
 
     captured = {}
 
@@ -46,7 +77,7 @@ def test_diagnose_crash_accepts_log_without_backtrace(monkeypatch):
 
 
 def test_diagnose_crash_rejects_empty_input(monkeypatch):
-    import diagnose
+    from code_agent import diagnose
 
     called = {"n": 0}
 

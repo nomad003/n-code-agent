@@ -1,8 +1,8 @@
 """Tests for the evaluation harness (offline — agent stubbed)."""
 import json
 
-import config
-import evaluate
+from code_agent import config
+from code_agent import evaluate
 import pytest
 
 
@@ -42,6 +42,35 @@ def test_score_file_can_match_in_refs():
 def test_score_no_expected_files_passes_on_symbols():
     r = evaluate._score("含 hp 字段", [], {"expect_symbols": ["hp"], "expect_files": []})
     assert r["passed"] is True
+
+
+def test_score_all_files_and_phrases():
+    r = evaluate._score(
+        "根因是 enemy skill 配置缺失，涉及 skillcore.cpp",
+        ["gameserver/tableload/skillconfig.cpp"],
+        {
+            "expect_all_files": [
+                "gameserver/tableload/skillconfig.cpp",
+                "skillcore.cpp",
+            ],
+            "expect_phrases": ["配置缺失", "enemy skill"],
+        },
+    )
+    assert r["passed"] is True
+
+
+def test_score_reports_missing_all_files_and_phrases():
+    r = evaluate._score(
+        "只提到了 skillcore.cpp",
+        [],
+        {
+            "expect_all_files": ["skillcore.cpp", "skillconfig.cpp"],
+            "expect_phrases": ["配置缺失"],
+        },
+    )
+    assert r["passed"] is False
+    assert r["missing_all_files"] == ["skillconfig.cpp"]
+    assert r["missing_phrases"] == ["配置缺失"]
 
 
 # --- dataset loading -------------------------------------------------------

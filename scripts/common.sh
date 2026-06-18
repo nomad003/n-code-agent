@@ -92,16 +92,16 @@ daemon_status() {
   fi
 }
 
-# daemon_dispatch <name> <script.py> <cmd> -- handles start/stop/restart/status,
+# daemon_dispatch <name> <cmd> <python args...> -- handles start/stop/restart/status,
 # or runs in the FOREGROUND when cmd is empty (keeps the old default behaviour).
 daemon_dispatch() {
-  local name="$1" script="$2" cmd="${3:-}"
+  local name="$1" cmd="${2:-}"; shift 2 || true
   case "$cmd" in
-    start)   daemon_start "$name" "$script" ;;
+    start)   daemon_start "$name" "$@" ;;
     stop)    daemon_stop "$name" ;;
-    restart) daemon_stop "$name"; daemon_start "$name" "$script" ;;
+    restart) daemon_stop "$name"; daemon_start "$name" "$@" ;;
     status)  daemon_status "$name" ;;
-    ""|fg|foreground) run_py "$script" ;;  # foreground (exec)
+    ""|fg|foreground) run_py "$@" ;;  # foreground (exec)
     *) echo "usage: $(basename "$0") [start|stop|restart|status]  (no arg = foreground)" >&2; return 2 ;;
   esac
 }

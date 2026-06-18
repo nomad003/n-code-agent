@@ -1,10 +1,12 @@
 """Tests for the custom CodeAgent loop (offline — litellm is stubbed)."""
+import json
 import types
+from pathlib import Path
 
-import agent
-import config
+from code_agent import agent
+from code_agent import config
 import pytest
-from events import Action, Observation
+from code_agent.events import Action, Observation
 
 
 # --- helpers to fake litellm responses -------------------------------------
@@ -84,6 +86,37 @@ def test_tool_call_then_answer(stub_llm, tmp_path):
     assert "a.py" in a.history[1].content
 
 
+def test_answer_writes_per_request_llm_trace(stub_llm, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "USE_SHORTCUT", False)
+    trace_dir = tmp_path / "traces"
+    monkeypatch.setattr(config, "LLM_TRACE_DIR", str(trace_dir))
+    (tmp_path / "a.py").write_text("class Foo: pass\n", encoding="utf-8")
+    stub_llm(
+        [
+            _msg(tool_calls=[_tool_call("c1", "find_symbol", '{"name": "Foo"}')]),
+            _msg(content="Foo 在 a.py"),
+        ],
+        str(tmp_path),
+    )
+
+    assert agent.answer("Foo 在哪") == "Foo 在 a.py"
+
+    files = list(Path(config.LLM_TRACE_DIR).glob("*.jsonl"))
+    assert len(files) == 1
+    rows = [json.loads(line) for line in files[0].read_text(encoding="utf-8").splitlines()]
+    events = [r["event"] for r in rows]
+    assert events[0] == "request_start"
+    assert events.count("llm_request") == 2
+    assert events.count("llm_response") == 2
+    assert "tool_result" in events
+    assert events[-1] == "request_end"
+    assert rows[1]["messages"][0]["role"] == "system"
+    assert rows[1]["messages"][1] == {"role": "user", "content": "Foo 在哪"}
+    tool_row = next(r for r in rows if r["event"] == "tool_result")
+    assert tool_row["name"] == "find_symbol"
+    assert "a.py" in tool_row["result"]
+
+
 # --- message building keeps pairing ----------------------------------------
 
 
@@ -101,6 +134,16 @@ def test_build_messages_pairs_tool_results(tmp_path, monkeypatch):
     assert msgs[1] == {"role": "user", "content": "Q"}
     assert msgs[2] is assistant_msg                     # assistant turn once
     assert msgs[3]["role"] == "tool" and msgs[3]["tool_call_id"] == "c1"
+
+
+def test_build_messages_injects_question_intent(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "TARGET_CODE_PATH", str(tmp_path))
+    monkeypatch.setattr(config, "LLM_PROMPT_CACHE", False)
+    a = agent.CodeAgent()
+    a.question = "[ERROR] ASSERT_FALSE player id invalid 1001"
+    msgs = a._build_messages(with_tools=True)
+    assert "当前问题类型：宕机/错误日志分析" in msgs[0]["content"]
+    assert "find_assert_context" in msgs[0]["content"]
 
 
 def test_build_messages_dedupes_multi_call_assistant(tmp_path, monkeypatch):
@@ -135,6 +178,41 @@ def test_stuck_after_repeated_identical_calls(stub_llm, tmp_path, monkeypatch):
     assert a.run("问题") == "尽力回答"
     # 3 tool rounds + 1 final wrap-up = 4 llm calls (did NOT run all 20)
     assert calls["n"] == 4
+
+
+def test_stuck_same_pattern_varying_path(stub_llm, tmp_path, monkeypatch):
+    """grep_code re-issued with the same pattern but a tweaked path/mode still stucks."""
+    monkeypatch.setattr(config, "STUCK_REPEAT_THRESHOLD", 3)
+    monkeypatch.setattr(config, "MAX_ITERATIONS", 20)
+    turns = [
+        _msg(tool_calls=[_tool_call("c1", "grep_code", '{"pattern":"zzz","path":"a"}')]),
+        _msg(tool_calls=[_tool_call("c2", "grep_code", '{"pattern":"zzz","path":"b"}')]),
+        _msg(tool_calls=[_tool_call("c3", "grep_code", '{"pattern":"zzz","output_mode":"files"}')]),
+        _msg(content="尽力回答"),
+    ]
+    calls = stub_llm(turns, str(tmp_path))
+    assert agent.CodeAgent().run("问题") == "尽力回答"
+    assert calls["n"] == 4  # 3 stuck rounds + wrap-up
+
+
+def test_stuck_all_recent_errors(stub_llm, tmp_path, monkeypatch):
+    """If the last N observations are all errors, bail out."""
+    monkeypatch.setattr(config, "STUCK_REPEAT_THRESHOLD", 3)
+    monkeypatch.setattr(config, "MAX_ITERATIONS", 20)
+    # Each call points at a different bogus path so action_key/primary_key all
+    # differ — only the all-errors rule should fire.
+    turns = [
+        _msg(tool_calls=[_tool_call(f"c{i}", "read_file",
+            f'{{"path":"nope_{i}.txt","start":1,"end":5}}')])
+        for i in range(3)
+    ] + [_msg(content="尽力回答")]
+    calls = stub_llm(turns, str(tmp_path))
+    a = agent.CodeAgent()
+    assert a.run("问题") == "尽力回答"
+    assert calls["n"] == 4
+    # Confirm the observations actually were errors (otherwise the test is moot).
+    obs = [e for e in a.history if isinstance(e, Observation)]
+    assert len(obs) == 3 and all(o.is_error for o in obs)
 
 
 def test_stuck_disabled(stub_llm, tmp_path, monkeypatch):
@@ -201,3 +279,53 @@ def test_iteration_cap_triggers_final_answer(stub_llm, tmp_path, monkeypatch):
     calls = stub_llm(msgs, str(tmp_path))
     assert agent.CodeAgent().run("问题") == "基于现有信息的回答"
     assert calls["n"] == 3  # 2 loop iterations + 1 final wrap-up
+
+
+def test_iteration_cap_reuses_substantial_assistant_text(stub_llm, tmp_path, monkeypatch):
+    """When the last turn already has answer-shaped text, skip the wrap-up call."""
+    monkeypatch.setattr(config, "MAX_ITERATIONS", 2)
+    monkeypatch.setattr(config, "STUCK_REPEAT_THRESHOLD", 0)
+    substantive = "基于已收集的证据：玩家血量字段是 hp，定义在 player.py 第 4 行。" * 4
+    msgs = [
+        _msg(
+            content=substantive,
+            tool_calls=[_tool_call("c", "grep_code", f'{{"pattern":"p{i}"}}')],
+        )
+        for i in range(2)
+    ]
+    calls = stub_llm(msgs, str(tmp_path))
+    out = agent.CodeAgent().run("问题")
+    assert out == substantive.strip()
+    assert calls["n"] == 2  # no wrap-up call
+
+
+def test_iteration_cap_ignores_short_narration(stub_llm, tmp_path, monkeypatch):
+    """Short 'let me check X' narration shouldn't bypass the wrap-up call."""
+    monkeypatch.setattr(config, "MAX_ITERATIONS", 2)
+    monkeypatch.setattr(config, "STUCK_REPEAT_THRESHOLD", 0)
+    msgs = [
+        _msg(content="继续检索。", tool_calls=[_tool_call("c1", "grep_code", '{"pattern":"x"}')]),
+        _msg(content="还需要确认。", tool_calls=[_tool_call("c2", "grep_code", '{"pattern":"y"}')]),
+        _msg(content="正式答案"),
+    ]
+    calls = stub_llm(msgs, str(tmp_path))
+    assert agent.CodeAgent().run("问题") == "正式答案"
+    assert calls["n"] == 3  # wrap-up still happens — narration was too short
+
+
+def test_system_message_gets_cache_control_when_enabled(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "LLM_PROMPT_CACHE", True)
+    a = agent.CodeAgent()
+    a.question = "Q"
+    msgs = a._build_messages(with_tools=True)
+    sys_content = msgs[0]["content"]
+    assert isinstance(sys_content, list)
+    assert sys_content[0]["cache_control"] == {"type": "ephemeral"}
+
+
+def test_system_message_is_plain_string_when_cache_disabled(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "LLM_PROMPT_CACHE", False)
+    a = agent.CodeAgent()
+    a.question = "Q"
+    msgs = a._build_messages(with_tools=True)
+    assert isinstance(msgs[0]["content"], str)

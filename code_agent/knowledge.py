@@ -9,7 +9,7 @@ Staleness is the make-or-break mechanism (see roadmap 方案 3): on recall, each
 entry's referenced files are re-hashed; if any changed, the entry is flagged
 stale so callers can downgrade it to "based on an older version, re-verify".
 
-Storage is a separate DB (config.KNOWLEDGE_DB_PATH) from the read-only code
+Storage is a separate DB (config.current_knowledge_db_path()) from the read-only code
 index, because knowledge is written incrementally at query time. FTS5 backs
 keyword recall; vector/semantic recall is deferred (V3).
 """
@@ -21,11 +21,11 @@ import os
 import re
 import sqlite3
 
-import config
+from . import config
 
 
 def _connect(*, write: bool) -> sqlite3.Connection:
-    path = config.KNOWLEDGE_DB_PATH
+    path = config.current_knowledge_db_path()
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     conn = sqlite3.connect(path)
     if write:
@@ -80,7 +80,7 @@ def store(question: str, answer: str, ref_paths: list[str]) -> int | None:
     answer = (answer or "").strip()
     if not question or not answer:
         return None
-    root = config.TARGET_CODE_PATH
+    root = config.current_target_code_path()
     refs = []
     for rel in dict.fromkeys(ref_paths):  # dedupe, preserve order
         h = _hash_file(os.path.join(root, rel))
@@ -160,7 +160,7 @@ def _fts_or_query(query: str) -> str:
 
 def _stale_refs(refs: list[dict]) -> list[str]:
     """Return paths whose content hash no longer matches (changed/deleted)."""
-    root = config.TARGET_CODE_PATH
+    root = config.current_target_code_path()
     changed = []
     for r in refs:
         if _hash_file(os.path.join(root, r["path"])) != r["hash"]:
@@ -175,7 +175,7 @@ def recall(query: str, *, limit: int = 3) -> list[dict]:
     it as a lead to re-verify rather than fact. Returns [] if no store/match.
     """
     query = (query or "").strip()
-    if not query or not os.path.isfile(config.KNOWLEDGE_DB_PATH):
+    if not query or not os.path.isfile(config.current_knowledge_db_path()):
         return []
     fts_query = _fts_or_query(query)
     if not fts_query:
@@ -214,7 +214,7 @@ def recall(query: str, *, limit: int = 3) -> list[dict]:
 
 def stats() -> dict:
     """Quick counts for diagnostics/eval (total entries)."""
-    if not os.path.isfile(config.KNOWLEDGE_DB_PATH):
+    if not os.path.isfile(config.current_knowledge_db_path()):
         return {"entries": 0}
     try:
         conn = _connect(write=False)

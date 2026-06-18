@@ -1,6 +1,6 @@
 """Tests for the knowledge flywheel (方案 3): store, recall, staleness."""
-import config
-import knowledge
+from code_agent import config
+from code_agent import knowledge
 import pytest
 
 
@@ -101,12 +101,12 @@ def test_fts_or_query_expands_synonyms():
 
 
 def test_agent_precipitates_after_answer(kb, monkeypatch):
-    import agent
+    from code_agent import agent
 
     a = agent.CodeAgent()
     # stub the loop so no LLM is called; pretend it read scene.cpp
     import json
-    from events import Action
+    from code_agent.events import Action
 
     def fake_loop():
         a.history = [Action("c1", "read_file", json.dumps({"path": "scene.cpp"}))]
@@ -121,19 +121,24 @@ def test_agent_precipitates_after_answer(kb, monkeypatch):
 
 
 def test_agent_recalls_into_system_prompt(kb, monkeypatch):
-    import agent
+    from code_agent import agent
 
     knowledge.store("旧问题 SceneMgr", "旧结论内容", ["scene.cpp"])
     a = agent.CodeAgent()
     a.recalled = a._recalled_context("SceneMgr 怎么用")
     assert "旧结论内容" in a.recalled
-    # recalled context is injected into the system message
+    # recalled context is injected into the system message. When prompt caching
+    # is enabled the content is a list of typed blocks; either shape is fine.
     msgs = a._build_messages(with_tools=True)
-    assert "旧结论内容" in msgs[0]["content"]
+    sys_content = msgs[0]["content"]
+    sys_text = sys_content if isinstance(sys_content, str) else "".join(
+        b.get("text", "") for b in sys_content
+    )
+    assert "旧结论内容" in sys_text
 
 
 def test_flywheel_off_no_recall_no_store(kb, monkeypatch):
-    import agent
+    from code_agent import agent
 
     monkeypatch.setattr(config, "USE_KNOWLEDGE", False)
     a = agent.CodeAgent()

@@ -1,9 +1,9 @@
 """Tests for the offline index: build + query + tool integration."""
-import config
-import index_query
-import indexer
+from code_agent import config
+from code_agent import index_query
+from code_agent import indexer
 import pytest
-import tools
+from code_agent import tools
 
 
 @pytest.fixture
@@ -22,7 +22,10 @@ def built_index(tmp_path, monkeypatch):
     )
     (root / "scene" / "scenemgr.cpp").write_text(
         '#include "scenemgr.h"\n'
-        "void SceneMgr::load_scene(int id) { current_ = id; }\n",
+        "void SceneMgr::load_scene(int id) {\n"
+        '    ASSERT_FALSE(id <= 0, "scene id invalid %d", id);\n'
+        "    current_ = id;\n"
+        "}\n",
         encoding="utf-8",
     )
     db = tmp_path / "idx.db"
@@ -68,6 +71,22 @@ def test_search_fts(built_index):
     assert hits and any("scenemgr" in h["path"] for h in hits)
 
 
+def test_search_asserts_from_runtime_log(built_index):
+    hits = index_query.search_asserts("scene id invalid 1001")
+    assert hits
+    assert hits[0]["macro"] == "ASSERT_FALSE"
+    assert "scenemgr.cpp" in hits[0]["path"]
+    assert "scene id invalid" in hits[0]["statement"]
+    assert hits[0]["match"] == "text"
+
+
+def test_search_asserts_uses_file_line_as_weak_hint(built_index):
+    hits = index_query.search_asserts("crash near scene/scenemgr.cpp:20")
+    assert hits
+    assert hits[0]["macro"] == "ASSERT_FALSE"
+    assert hits[0]["match"] == "near_location"
+
+
 def test_meta_root(built_index, tmp_path):
     assert index_query.meta_root() == str(tmp_path / "src")
 
@@ -81,6 +100,7 @@ def test_query_unavailable_without_db(tmp_path, monkeypatch):
     assert index_query.available() is False
     assert index_query.find_symbol("X") is None
     assert index_query.search_fts("X") is None
+    assert index_query.search_asserts("X") is None
 
 
 def test_disabled_via_flag(built_index, monkeypatch):
@@ -106,6 +126,14 @@ def test_tool_grep_regex_falls_back_to_live(built_index):
     # A regex pattern can't use FTS; must still work via the live scan.
     out = tools.grep_code(r"load_\w+")
     assert "load_scene" in out
+
+
+def test_tool_find_assert_context_uses_index(built_index):
+    out = tools.find_assert_context("scene id invalid 1001", context=2)
+    assert "ASSERT_FALSE" in out
+    assert "scenemgr.cpp" in out
+    assert "context:" in out
+    assert "confirm with surrounding code" in out
 
 
 # --- incremental update ----------------------------------------------------
@@ -160,41 +188,41 @@ def test_update_without_db_does_full_build(tmp_path, monkeypatch):
 
 
 def test_shortcut_answers_where_defined(built_index):
-    import shortcut
+    from code_agent import shortcut
 
     out = shortcut.try_answer("SceneMgr 定义在哪")
     assert out and "scenemgr.h" in out and "未经 LLM" in out
 
 
 def test_shortcut_english(built_index):
-    import shortcut
+    from code_agent import shortcut
 
     out = shortcut.try_answer("where is SceneMgr defined")
     assert out and "scenemgr.h" in out
 
 
 def test_shortcut_ignores_explanatory_question(built_index):
-    import shortcut
+    from code_agent import shortcut
 
     # "做什么" needs explanation → must NOT short-circuit
     assert shortcut.try_answer("SceneMgr 是做什么的") is None
 
 
 def test_shortcut_unknown_symbol_falls_through(built_index):
-    import shortcut
+    from code_agent import shortcut
 
     assert shortcut.try_answer("NoSuchClass 定义在哪") is None
 
 
 def test_shortcut_disabled(built_index, monkeypatch):
-    import shortcut
+    from code_agent import shortcut
 
     monkeypatch.setattr(config, "USE_INDEX", False)
     assert shortcut.try_answer("SceneMgr 定义在哪") is None
 
 
 def test_answer_uses_shortcut(built_index, monkeypatch):
-    import agent
+    from code_agent import agent
 
     monkeypatch.setattr(config, "USE_SHORTCUT", True)
     monkeypatch.setattr(config, "AGENT_BACKEND", "custom")

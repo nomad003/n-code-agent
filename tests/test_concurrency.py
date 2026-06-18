@@ -2,9 +2,9 @@
 import concurrent.futures
 import time
 
-import agent
-import config
-import main
+from code_agent import agent
+from code_agent import config
+from code_agent import main
 import pytest
 from fastapi.testclient import TestClient
 
@@ -31,7 +31,7 @@ def _client():
 
 
 def test_normal_request_ok(monkeypatch):
-    monkeypatch.setattr(agent, "answer", lambda q, *, verbose=False: f"A:{q}")
+    monkeypatch.setattr(agent, "answer", lambda q, *, verbose=False, mode=None, repo=None: f"A:{q}")
     r = _client().post("/ask", json={"question": "hi"})
     assert r.status_code == 200 and r.json()["answer"] == "A:hi"
 
@@ -39,7 +39,7 @@ def test_normal_request_ok(monkeypatch):
 def test_timeout_returns_504(monkeypatch):
     monkeypatch.setattr(config, "REQUEST_TIMEOUT", 0.2)
 
-    def slow(q, *, verbose=False):
+    def slow(q, *, verbose=False, mode=None, repo=None):
         time.sleep(1.0)
         return "too late"
 
@@ -68,7 +68,7 @@ def test_queue_overflow_returns_503(monkeypatch):
 
 def test_inflight_released_after_completion(monkeypatch):
     """A normal request increments then decrements _inflight (no leak)."""
-    monkeypatch.setattr(agent, "answer", lambda q, *, verbose=False: "ok")
+    monkeypatch.setattr(agent, "answer", lambda q, *, verbose=False, mode=None, repo=None: "ok")
     c = _client()
     c.post("/ask", json={"question": "q1"})
     # give the done-callback a moment to marshal back to the loop
@@ -81,7 +81,7 @@ def test_timeout_does_not_free_slot_until_thread_done(monkeypatch):
     monkeypatch.setattr(config, "REQUEST_TIMEOUT", 0.15)
     release = []
 
-    def slow(q, *, verbose=False):
+    def slow(q, *, verbose=False, mode=None, repo=None):
         time.sleep(0.5)
         release.append(1)
         return "late"
@@ -100,7 +100,7 @@ def test_cache_hit_skips_gate(monkeypatch):
     """A cached answer returns without consuming a slot."""
     calls = {"n": 0}
 
-    def once(q, *, verbose=False):
+    def once(q, *, verbose=False, mode=None, repo=None):
         calls["n"] += 1
         return "cached-me"
 

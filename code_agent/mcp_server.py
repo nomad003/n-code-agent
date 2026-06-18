@@ -5,8 +5,8 @@ high-level tool, ``ask_codebase(question)``, which runs the full agent loop
 (via the configured AGENT_BACKEND) and returns a natural-language answer.
 
 Run:
-    python3 mcp_server.py                 # streamable-http on MCP_HOST:MCP_PORT
-    MCP_PORT=8901 python3 mcp_server.py
+    python -m code_agent.mcp_server                 # streamable-http on MCP_HOST:MCP_PORT
+    MCP_PORT=8901 python -m code_agent.mcp_server
 
 The MCP endpoint is served at the path ``/mcp`` (configurable via MCP_PATH).
 Other services connect with an MCP streamable-http client pointed at
@@ -23,15 +23,17 @@ from logging.handlers import RotatingFileHandler
 
 from mcp.server.fastmcp import FastMCP
 
-import agent
-import config
+from . import agent
+from . import config
+from . import operation_modes
+from . import response_policy
 
 MCP_HOST = os.environ.get("MCP_HOST", "0.0.0.0")
 MCP_PORT = int(os.environ.get("MCP_PORT", "8901"))
 MCP_PATH = os.environ.get("MCP_PATH", "/mcp")
 
 # Log file path. Defaults to <project>/logs/mcp.log; override with MCP_LOG_FILE.
-_DEFAULT_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "mcp.log")
+_DEFAULT_LOG = os.path.join(config.PROJECT_ROOT, "logs", "mcp.log")
 MCP_LOG_FILE = os.environ.get("MCP_LOG_FILE", _DEFAULT_LOG)
 
 _fmt = logging.Formatter("%(asctime)s [%(name)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
@@ -65,7 +67,7 @@ mcp = FastMCP(
 
 
 @mcp.tool()
-def ask_codebase(question: str) -> str:
+def ask_codebase(question: str, mode: str = "", repo: str = "") -> str:
     """回答关于目标代码库的自然语言问题。
 
     内部运行完整的 agent 循环（grep/read/list/find_symbol 工具检索 + LLM），
@@ -73,28 +75,42 @@ def ask_codebase(question: str) -> str:
 
     Args:
         question: 要询问的问题，例如 "SceneMgr 是做什么的？"。
+        mode: 回答/操作等级：plain（非程序员）、technical（程序员解读）、edit（直接修改）；不传则使用 agent 默认模式。
+        repo: 代码库名称；不传则使用默认仓库。
     """
     question = (question or "").strip()
     if not question:
         log.info("ask_codebase | 空问题，已拒绝")
         return "问题不能为空。"
+    try:
+        mode = operation_modes.resolve(
+            mode, default=config.AGENT_DEFAULT_MODE, allowed=config.AGENT_ALLOWED_MODES
+        )
+    except operation_modes.ModeError as exc:
+        log.info("ask_codebase | 模式拒绝: %s", exc)
+        return f"模式不可用：{exc}"
+    try:
+        repo_name = config.resolve_repo_name(repo or None)
+    except ValueError as exc:
+        log.info("ask_codebase | 仓库拒绝: %s", exc)
+        return f"仓库不可用：{exc}"
     # agent.answer is synchronous; FastMCP runs sync tools in a worker thread,
     # so this does not block the event loop.
-    log.info("ask_codebase | 收到提问: %s", question)
+    log.info("ask_codebase | 收到提问 (repo=%s, mode=%s): %s", repo_name, mode, question)
     start = time.monotonic()
     try:
-        answer = agent.answer(question)
+        answer = agent.answer(question, mode=mode, repo=repo_name)
     except Exception as exc:
         elapsed = time.monotonic() - start
         log.warning("ask_codebase | 失败 (%.1fs): %s", elapsed, exc)
         raise
     elapsed = time.monotonic() - start
     log.info("ask_codebase | 完成 (%.1fs, 答案 %d 字): %s", elapsed, len(answer), question)
-    return answer
+    return response_policy.enforce(answer, mode=mode)
 
 
 @mcp.tool()
-def diagnose_crash(backtrace: str, log_snippet: str = "") -> str:
+def diagnose_crash(backtrace: str, log_snippet: str = "", repo: str = "") -> str:
     """分析崩溃栈或日志片段，结合代码库定位根因。
 
     有 backtrace 时逐帧把函数映射到代码定义（复用符号索引，自动收窄同名候选）；
@@ -103,21 +119,28 @@ def diagnose_crash(backtrace: str, log_snippet: str = "") -> str:
     Args:
         backtrace: 可选，gdb 风格的崩溃栈文本（如 `gdb bt` 输出）。
         log_snippet: 可选，相关日志片段。可单独提供，用于纯日志诊断。
+        repo: 代码库名称；不传则使用默认仓库。
     """
     backtrace = backtrace or ""
     log_snippet = log_snippet or ""
     if not backtrace.strip() and not log_snippet.strip():
         return "backtrace 和 log_snippet 不能同时为空。"
-    import diagnose as diag
+    from . import diagnose as diag
+    try:
+        repo_name = config.resolve_repo_name(repo or None)
+    except ValueError as exc:
+        return f"仓库不可用：{exc}"
 
     log.info(
-        "diagnose_crash | 收到 backtrace (%d 字), log_snippet (%d 字)",
+        "diagnose_crash | 收到 repo=%s backtrace (%d 字), log_snippet (%d 字)",
+        repo_name,
         len(backtrace),
         len(log_snippet),
     )
     start = time.monotonic()
     try:
-        result = diag.diagnose(backtrace, extra_log=log_snippet)
+        with config.use_repo(repo_name):
+            result = diag.diagnose(backtrace, extra_log=log_snippet)
     except Exception as exc:
         log.warning("diagnose_crash | 失败 (%.1fs): %s", time.monotonic() - start, exc)
         raise
@@ -126,7 +149,7 @@ def diagnose_crash(backtrace: str, log_snippet: str = "") -> str:
         "diagnose_crash | 完成 (%.1fs, %d/%d 帧已定位)",
         elapsed, result["resolved"], result["total_frames"],
     )
-    return result["answer"]
+    return response_policy.enforce(result["answer"], mode="technical")
 
 
 def main() -> None:

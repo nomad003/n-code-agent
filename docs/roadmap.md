@@ -17,7 +17,7 @@
 
 ### 服务化与运维
 
-- 三个对等入口（REST `main.py` / MCP `mcp_server.py` / CLI `cli.py`），都走同一个 `agent.answer()`。
+- 三个对等入口（REST `code_agent.main` / MCP `code_agent.mcp_server` / CLI `code_agent.cli`），都走同一个 `agent.answer(..., repo=...)`。
 - `/ask` 失败返回干净 502（非 500 栈），失败不入缓存。
 - MCP 调用日志 → `logs/mcp.log`（轮转）；`serve.sh`/`mcp.sh` 支持 `start/stop/restart/status`。
 - 全量环境变量配置（`.env` / `.env.example`）、离线单元测试套件（见 [testing.md](testing.md)）。
@@ -36,7 +36,7 @@
 | LLM 式压缩（`LLMSummarizingCondenser`） | 用额外 LLM 调用压历史 | 短问答收益不抵成本；已用确定性遮蔽替代 |
 | 12 态状态机 + 确认模式 | 危险写/执行的人类把关 | 只读无副作用，三态足够 |
 
-> 原则：保持工具层（`tools.py`）是唯一接触文件系统的层，复杂度只在真正需要时引入。
+> 原则：保持工具层（`code_agent.tools`）是唯一接触文件系统的层，复杂度只在真正需要时引入。
 
 ## 三、后续可选方向
 
@@ -47,14 +47,14 @@
 当前每次查询都走 LLM tool-call。离线索引让符号/全文检索从"全库扫描"变成"一次 SQLite 查询"。
 
 **已落地（第一步：符号索引 + 工具加速）**
-- `indexer.py`：tree-sitter 解析 C++ → 抽取 class/struct/enum/union/function/method → SQLite `symbols` 表 + FTS5 全文索引（`files_fts`）。每条符号记 `file + line + 文件哈希`（为方案 3 的失效检查预留）。
+- `code_agent.indexer`：tree-sitter 解析 C++ → 抽取 class/struct/enum/union/function/method → SQLite `symbols` 表 + FTS5 全文索引（`files_fts`）。每条符号记 `file + line + 文件哈希`（为方案 3 的失效检查预留）。
 - `index_query.py`：只读查询层，无索引时返回 `None` 让调用方回退。
-- `tools.py`：`find_symbol` 优先查索引（精确、一步命中）；`grep_code` 对「整库 + 纯文本」走 FTS 快路，正则/限定路径回退 live scan。
-- 构建：`scripts/index.sh`（真实 gameserver：553 文件 / 9256 符号 / 3.5s / 8M）。`USE_INDEX=0` 可强制回退。
+- `code_agent.tools`：`find_symbol` 优先查索引（精确、一步命中）；`grep_code` 对「整库 + 纯文本」走 FTS 快路，正则/限定路径回退 live scan。
+- 构建：`scripts/index.sh --repo <name>`（多仓库模式）或 `scripts/index.sh`（单仓库兼容模式）。`USE_INDEX=0` 可强制回退。
 
 **已落地（第二步：增量更新 + 入口短路）**
 - **增量更新**：`indexer.update()`（`scripts/index.sh --update`）按文件内容哈希只重建变更/新增文件、删除消失文件的行，无变化则空跑。比全量 `build()` 快得多，跟得上代码改动。
-- **入口短路**：`shortcut.py` 识别「X 定义在哪 / where is X defined」这类纯查定义问题，直接查索引返回、**完全不走 LLM**（秒回、零成本）。接在 `agent.answer()` 层，三个入口都受益；保守匹配（"X 是做什么的"这类需解释的不短路）；`USE_SHORTCUT=0` 可关。
+- **入口短路**：`code_agent.shortcut` 识别「X 定义在哪 / where is X defined」这类纯查定义问题，直接查索引返回、**完全不走 LLM**（秒回、零成本）。接在 `agent.answer()` 层，三个入口都受益；保守匹配（"X 是做什么的"这类需解释的不短路）；`USE_SHORTCUT=0` 可关。
 
 **未做（后续）**
 - 向量库 / 语义检索（刻意推迟到方案 3，符号索引不需要它）。
@@ -95,12 +95,12 @@
 - **V3（部分）**：✅ FTS 召回加了**同义词扩展**（"作用/功能/干嘛"等词组，不同措辞也能召回，零依赖的轻量语义近似）。未做：真正的向量/语义召回（代理暂无 embedding 接口，留待有接口或命中率验证后引入本地模型）；与方案 2 符号表合并成统一检索；知识去重/合并、可信度打分。
 
 **已落地（MVP + 失效）**
-- `knowledge.py`：SQLite + FTS5 知识库。`store(q, a, refs)` 记录问题/答案/引用文件+内容哈希；`recall(query)` 按关键词 OR 匹配召回，并对每条重算引用文件哈希、变了标 `stale`。独立 DB（`KNOWLEDGE_DB_PATH`），与只读 code_index 分开。
+- `knowledge.py`：SQLite + FTS5 知识库。`store(q, a, refs)` 记录问题/答案/引用文件+内容哈希；`recall(query)` 按关键词 OR 匹配召回，并对每条重算引用文件哈希、变了标 `stale`。独立 DB；多仓库模式下按 repo 写到 `index/repos/<repo>/knowledge.db`，与只读 code_index 分开。
 - `agent.CodeAgent`：问答后**自动沉淀**（`_precipitate`，从 `read_file` 的 Action 提取引用文件）；起手**自动召回**注入 system 提示（`_recalled_context`，stale 条目降级为"需重新核实"）。`recall_knowledge` 作为第 7 个工具，仅在飞轮开启时 advertise。
 - 开关 `USE_KNOWLEDGE`（默认 **关**，验证命中率后再开）。失效是核心：实测改源文件 → stale=True、还原 → False。
 - 实测飞轮：同一问题问两次，第二次成功召回第一次结论作为线索（带来源文件 + 核实提示）。
 
-**现有项目的有利条件：** `events.py` 的 Action/Observation 历史是 Extractor 的现成输入；`tools.py` 是唯一文件入口，检索层可作为"第 5 个工具"接入，`agent.py` 几乎不动。
+**现有项目的有利条件：** `code_agent.events` 的 Action/Observation 历史是 Extractor 的现成输入；`code_agent.tools` 是唯一文件入口，检索层可作为"第 5 个工具"接入，`code_agent.agent` 几乎不动。
 
 **风险：**
 - 正反馈不一定成立 —— 若用户问题分散、命中率低，沉淀收益跟不上维护成本。MVP 阶段先测命中率再投入。
@@ -109,7 +109,7 @@
 **权衡说明（诚实记录）：** 本闭环用到 Memory/RAG，而上面「二、明确舍弃」曾以"只读问答用不到"为由舍弃它。结论不矛盾：当时是**无知识沉淀**场景下的正确取舍；一旦要做"越用越强"的飞轮，RAG 正是其核心机制 —— 这是**有条件地翻回**该决策，触发条件就是方案 3 立项。
 
 - 价值：高（飞轮成立时延迟/成本/质量持续改善）；MVP 成本：低（复用 FTS）；剩余成本：中（向量召回 + 命中率验证 + 去重）。
-- 状态：MVP + 失效 + 同义召回已落地，默认仍关闭。召回管道与正反馈已用 `evaluate.py --twice` 验证（样例集 4/4），但真实命中率待更大评测集（见 E）确认后才开默认；向量召回与统一检索留待后续 V3。
+- 状态：MVP + 失效 + 同义召回已落地，默认仍关闭。召回管道与正反馈已用 `code_agent.evaluate --twice` 验证（样例集 4/4），但真实命中率待更大评测集（见 E）确认后才开默认；向量召回与统一检索留待后续 V3。
 
 ### B. 服务治理（并发治理已落地）
 
@@ -124,12 +124,12 @@ custom 后端的 stuck / 遮蔽 / 重试，SDK 后端目前依赖框架自身机
 
 ### D. 缓存增强
 
-当前 `/ask` 是进程内字典缓存、重启即失。可选：持久化缓存（SQLite/Redis）、按 `TARGET_CODE_PATH` 版本失效（代码变了缓存作废）。
+当前 `/ask` 是进程内 LRU 缓存、key 包含 `repo + mode + question`，重启即失。可选：持久化缓存（SQLite/Redis）、按 repo 版本/commit 失效（代码变了缓存作废）。
 - 价值：中；成本：低-中。
 
 ### E. 质量评测（已落地）
 
-- `evaluate.py` + `scripts/eval.sh`：跑一个 `{问题 → 期望文件/符号}` 的 JSONL 评测集，对每题调 agent、按"答案是否提到全部期望符号 + 至少一个期望文件（答案或引用文件）"打分，输出通过率。确定性子串打分，无 LLM judge。
+- `code_agent.evaluate` + `scripts/eval.sh`：跑一个 `{问题 → 期望文件/符号}` 的 JSONL 评测集，对每题调 agent、按"答案是否提到全部期望符号 + 至少一个期望文件（答案或引用文件）"打分，输出通过率。确定性子串打分，无 LLM judge。
 - `--twice` 模式同时验证 **方案 3 飞轮召回率**：每题问两次（第一次沉淀、第二次应召回），报告召回命中率——这是"方案 3 是否敢默认开启"的判断信号。
 - 样例集 `eval/dataset.sample.jsonl`（针对仓库自带 target_code 示例）：实测通过率 4/4、飞轮召回 4/4。
 - **诚实说明**：样例集仅 4 题且问题高度相关，召回率天然偏高，只验证了"管道与正反馈成立"；真实命中率需更大、更分散的评测集（针对真实 gameserver 符号）才有统计意义。这是开启方案 3 默认值前要补的一步。

@@ -55,10 +55,11 @@ scripts/ask.sh "SceneMgr 有什么方法？"          # 经真实代理返回答
 
 ```bash
 scripts/eval.sh                                  # 跑样例集 eval/dataset.sample.jsonl
+scripts/eval.sh eval/dataset.real_user.jsonl     # 跑真实用户日志/问题集
 scripts/eval.sh eval/my_set.jsonl                # 自定义评测集
 USE_KNOWLEDGE=1 scripts/eval.sh <set> --twice     # 同时测方案 3 飞轮召回率
 ```
 
-每题调 agent，按"答案是否提到全部期望符号 + 至少一个期望文件"打分，输出通过率（确定性子串匹配，无 LLM judge）。`--twice` 每题问两次，报告第二次召回第一次沉淀的比例——判断方案 3 是否值得默认开启的信号。换模型/改 prompt/调限额后跑一遍，用通过率量化影响。
+每题调 agent，按"答案是否提到全部期望符号 + 至少一个期望文件"打分，输出通过率（确定性子串匹配，无 LLM judge）。真实集还可用 `expect_all_files` 要求多个关键文件全部命中、用 `expect_phrases` 要求根因关键词出现。`--twice` 每题问两次，报告第二次召回第一次沉淀的比例——判断方案 3 是否值得默认开启的信号。换模型/改 prompt/调限额后跑一遍，用通过率量化影响。
 
 > 扩充评测集（针对真实 gameserver 符号）是开启方案 3 默认值前要补的一步——样例集太小，召回率不具统计意义。

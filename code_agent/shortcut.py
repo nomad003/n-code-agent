@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 
-import config
+from . import config
 
 # Question patterns that ask only "where is <symbol> defined / which file".
 # Each must capture the symbol name in group 1. Kept tight to avoid hijacking
@@ -52,7 +52,7 @@ def try_answer(question: str) -> str | None:
     if not symbol:
         return None
     try:
-        import index_query
+        from . import index_query
 
         rows = index_query.find_symbol(symbol)
     except Exception:

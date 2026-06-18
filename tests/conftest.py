@@ -12,7 +12,14 @@ import pytest
 # Make the project modules importable when pytest is run from the repo root.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import config  # noqa: E402
+from code_agent import config  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def isolate_llm_trace(tmp_path, monkeypatch):
+    """Keep per-request trace files out of the repo during tests."""
+    monkeypatch.setattr(config, "LLM_TRACE_ENABLED", True)
+    monkeypatch.setattr(config, "LLM_TRACE_DIR", str(tmp_path / "llm-traces"))
 
 
 @pytest.fixture

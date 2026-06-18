@@ -139,7 +139,7 @@ def resolve_frames(frames: list[Frame]) -> list[Frame]:
     (e.g. dozens of ``Update`` methods) down to the likely one(s).
     """
     try:
-        import index_query
+        from . import index_query
     except Exception:
         return frames
     for fr in frames:
@@ -219,7 +219,7 @@ def find_log_source(message: str, *, limit: int = 10) -> list[dict]:
     Empty list if no index or no match.
     """
     try:
-        import index_query
+        from . import index_query
     except Exception:
         return []
     runs = _literal_runs(message)
@@ -230,6 +230,16 @@ def find_log_source(message: str, *, limit: int = 10) -> list[dict]:
         if hits:
             return hits
     return []
+
+
+def find_assert_context(message: str, *, limit: int = 10) -> list[dict]:
+    """Locate assert/check sites related to a runtime assert/error log."""
+    try:
+        from . import index_query
+    except Exception:
+        return []
+    hits = index_query.search_asserts(message, limit=limit)
+    return hits or []
 
 
 # --- diagnosis -------------------------------------------------------------
@@ -271,7 +281,7 @@ def diagnose(
     Returns {"answer", "frames", "resolved", "total_frames"}; when ``with_plain``
     is set, also a "plain" one-sentence non-technical summary (one extra LLM call).
     """
-    import agent
+    from . import agent
 
     frames = resolve_frames(parse_backtrace(backtrace))
     resolved = sum(1 for f in frames if f.candidates)
@@ -292,6 +302,18 @@ def diagnose(
                 log_sources.append(f"  「{line.strip()[:60]}」 → {locs}")
         if log_sources:
             prompt += "\n\n日志打印位置（已反查）：\n" + "\n".join(log_sources)
+        assert_sources: list[str] = []
+        for line in extra_log.strip().splitlines():
+            if not line.strip():
+                continue
+            hits = find_assert_context(line, limit=3)
+            if hits:
+                locs = "; ".join(
+                    f"{h['path']}:{h['line']} [{h['macro']}]" for h in hits[:3]
+                )
+                assert_sources.append(f"  「{line.strip()[:60]}」 → {locs}")
+        if assert_sources:
+            prompt += "\n\n断言/检查位置（已反查）：\n" + "\n".join(assert_sources)
 
     answer = agent.answer(prompt, verbose=verbose)
     result = {

@@ -4,9 +4,9 @@
 
 - 传输：**streamable-http**（当前 MCP 的 HTTP 传输）。
 - 暴露工具：
-  - **`ask_codebase(question: str) -> str`** —— 高层问答，内部跑完整 agent 循环（grep/read/list/find_symbol + LLM），返回自然语言答案。
-  - **`diagnose_crash(backtrace: str = "", log_snippet: str = "") -> str`** —— 分析崩溃栈或日志；可只传日志，逐帧映射代码 + 日志反查打印点定位根因（方向 F）。
-- 实现：`mcp_server.py`，是 `agent.answer()` 的薄封装，沿用同一套 `AGENT_BACKEND`、沙箱工具、目标代码库。
+  - **`ask_codebase(question: str, mode: str = "", repo: str = "") -> str`** —— 高层问答，内部跑完整 agent 循环（grep/read/list/glob/find_symbol + LLM），返回所选等级的答案；不传 `mode` 时使用 `AGENT_DEFAULT_MODE`，显式选择时必须已在 `AGENT_ALLOWED_MODES` 开启；不传 `repo` 时使用 `CODE_REPO_DEFAULT`。
+  - **`diagnose_crash(backtrace: str = "", log_snippet: str = "", repo: str = "") -> str`** —— 分析崩溃栈或日志；可只传日志，逐帧映射代码 + 日志反查打印点定位根因（方向 F）。
+- 实现：`code_agent.mcp_server`，是 `agent.answer()` 的薄封装，沿用同一套 `AGENT_BACKEND`、沙箱工具、repo 选择。
 
 ## 启动
 
@@ -18,7 +18,7 @@ scripts/mcp.sh restart | status                 # 重启 / 查看状态
 MCP_PORT=8901 AGENT_BACKEND=sdk scripts/mcp.sh start
 ```
 
-等价裸命令：`python mcp_server.py`（脚本会自动建 venv、加载 `.env`）。
+等价裸命令：`python -m code_agent.mcp_server`（脚本会自动建 venv、加载 `.env`）。
 
 ## 配置
 
@@ -28,9 +28,10 @@ MCP_PORT=8901 AGENT_BACKEND=sdk scripts/mcp.sh start
 | `MCP_PORT` | `8901` | 端口（与 REST 服务的 8900 分开） |
 | `MCP_PATH` | `/mcp` | MCP 端点路径 |
 
-外加通用的 `AGENT_BACKEND` / `TARGET_CODE_PATH` / `LLM_API_KEY` 等（见 [configuration.md](configuration.md)）。
+外加通用的 `AGENT_BACKEND` / `CODE_REPOS` / `CODE_REPO_DEFAULT` / `TARGET_CODE_PATH` / `LLM_API_KEY` 等（见 [configuration.md](configuration.md)）。
+`ask_codebase` 的 `mode` 支持 `plain`（非程序员）、`technical`（程序员解读）、`edit`（直接改码入口）；接口可请求，但 agent 必须先通过 `AGENT_ALLOWED_MODES` 开启。`repo` 来自 `CODE_REPOS`，不配置多仓库时只使用 `TARGET_CODE_PATH` 单仓库模式。
 
-> 设计为**独立进程**（独立端口），不与 `main.py` 的 REST 服务混挂——MCP 的 ASGI app 需要自己的 lifespan/session 管理，独立运行更稳。两者可同时起：REST 在 8900，MCP 在 8901。
+> 设计为**独立进程**（独立端口），不与 `code_agent.main` 的 REST 服务混挂——MCP 的 ASGI app 需要自己的 lifespan/session 管理，独立运行更稳。两者可同时起：REST 在 8900，MCP 在 8901。
 
 ## 客户端连接
 
@@ -46,7 +47,10 @@ async def main():
         async with ClientSession(r, w) as s:
             await s.initialize()
             print([t.name for t in (await s.list_tools()).tools])   # ['ask_codebase', 'diagnose_crash']
-            res = await s.call_tool("ask_codebase", {"question": "SceneMgr 有哪些方法？"})
+            res = await s.call_tool(
+                "ask_codebase",
+                {"repo": "gameserver", "question": "SceneMgr 有哪些方法？", "mode": "technical"},
+            )
             print("".join(c.text for c in res.content if hasattr(c, "text")))
 
 asyncio.run(main())
@@ -69,8 +73,8 @@ asyncio.run(main())
 
 | 入口 | 用途 |
 |------|------|
-| `main.py`（REST，8900） | 给普通 HTTP 客户端 |
-| `mcp_server.py`（MCP，8901） | 给 MCP 客户端/agent |
-| `cli.py` | 本地命令行调试 |
+| `code_agent.main`（REST，8900） | 给普通 HTTP 客户端 |
+| `code_agent.mcp_server`（MCP，8901） | 给 MCP 客户端/agent |
+| `code_agent.cli` | 本地命令行调试 |
 
 三者都调同一个 `agent.answer()`，行为一致。

@@ -2,12 +2,13 @@
 
 Parses the target C++ codebase with tree-sitter, extracts definitions
 (class / struct / enum / function, plus member-function declarations) into a
-SQLite table, and builds an FTS5 full-text index over file contents. The index
-lets ``tools.find_symbol`` / ``tools.grep_code`` answer precise queries fast
+SQLite table, extracts assert/check sites, and builds FTS5 full-text indexes
+over file contents and assert text. The index lets ``tools.find_symbol`` /
+``tools.grep_code`` / ``tools.find_assert_context`` answer precise queries fast
 without scanning the whole tree at query time.
 
-The index is a plain SQLite file (config.INDEX_DB_PATH). It is built offline via
-``python indexer.py`` (or scripts/index.sh) and queried read-only by index_query.
+The index is a plain SQLite file (config.current_index_db_path()). It is built offline via
+``python -m code_agent.indexer`` (or scripts/index.sh) and queried read-only by index_query.
 
 Design notes:
 - Symbols carry file + line + a content hash of the source file, so a future
@@ -19,9 +20,10 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import sqlite3
 
-import config
+from . import config
 
 # tree-sitter is only needed at index-build time, imported lazily so the rest of
 # the app (and the no-index fallback) never requires it.
@@ -44,7 +46,7 @@ def _file_hash(text: str) -> str:
 
 
 def _iter_cpp_files(root: str):
-    for dirpath, dirs, files in os.walk(root):
+    for dirpath, dirs, files in os.walk(root, followlinks=True):
         dirs[:] = [d for d in dirs if d not in _SKIP_DIRS and not d.startswith(".")]
         for fname in files:
             if os.path.splitext(fname)[1].lower() in _CPP_EXT:
@@ -103,13 +105,86 @@ def _extract_symbols(parser, rel_path: str, source: bytes) -> list[tuple]:
     return out
 
 
-def build(root: str | None = None, db_path: str | None = None, *, verbose: bool = False) -> dict:
+_ASSERT_MACRO_RE = re.compile(
+    r"\b(?P<macro>(?:assert|Assert|ASSERT[A-Z0-9_]*|CHECK[A-Z0-9_]*|"
+    r"VERIFY[A-Z0-9_]*|ENSURE[A-Z0-9_]*))\s*\("
+)
+
+
+def _paren_balance(text: str) -> int:
+    """Rough parenthesis balance, ignoring quoted text."""
+    balance = 0
+    in_str: str | None = None
+    escaped = False
+    for ch in text:
+        if in_str:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == in_str:
+                in_str = None
+            continue
+        if ch in ("'", '"'):
+            in_str = ch
+        elif ch == "(":
+            balance += 1
+        elif ch == ")":
+            balance -= 1
+    return balance
+
+
+def _extract_string_literals(text: str) -> list[str]:
+    """Extract C/C++ string literal contents from an assert statement."""
+    out: list[str] = []
+    for m in re.finditer(r'"((?:\\.|[^"\\])*)"', text):
+        lit = m.group(1).replace(r"\"", '"').replace(r"\\", "\\")
+        if lit:
+            out.append(lit)
+    return out
+
+
+def _extract_asserts(rel_path: str, text: str) -> list[tuple]:
+    """Return (macro, path, line, statement, message) for assert-like calls."""
+    lines = text.splitlines()
+    out: list[tuple] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        m = _ASSERT_MACRO_RE.search(line)
+        if not m:
+            i += 1
+            continue
+        start = i
+        stmt_lines = [line.strip()]
+        balance = _paren_balance(line[m.start():])
+        j = i
+        while balance > 0 and j + 1 < len(lines) and (j - start) < 8:
+            j += 1
+            stmt_lines.append(lines[j].strip())
+            balance += _paren_balance(lines[j])
+        statement = " ".join(part for part in stmt_lines if part)
+        statement = re.sub(r"\s+", " ", statement)[:1000]
+        message = " ".join(_extract_string_literals(statement))[:500]
+        out.append((m.group("macro"), rel_path, start + 1, statement, message))
+        i = j + 1
+    return out
+
+
+def build(
+    root: str | None = None,
+    db_path: str | None = None,
+    *,
+    repo: str | None = None,
+    verbose: bool = False,
+) -> dict:
     """Build the index. Returns a summary dict (files, symbols)."""
     from tree_sitter import Language, Parser
     import tree_sitter_cpp
 
-    root = os.path.abspath(root or config.TARGET_CODE_PATH)
-    db_path = db_path or config.INDEX_DB_PATH
+    with config.use_repo(repo):
+        root = os.path.abspath(root or config.current_target_code_path())
+        db_path = db_path or config.current_index_db_path()
     parser = Parser(Language(tree_sitter_cpp.language()))
 
     os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
@@ -138,7 +213,13 @@ def build(root: str | None = None, db_path: str | None = None, *, verbose: bool 
     return summary
 
 
-def update(root: str | None = None, db_path: str | None = None, *, verbose: bool = False) -> dict:
+def update(
+    root: str | None = None,
+    db_path: str | None = None,
+    *,
+    repo: str | None = None,
+    verbose: bool = False,
+) -> dict:
     """Incrementally sync the index to the current files.
 
     Re-parses only files whose content hash changed (or are new), and drops rows
@@ -148,8 +229,9 @@ def update(root: str | None = None, db_path: str | None = None, *, verbose: bool
     from tree_sitter import Language, Parser
     import tree_sitter_cpp
 
-    root = os.path.abspath(root or config.TARGET_CODE_PATH)
-    db_path = db_path or config.INDEX_DB_PATH
+    with config.use_repo(repo):
+        root = os.path.abspath(root or config.current_target_code_path())
+        db_path = db_path or config.current_index_db_path()
     if not os.path.isfile(db_path):
         return build(root, db_path, verbose=verbose)
 
@@ -217,6 +299,17 @@ def _index_one(conn: sqlite3.Connection, parser, rel: str, text: str) -> int:
             "INSERT INTO symbols(name, kind, path, line, file_hash) VALUES (?, ?, ?, ?, ?)",
             [(n, k, p, ln, digest) for (n, k, p, ln) in syms],
         )
+    for macro, path, line, statement, message in _extract_asserts(rel, text):
+        cur = conn.execute(
+            "INSERT INTO asserts(macro, path, line, statement, message, file_hash) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (macro, path, line, statement, message, digest),
+        )
+        conn.execute(
+            "INSERT INTO assert_fts(rowid, path, macro, statement, message) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (cur.lastrowid, path, macro, statement, message),
+        )
     return len(syms)
 
 
@@ -225,6 +318,11 @@ def _delete_file(conn: sqlite3.Connection, rel: str) -> None:
     conn.execute("DELETE FROM files WHERE path = ?", (rel,))
     conn.execute("DELETE FROM files_fts WHERE path = ?", (rel,))
     conn.execute("DELETE FROM symbols WHERE path = ?", (rel,))
+    conn.execute(
+        "DELETE FROM assert_fts WHERE rowid IN (SELECT id FROM asserts WHERE path = ?)",
+        (rel,),
+    )
+    conn.execute("DELETE FROM asserts WHERE path = ?", (rel,))
 
 
 def _set_root(conn: sqlite3.Connection, root: str) -> None:
@@ -253,15 +351,32 @@ def _init_schema(conn: sqlite3.Connection) -> None:
             file_hash TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name);
+        CREATE TABLE IF NOT EXISTS asserts(
+            id INTEGER PRIMARY KEY,
+            macro TEXT NOT NULL,
+            path TEXT NOT NULL,
+            line INTEGER NOT NULL,
+            statement TEXT NOT NULL,
+            message TEXT NOT NULL,
+            file_hash TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_asserts_path_line ON asserts(path, line);
+        CREATE VIRTUAL TABLE IF NOT EXISTS assert_fts
+        USING fts5(path, macro, statement, message);
         CREATE VIRTUAL TABLE IF NOT EXISTS files_fts USING fts5(path, content);
         """
     )
 
 
 if __name__ == "__main__":
-    import sys
+    import argparse
 
-    if "--update" in sys.argv or "-u" in sys.argv:
-        update(verbose=True)
+    parser = argparse.ArgumentParser(description="Build/update the code index")
+    parser.add_argument("--repo", default=None, help="repo name from CODE_REPOS")
+    parser.add_argument("-u", "--update", action="store_true", help="incremental update")
+    args = parser.parse_args()
+
+    if args.update:
+        update(repo=args.repo, verbose=True)
     else:
-        build(verbose=True)
+        build(repo=args.repo, verbose=True)

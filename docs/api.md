@@ -4,6 +4,11 @@
 
 服务默认监听 `0.0.0.0:8900`（`SERVICE_HOST` / `SERVICE_PORT` 可改）。
 
+### `GET /ui`
+
+浏览器测试界面。可选择 repo、回答模式、问题类型，支持提交 `/ask` 和 `/diagnose`，
+并展示请求体、原始响应、耗时和缓存命中状态。
+
 ### `GET /health`
 
 健康检查。
@@ -22,7 +27,10 @@ curl http://localhost:8900/health
 ```json
 {
   "question": "要问的问题",
-  "use_cache": true
+  "use_cache": true,
+  "mode": "plain",
+  "repo": "gameserver",
+  "question_type": "outage_log"
 }
 ```
 
@@ -30,6 +38,9 @@ curl http://localhost:8900/health
 |------|------|------|------|
 | `question` | string | （必填） | 自然语言问题 |
 | `use_cache` | bool | `true` | 是否使用缓存 |
+| `mode` | string | `AGENT_DEFAULT_MODE` | 回答/操作等级：`plain`、`technical`、`edit`；必须已在 `AGENT_ALLOWED_MODES` 开启 |
+| `repo` | string | `CODE_REPO_DEFAULT` | 目标代码库名称；来自 `CODE_REPOS` |
+| `question_type` | string | 自动识别 | 覆盖问题类型策略：`crash_stack`、`outage_log`、`feature_impl`、`config_impl`、`general` |
 
 **响应**
 
@@ -53,14 +64,67 @@ curl -X POST http://localhost:8900/ask \
   -d '{"question": "SceneMgr 是做什么的？"}'
 ```
 
+多仓库示例：
+
+```bash
+curl -X POST http://localhost:8900/ask \
+  -H "Content-Type: application/json" \
+  -d '{"repo": "ecs", "question": "MoveSystem 是做什么的？"}'
+```
+
+### `GET /repos`
+
+列出当前可选代码库：
+
+```json
+{
+  "default": "gameserver",
+  "repos": [
+    {"name": "gameserver", "path": "/path/to/gameserver"},
+    {"name": "ecs", "path": "/path/to/ecs"}
+  ]
+}
+```
+
+### `GET /repos/{repo}/overview`
+
+读取某个仓库的概览/导航缓存。未构建时返回 `available:false`。
+
+构建命令：
+
+```bash
+python -m code_agent.repo_profile --repo gameserver
+python -m code_agent.repo_profile --repo ecs
+```
+
 ### 缓存说明
 
-缓存是 `main.py` 里的**有界 LRU**（问题 → 答案，上限 `CACHE_MAX_ENTRIES`，超出淘汰最久未用）：
+缓存是 `code_agent.main` 里的**有界 LRU**（问题 → 答案，上限 `CACHE_MAX_ENTRIES`，超出淘汰最久未用）：
 
 - `use_cache=true` 且问题问过 → 直接返回缓存，`cached:true`，**不调 LLM**（省时省 token），且不占并发槽。
+- 缓存 key 包含 `repo + mode + question`，不同仓库不会串答案。
 - 命中即提到最新位置（LRU）；超过上限淘汰最旧；`CACHE_MAX_ENTRIES=0` 禁用缓存。
 - 重启服务即清空；失败的请求不入缓存。
 - 空问题返回 `{"answer":"问题不能为空。","cached":false}`。
+
+### LLM 交互 Trace
+
+默认每次有效 `/ask` 请求都会在 `logs/llm/` 下生成一个独立 `.jsonl` 文件，记录请求信息、每轮 LLM 输入 messages、LLM 输出、工具调用结果和最终答案。用 `LLM_TRACE_ENABLED=0` 可关闭，用 `LLM_TRACE_DIR` 可改目录。缓存命中也会生成 trace，但只记录 `cache_hit`，不会有 LLM round。
+
+后台可视化页面：
+
+```text
+GET /admin/llm-traces
+```
+
+配套 JSON 接口：
+
+| 接口 | 说明 |
+|------|------|
+| `GET /admin/llm-traces/api` | 列出最近的 trace 文件 |
+| `GET /admin/llm-traces/api/{file}` | 读取某个 `.jsonl` trace 文件，按事件返回 |
+
+页面左侧是 `logs/llm/` 下的文件列表，右侧按对话轮次展示每次 LLM request/response、tool result、cache hit 和最终答案。
 
 ### `POST /diagnose`
 
@@ -72,7 +136,8 @@ curl -X POST http://localhost:8900/ask \
 {
   "backtrace": "#0 0x... in SceneMgr::Update (this=0x0) at scene/scenemgr.cpp:142\n#1 ...",
   "log": "可选：相关日志片段",
-  "plain": false
+  "plain": false,
+  "repo": "gameserver"
 }
 ```
 
@@ -96,7 +161,7 @@ curl -X POST http://localhost:8900/diagnose \
   -d '{"backtrace": "#0 0x55ab in SceneMgr::Update (this=0x0) at scene/scenemgr.cpp:142\n#1 0x55cd in Process::Update () at process.cpp:211"}'
 ```
 
-逐帧用符号索引（方案 2）映射到 `file:line`；带类名的帧（`SceneMgr::Update`）自动收窄同名候选。`log` 字段会被反查到打印它的代码位置（剥时间戳 + 变量归一化 → FTS）。`backtrace` 与 `log` 可单独或组合提供；两者同时为空返回 400。
+逐帧用符号索引（方案 2）映射到 `file:line`；带类名的帧（`SceneMgr::Update`）自动收窄同名候选。`log` 字段会被反查到打印它的代码位置（剥时间戳 + 变量归一化 → FTS）；如果日志像断言失败或 ASSERT/CHECK 报错，还会查询离线 assert 索引，把断言语句和上下文作为诊断线索。`backtrace` 与 `log` 可单独或组合提供；两者同时为空返回 400。
 
 ### 并发治理
 
@@ -106,12 +171,13 @@ curl -X POST http://localhost:8900/diagnose \
 |------|--------|
 | 正常 | 200 |
 | 上游模型调用失败（预算/鉴权等） | 502 |
+| 请求了未知或未开启的 `mode` | 400 / 403 |
 | 服务繁忙（并发 + 排队已满，`MAX_CONCURRENCY`/`MAX_QUEUE`） | 503 |
 | 单请求超时（`REQUEST_TIMEOUT`，默认 180s） | 504 |
 
 闸门是一个有界线程池（`MAX_CONCURRENCY` 个 worker）：504 超时无法杀死线程，但该线程仍占用 worker，所以真实并发不会被架空（槽位在线程真正结束时才释放）。缓存命中不占并发槽，直接返回。阈值见 [configuration.md](configuration.md)。
 
-## 命令行（`cli.py`）
+## 命令行（`code_agent.cli`）
 
 ```bash
 # 交互模式（会打印工具调用过程）
@@ -119,6 +185,9 @@ scripts/cli.sh
 
 # 单次提问
 scripts/cli.sh "SceneMgr 是做什么的？"
+
+# 程序员解读模式（需 agent 已开启 technical）
+scripts/cli.sh --mode technical "SceneMgr 初始化流程怎么走？"
 
 # 切后端
 AGENT_BACKEND=sdk scripts/cli.sh "暴击伤害怎么算？"
@@ -136,7 +205,7 @@ AGENT_BACKEND=sdk scripts/cli.sh "暴击伤害怎么算？"
 | `serve.sh [start\|stop\|restart\|status]` | HTTP 服务（端口 8900）；无参数=前台运行 |
 | `mcp.sh [start\|stop\|restart\|status]` | MCP 服务（端口 8901）；无参数=前台运行 |
 | `cli.sh ["问题"]` | 命令行交互；带参数则单次提问 |
-| `ask.sh [--no-cache] "问题"` | 用 curl 向**运行中**的服务发 `/ask` |
+| `ask.sh [--no-cache] [--mode plain\|technical\|edit] "问题"` | 用 curl 向**运行中**的服务发 `/ask` |
 
 `scripts/common.sh` 是被 source 的公共库（`PROJECT_ROOT`、`VENV_PY`、`ensure_venv`、`run_py`、加载 `.env`、`daemon_*` 守护进程助手），不直接运行。
 
@@ -161,6 +230,7 @@ pid 文件与日志都在 `logs/` 下（已 gitignore）。`stop`/`start` 幂等
 # 典型流程
 scripts/serve.sh start                    # 后台起服务
 scripts/ask.sh "玩家生命值字段叫什么？"      # 提问
+scripts/ask.sh --mode technical "玩家生命值在哪里扣减？"  # 请求程序员解读模式
 scripts/ask.sh --no-cache "同一个问题"      # 绕过缓存
 scripts/serve.sh stop                     # 用完停掉
 ```
