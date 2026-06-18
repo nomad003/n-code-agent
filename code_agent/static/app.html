@@ -192,13 +192,14 @@
             <h2>知识图谱</h2>
             <button class="ghost" @click="loadKnowledgeGraph">刷新</button>
           </div>
+          <div class="hint">图谱来源：{{ knowledge.graphSourceRepo || selectedRepo }}</div>
           <div class="metrics compact-metrics">
             <div><strong>{{ graphStats.concepts }}</strong><span>概念</span></div>
             <div><strong>{{ graphStats.tags }}</strong><span>标签</span></div>
             <div><strong>{{ graphStats.edges }}</strong><span>关系</span></div>
           </div>
           <div class="graph-wrap">
-            <div class="notice" v-if="!graphNodes.length">当前仓库没有可展示的知识图谱节点。</div>
+            <div class="notice" v-if="!graphNodes.length">当前仓库没有可展示的知识图谱节点。请切换到 {{ defaultRepo || '默认聚合仓库' }}，或先新增知识卡片。</div>
             <svg viewBox="0 0 960 560" role="img" aria-label="知识图谱">
               <line v-for="edge in graphEdges" :key="edge.id" :x1="edge.x1" :y1="edge.y1" :x2="edge.x2" :y2="edge.y2" :class="'edge ' + edge.relation"></line>
               <g v-for="node in graphNodes" :key="node.id" :transform="'translate(' + node.x + ',' + node.y + ')'" @click="node.kind === 'concept' && loadCard(node.id)">

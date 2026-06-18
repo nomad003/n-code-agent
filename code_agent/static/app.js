@@ -119,6 +119,7 @@
         view: pathToView(window.location.pathname),
         loading: false,
         statusText: "就绪",
+        defaultRepo: "",
         repos: [],
         selectedRepo: "",
         ask: {
@@ -142,6 +143,7 @@
           meta: {},
           editing: false,
           graph: { nodes: [], edges: [] },
+          graphSourceRepo: "",
           qaItems: [],
           qa: null,
           curateQuestion: "",
@@ -315,8 +317,9 @@
       async loadRepos() {
         await this.withLoading("加载仓库", async () => {
           const data = await this.apiJson("/repos");
+          this.defaultRepo = data.default || "";
           this.repos = data.repos || [];
-          const current = this.repos.find((repo) => repo.current) || this.repos[0];
+          const current = this.repos.find((repo) => repo.name === this.defaultRepo) || this.repos[0];
           if (current && !this.selectedRepo) this.selectedRepo = current.name;
         });
       },
@@ -432,11 +435,23 @@
       },
       async loadKnowledgeGraph() {
         await this.withLoading("加载图谱", async () => {
-          const data = await this.apiJson("/knowledge/api/graph?repo=" + encodeURIComponent(this.selectedRepo));
+          let repo = this.selectedRepo;
+          let data = await this.apiJson("/knowledge/api/graph?repo=" + encodeURIComponent(repo));
+          if (!(data.nodes || []).length && this.defaultRepo && this.defaultRepo !== repo) {
+            const fallback = await this.apiJson("/knowledge/api/graph?repo=" + encodeURIComponent(this.defaultRepo));
+            if ((fallback.nodes || []).length) {
+              repo = this.defaultRepo;
+              this.selectedRepo = this.defaultRepo;
+              data = fallback;
+              const cards = await this.apiJson("/knowledge/api?repo=" + encodeURIComponent(this.defaultRepo));
+              this.knowledge.cards = cards.cards || [];
+            }
+          }
           this.knowledge.graph = {
             nodes: data.nodes || [],
             edges: data.edges || [],
           };
+          this.knowledge.graphSourceRepo = repo;
         });
       },
       async loadKnowledgeQa() {
