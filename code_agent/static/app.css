@@ -232,6 +232,11 @@ h2 {
   margin-bottom: 12px;
 }
 
+.form-grid.single {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
 label {
   display: grid;
   gap: 6px;
@@ -497,6 +502,7 @@ summary {
   border-radius: 8px;
   background: #fbfcfd;
   overflow: hidden;
+  margin-bottom: 12px;
 }
 
 .graph-wrap svg {
@@ -539,6 +545,15 @@ summary {
   pointer-events: none;
 }
 
+.graph-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  max-height: 240px;
+  overflow: auto;
+  margin-bottom: 10px;
+}
+
 .qa-layout {
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
@@ -563,6 +578,17 @@ summary {
   min-height: 320px;
 }
 
+.qa-list textarea {
+  min-height: 130px;
+}
+
+.section-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 6px;
+}
+
 .trace-dir {
   color: var(--muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
@@ -579,6 +605,10 @@ summary {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 12px;
+}
+
+.compact-metrics {
+  max-width: 520px;
 }
 
 .metrics div {
@@ -682,7 +712,8 @@ summary {
   .metrics,
   .nav,
   .qa-layout,
-  .meta-grid {
+  .meta-grid,
+  .graph-list {
     display: grid;
     grid-template-columns: 1fr;
   }

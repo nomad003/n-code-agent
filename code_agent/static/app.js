@@ -144,6 +144,8 @@
           graph: { nodes: [], edges: [] },
           qaItems: [],
           qa: null,
+          curateQuestion: "",
+          curateQuestionType: "general",
           qaDraft: {
             title: "",
             name: "",
@@ -251,6 +253,17 @@
             };
           })
           .filter(Boolean);
+      },
+      graphStats() {
+        const nodes = this.knowledge.graph.nodes || [];
+        return {
+          concepts: nodes.filter((node) => node.kind === "concept").length,
+          tags: nodes.filter((node) => node.kind === "tag").length,
+          edges: (this.knowledge.graph.edges || []).length,
+        };
+      },
+      graphConcepts() {
+        return (this.knowledge.graph.nodes || []).filter((node) => node.kind === "concept");
       },
     },
     mounted() {
@@ -443,6 +456,27 @@
           tags: "qa, curated",
           answer: item.answer || "",
         };
+      },
+      async askKnowledgeQa() {
+        await this.withLoading("后台追问", async () => {
+          const data = await this.apiJson("/knowledge/api/qa/ask", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              repo: this.selectedRepo,
+              question: this.knowledge.curateQuestion,
+              question_type: this.knowledge.curateQuestionType,
+              mode: "technical",
+            }),
+          });
+          this.selectQa({
+            id: "draft-" + Date.now(),
+            question: data.question,
+            answer: data.answer,
+            refs: [],
+            created_at: "draft",
+          });
+        });
       },
       async precipitateQa() {
         if (!this.knowledge.qa) return;

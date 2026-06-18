@@ -1,4 +1,6 @@
 """Tests for the module knowledge maintenance UI/API helpers."""
+import asyncio
+
 import pytest
 
 from code_agent import config
@@ -82,3 +84,35 @@ def test_knowledge_precipitate_creates_card(knowledge_env):
     read = main.knowledge_read("marvel", "qa-test.md")
     assert read["meta"]["type"] == "Code Playbook"
     assert "SceneMgr 管理场景" in read["content"]
+
+
+def test_knowledge_qa_ask_calls_agent(knowledge_env, monkeypatch):
+    captured = {}
+    monkeypatch.setattr(config, "AGENT_ALLOWED_MODES", ("plain", "technical"))
+
+    def fake_answer(question, *, mode="plain", repo=None, question_type=None, **_kwargs):
+        captured.update(
+            {
+                "question": question,
+                "mode": mode,
+                "repo": repo,
+                "question_type": question_type,
+            }
+        )
+        return "模型回答"
+
+    monkeypatch.setattr(main.agent, "answer", fake_answer)
+    req = main.KnowledgeCurateAskRequest(
+        repo="marvel",
+        question="场景如何创建？",
+        mode="technical",
+        question_type="feature_impl",
+    )
+    res = asyncio.run(main.knowledge_qa_ask(req))
+    assert res["answer"] == "模型回答"
+    assert captured == {
+        "question": "场景如何创建？",
+        "mode": "technical",
+        "repo": "marvel",
+        "question_type": "feature_impl",
+    }

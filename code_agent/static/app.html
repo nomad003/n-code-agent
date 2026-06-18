@@ -192,7 +192,13 @@
             <h2>知识图谱</h2>
             <button class="ghost" @click="loadKnowledgeGraph">刷新</button>
           </div>
+          <div class="metrics compact-metrics">
+            <div><strong>{{ graphStats.concepts }}</strong><span>概念</span></div>
+            <div><strong>{{ graphStats.tags }}</strong><span>标签</span></div>
+            <div><strong>{{ graphStats.edges }}</strong><span>关系</span></div>
+          </div>
           <div class="graph-wrap">
+            <div class="notice" v-if="!graphNodes.length">当前仓库没有可展示的知识图谱节点。</div>
             <svg viewBox="0 0 960 560" role="img" aria-label="知识图谱">
               <line v-for="edge in graphEdges" :key="edge.id" :x1="edge.x1" :y1="edge.y1" :x2="edge.x2" :y2="edge.y2" :class="'edge ' + edge.relation"></line>
               <g v-for="node in graphNodes" :key="node.id" :transform="'translate(' + node.x + ',' + node.y + ')'" @click="node.kind === 'concept' && loadCard(node.id)">
@@ -200,6 +206,12 @@
                 <text text-anchor="middle" :y="node.kind === 'concept' ? 42 : 31">{{ node.title }}</text>
               </g>
             </svg>
+          </div>
+          <div class="graph-list">
+            <button v-for="node in graphConcepts" :key="node.id" class="list-item" @click="loadCard(node.id)">
+              <span>{{ node.title }}</span>
+              <small>{{ node.id }} · {{ node.type }}</small>
+            </button>
           </div>
           <div class="hint">圆点是知识概念，浅色小点是标签；实线表示 Markdown 内部链接，虚线表示标签关系。</div>
         </div>
@@ -211,13 +223,33 @@
           </div>
           <div class="qa-layout">
             <div class="qa-list">
+              <label>后台追问模型
+                <textarea v-model="knowledge.curateQuestion" spellcheck="false" placeholder="输入要追问并准备沉淀的问题。"></textarea>
+              </label>
+              <div class="form-grid single">
+                <label>问题类型
+                  <select v-model="knowledge.curateQuestionType">
+                    <option value="general">通用问题</option>
+                    <option value="crash_stack">程序 crash 堆栈</option>
+                    <option value="outage_log">宕机 / 错误日志</option>
+                    <option value="feature_impl">功能实现</option>
+                    <option value="config_impl">配置实现</option>
+                  </select>
+                </label>
+                <button class="primary" @click="askKnowledgeQa" :disabled="loading || !knowledge.curateQuestion.trim()">追问模型</button>
+              </div>
+              <div class="section-label">历史问答</div>
               <button v-for="item in knowledge.qaItems" :key="item.id" class="list-item" :class="{ active: knowledge.qa && knowledge.qa.id === item.id }" @click="selectQa(item)">
                 <span>{{ item.question }}</span>
                 <small>{{ item.created_at || '-' }} · {{ (item.refs || []).join(', ') || 'no refs' }}</small>
               </button>
-              <p class="hint" v-if="!knowledge.qaItems.length">没有历史问答。开启 USE_KNOWLEDGE=1 后，后台问答会写入这里。</p>
+              <p class="hint" v-if="!knowledge.qaItems.length">没有历史问答也可以直接在上方追问模型，认可后落地为知识卡。</p>
             </div>
             <div class="qa-draft">
+              <div class="notice" v-if="knowledge.qa">
+                <strong>待沉淀问题</strong>
+                <p>{{ knowledge.qa.question }}</p>
+              </div>
               <label>卡片标题
                 <input v-model="knowledge.qaDraft.title">
               </label>

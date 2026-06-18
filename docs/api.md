@@ -151,7 +151,16 @@ GET /knowledge
 | `POST /knowledge/api` | 保存知识卡片 |
 | `GET /knowledge/api/graph?repo=<repo>` | 返回知识图谱节点和边，包含概念、标签、内部链接关系 |
 | `GET /knowledge/api/qa?repo=<repo>` | 列出后台知识飞轮沉淀的历史问答 |
+| `POST /knowledge/api/qa/ask` | 在知识库后台追问模型，返回待人工审核的答案 |
 | `POST /knowledge/api/precipitate` | 将人工认可的问答落地为 `Code Playbook` 知识卡 |
+
+推荐沉淀流程：
+
+1. 在知识库页面进入“问答沉淀”。
+2. 后台追问模型，得到一版答案。
+3. 人工编辑标题、标签和沉淀结论。
+4. 确认答案质量后调用 `precipitate` 落地成 Markdown 知识卡。
+5. 后续类似问题会通过模块知识卡召回这份 `Code Playbook`，但仍要求 agent 用工具核实当前代码。
 
 ### `POST /diagnose`
 

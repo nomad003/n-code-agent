@@ -176,6 +176,13 @@ class KnowledgePrecipitateRequest(BaseModel):
     refs: list[str] = []
 
 
+class KnowledgeCurateAskRequest(BaseModel):
+    repo: str
+    question: str
+    mode: str | None = "technical"
+    question_type: str | None = None
+
+
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
@@ -324,6 +331,39 @@ def knowledge_list(repo: str | None = None) -> dict:
                 }
             )
     return {"repo": repo_name, "cards": cards}
+
+
+@app.post("/knowledge/api/qa/ask")
+async def knowledge_qa_ask(req: KnowledgeCurateAskRequest) -> dict:
+    question = req.question.strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="question cannot be empty")
+    repo = _resolve_request_repo(req.repo)
+    mode = _resolve_request_mode(req.mode)
+    try:
+        question_type = question_intent.normalize(req.question_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    try:
+        answer = await _run_governed(
+            lambda: agent.answer(
+                question,
+                mode=mode,
+                repo=repo,
+                question_type=question_type,
+            )
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"上游模型调用失败: {exc}")
+    return {
+        "repo": repo,
+        "question": question,
+        "answer": response_policy.enforce(answer, mode=mode),
+        "question_type": question_type,
+        "mode": mode,
+    }
 
 
 @app.get("/knowledge/api/{repo}/{name}")
