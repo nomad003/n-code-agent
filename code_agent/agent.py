@@ -20,6 +20,7 @@ import litellm
 
 from . import config
 from . import llm_trace
+from . import module_knowledge
 from . import operation_modes
 from . import question_intent
 from . import response_policy
@@ -235,6 +236,9 @@ class CodeAgent:
             profile_text = ""
         if profile_text:
             system = system + "\n\n" + profile_text
+        module_text = module_knowledge.format_for_prompt(self.question)
+        if module_text:
+            system = system + "\n\n" + module_text
         if self.recalled:
             system = system + "\n\n" + self.recalled
         # Mark the static prefix (system + initial user question) for prompt

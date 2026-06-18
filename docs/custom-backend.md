@@ -66,6 +66,7 @@ system =
   + operation_modes.response_rules(mode)
   + question_intent.prompt(question)
   + repo_profile.format_for_prompt()
+  + module_knowledge.format_for_prompt(question)
   + knowledge recall（可选）
 
 messages =
@@ -129,6 +130,17 @@ repo_profile.format_for_prompt()
 ```
 
 这部分来自 `index/repos/<repo>/profile.json`，用于告诉模型常用目录、模块、符号样例和导航入口，避免每次从根目录盲搜。
+
+随后会按问题关键词召回版本化模块知识卡：
+
+```text
+docs/code-knowledge/<repo>/*.md
+```
+
+这类卡片用于维护大模块的稳定框架、关键链路、配置关系和排查手册，例如
+`docs/code-knowledge/marvel/monster-config.md` 记录了怪物配置、`CombatEnemy` 初始化、
+`SkillListForEnemy`、`GetEnemySkillConfigX`、`InitEnemySkill` 和常见 enemy skill 缺配置宕机链路。
+知识卡会作为“框架导览”注入 prompt，但答案仍要求用工具读当前代码核实。
 
 如果开启 `USE_KNOWLEDGE=1`，还会追加历史问答召回结果。召回内容被明确标成“线索”，模型必须再用工具核实。
 

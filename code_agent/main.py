@@ -585,6 +585,20 @@ _LLM_TRACES_HTML = r"""<!doctype html>
     .cache-table .bar { height:6px; background:var(--line); border-radius:3px; overflow:hidden; max-width:120px; }
     .cache-table .bar > div { height:100%; background:var(--accent); }
     .cache-table .pct { color:var(--muted); }
+    .audit { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:12px 0; }
+    .audit-card { border:1px solid var(--line); border-radius:8px; background:#fbfbf8; padding:12px; }
+    .audit-card h3 { margin:0 0 8px; font-size:14px; }
+    .audit-list { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 0; }
+    .pill { border:1px solid var(--line); border-radius:999px; background:#fff; padding:2px 8px; font-size:12px; color:var(--muted); }
+    .pill.ok { border-color:#a8d0c4; color:#17695c; background:#eef7f3; }
+    .pill.warn { border-color:#e2c590; color:#8a570c; background:#fbf3e4; }
+    .pill.err { border-color:#e3aaa7; color:var(--error); background:#fff1f0; }
+    .tool-seq { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+    .tool-step { border:1px solid var(--line); border-radius:6px; background:#fff; padding:4px 7px; font-size:12px; }
+    .tool-step .idx { color:var(--muted); margin-right:4px; }
+    .tool-step.err { border-color:#e3aaa7; color:var(--error); }
+    .recommend { margin:8px 0 0; padding-left:18px; color:var(--text); }
+    .recommend li { margin:3px 0; }
     .timeline { display:flex; flex-direction:column; gap:12px; }
     .round { background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:8px; overflow:hidden; }
     .round-head { padding:10px 14px; display:flex; align-items:center; justify-content:space-between; gap:12px; background:#fbfbf8; border-bottom:1px solid var(--line); font-weight:650; }
@@ -892,6 +906,10 @@ function renderSummary() {
   });
   summary.appendChild(statsRow);
 
+  if (stats.audit) {
+    summary.appendChild(renderAudit(stats.audit));
+  }
+
   // Per-round cache breakdown — exposes whether prompt caching is actually
   // being honored by the proxy. First round should be ~0% (cache is being
   // written); rounds 2+ should approach 100% of the static prefix.
@@ -935,6 +953,49 @@ function renderSummary() {
     summary.appendChild(ans);
   }
   return summary;
+}
+
+function renderAudit(audit) {
+  const wrap = el('div', 'audit');
+  const left = el('div', 'audit-card');
+  left.appendChild(el('h3', '', '最佳实践审计'));
+  const meta = el('div', 'audit-list');
+  meta.appendChild(el('span', 'pill ok', audit.intentLabel));
+  meta.appendChild(el('span', audit.statusClass, audit.status));
+  if (audit.missing.length) meta.appendChild(el('span', 'pill warn', `缺 ${audit.missing.length} 个推荐工具`));
+  if (audit.repeated.length) meta.appendChild(el('span', 'pill warn', `重复 ${audit.repeated.length} 类工具`));
+  if (audit.errors) meta.appendChild(el('span', 'pill err', `工具错误 ${audit.errors}`));
+  left.appendChild(meta);
+  if (audit.recommendations.length) {
+    const ul = el('ul', 'recommend');
+    audit.recommendations.forEach(r => ul.appendChild(el('li', '', r)));
+    left.appendChild(ul);
+  }
+
+  const right = el('div', 'audit-card');
+  right.appendChild(el('h3', '', '工具调用顺序'));
+  if (audit.toolSequence.length) {
+    const seq = el('div', 'tool-seq');
+    audit.toolSequence.forEach((t, i) => {
+      const s = el('span', 'tool-step' + (t.error ? ' err' : ''));
+      s.appendChild(el('span', 'idx', String(i + 1)));
+      s.appendChild(document.createTextNode(t.name));
+      seq.appendChild(s);
+    });
+    right.appendChild(seq);
+  } else {
+    right.appendChild(el('div', 'empty', '没有工具调用，可能是 cache/shortcut 或模型直接回答。'));
+  }
+  if (audit.expected.length) {
+    const expected = el('div', 'audit-list');
+    audit.expected.forEach(name => {
+      expected.appendChild(el('span', audit.used.has(name) ? 'pill ok' : 'pill', name));
+    });
+    right.appendChild(expected);
+  }
+  wrap.appendChild(left);
+  wrap.appendChild(right);
+  return wrap;
 }
 
 // --- aggregation ----------------------------------------------------------
@@ -1028,7 +1089,98 @@ function summarize(trace, agg) {
     duration, toolCounts, toolTotal, errors, finalAnswer,
     rounds: agg.rounds.length,
     hadUsage, promptTokens, completionTokens, totalTokens, cachedTokens,
+    audit: buildAudit(trace, agg, toolCounts, errors),
   };
+}
+
+const INTENT_RULES = {
+  '程序 crash 堆栈分析': {
+    expected: ['resolve_frame', 'read_file'],
+    optional: ['find_assert_context', 'find_log_source', 'grep_code'],
+    advice: 'crash 堆栈应先定位业务栈帧，再读崩溃点上下文，并结合上下游帧判断调用关系。'
+  },
+  '宕机/错误日志分析': {
+    expected: ['find_assert_context', 'find_log_source', 'read_file'],
+    optional: ['grep_code'],
+    advice: '宕机日志应先反查断言/打印点，再读错误分支上下文，最后给出触发条件和排查顺序。'
+  },
+  '功能实现分析': {
+    expected: ['repo_overview', 'grep_code', 'find_symbol', 'read_file'],
+    optional: ['glob', 'list_dir'],
+    advice: '功能实现应先缩小模块范围，再按入口、核心分支、下游调用和数据流追踪。'
+  },
+  '配置实现分析': {
+    expected: ['glob', 'grep_code', 'read_file'],
+    optional: ['repo_overview', 'find_symbol'],
+    advice: '配置实现应覆盖配置来源、加载/校验/缓存链路、业务读取点和非法值行为。'
+  },
+  '通用代码问答': {
+    expected: ['grep_code', 'read_file'],
+    optional: ['repo_overview', 'find_symbol', 'glob'],
+    advice: '通用问题应先低成本缩小范围，再读取关键上下文，并区分事实和推断。'
+  }
+};
+
+function buildAudit(trace, agg, toolCounts, errors) {
+  const intentLabel = detectIntent(trace, agg);
+  const rule = INTENT_RULES[intentLabel] || INTENT_RULES['通用代码问答'];
+  const toolSequence = [];
+  for (const g of agg.rounds) {
+    for (const t of g.tools) {
+      toolSequence.push({name: t.name || '(unknown)', error: !!t.is_error});
+    }
+  }
+  const used = new Set(toolSequence.map(t => t.name));
+  const missing = rule.expected.filter(name => !used.has(name));
+  const repeated = Object.entries(toolCounts)
+    .filter(([name, n]) => n >= 3 && !['read_file'].includes(name))
+    .map(([name]) => name);
+  const recommendations = [];
+  if (missing.length) recommendations.push(`建议补充推荐工具：${missing.join('、')}。`);
+  if (repeated.length) recommendations.push(`存在重复检索：${repeated.join('、')}，可先改用 files/count 或收窄 path。`);
+  if (errors) recommendations.push('存在工具错误，需要检查参数、路径或索引是否可用。');
+  if (!toolSequence.length) recommendations.push('没有工具调用；若不是 cache/shortcut，需确认模型是否过早直接回答。');
+  if (!recommendations.length) recommendations.push(rule.advice);
+  const status = errors ? '需要复核' : (missing.length || repeated.length ? '可优化' : '执行良好');
+  const statusClass = errors ? 'pill err' : (missing.length || repeated.length ? 'pill warn' : 'pill ok');
+  return {
+    intentLabel,
+    expected: rule.expected,
+    optional: rule.optional,
+    used,
+    missing,
+    repeated,
+    errors,
+    status,
+    statusClass,
+    recommendations,
+    toolSequence,
+  };
+}
+
+function detectIntent(trace, agg) {
+  for (const g of agg.rounds) {
+    const messages = (g.request && g.request.messages) || [];
+    const sys = messages.find(m => m.role === 'system');
+    const content = messageContentText(sys && sys.content);
+    const m = content.match(/当前问题类型：([^\n]+)/);
+    if (m) return m[1].trim();
+  }
+  const q = (trace.question || '').toLowerCase();
+  if (/^\s*#\d+\s+/m.test(trace.question || '') || q.includes('backtrace') || q.includes('sigsegv') || q.includes('堆栈')) return '程序 crash 堆栈分析';
+  if (q.includes('assert') || q.includes('error') || q.includes('fatal') || q.includes('日志') || q.includes('宕机')) return '宕机/错误日志分析';
+  if (q.includes('配置') || q.includes('config') || q.includes('字段')) return '配置实现分析';
+  if (q.includes('实现') || q.includes('流程') || q.includes('调用链')) return '功能实现分析';
+  return '通用代码问答';
+}
+
+function messageContentText(content) {
+  if (!content) return '';
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content.map(part => typeof part === 'string' ? part : (part && part.text) || '').join('\n');
+  }
+  return text(content);
 }
 
 function renderRound(g) {
