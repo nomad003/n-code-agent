@@ -18,7 +18,7 @@
           <div class="brand-title">Code Agent Workbench</div>
           <div class="brand-subtitle">代码调查 / 调用复盘 / 知识沉淀</div>
         </div>
-        <button class="sidebar-toggle" type="button" @click="toggleSidebar" :aria-pressed="shell.sidebarCollapsed" :aria-label="shell.sidebarCollapsed ? '展开边栏' : '收起边栏'" :title="shell.sidebarCollapsed ? '展开边栏' : '收起边栏'">
+        <button class="sidebar-toggle" type="button" @click.stop.prevent="toggleSidebar" :aria-pressed="shell.sidebarCollapsed" :aria-label="shell.sidebarCollapsed ? '展开边栏' : '收起边栏'" :title="shell.sidebarCollapsed ? '展开边栏' : '收起边栏'">
           <span>{{ shell.sidebarCollapsed ? '>' : '<' }}</span>
         </button>
       </div>

@@ -75,6 +75,7 @@ body {
 .sidebar {
   position: sticky;
   top: 0;
+  z-index: 20;
   height: 100vh;
   padding: 18px 14px;
   display: flex;
@@ -133,8 +134,8 @@ body {
 .sidebar-toggle {
   position: absolute;
   top: 10px;
-  right: -14px;
-  z-index: 5;
+  right: 2px;
+  z-index: 30;
   width: 30px;
   height: 30px;
   padding: 0;
@@ -274,6 +275,7 @@ small {
 
 #app.sidebar-collapsed .brand {
   grid-template-columns: 34px;
+  min-height: 82px;
   padding-right: 0;
 }
 
@@ -290,8 +292,8 @@ small {
 }
 
 #app.sidebar-collapsed .sidebar-toggle {
-  right: -14px;
-  top: 52px;
+  right: 2px;
+  top: 46px;
 }
 
 #app.sidebar-collapsed .nav button {
@@ -1019,51 +1021,59 @@ summary {
   }
 }
 
-@media (max-width: 760px) {
-  #app,
+@media (max-width: 760px) and (min-width: 561px) {
+  #app {
+    grid-template-columns: 180px minmax(0, 1fr);
+  }
+
   #app.sidebar-collapsed {
-    grid-template-columns: 1fr;
+    grid-template-columns: 58px minmax(0, 1fr);
   }
 
-  .sidebar,
-  #app.sidebar-collapsed .sidebar {
-    position: static;
-    height: auto;
-    display: grid;
-    grid-template-columns: minmax(220px, 1fr) minmax(260px, 2fr) minmax(160px, 0.8fr) auto;
-    align-items: center;
-    padding: 14px;
-  }
-
-  .brand,
-  #app.sidebar-collapsed .brand {
-    grid-template-columns: 42px minmax(0, 1fr);
-    border-bottom: 0;
-    padding: 0 0 0 2px;
-  }
-
-  .sidebar-toggle {
-    position: static;
-    display: grid;
-  }
-
-  .nav,
-  #app.sidebar-collapsed .nav {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .nav button,
-  #app.sidebar-collapsed .nav button {
-    grid-template-columns: 28px minmax(0, 1fr);
-    justify-items: start;
+  .sidebar {
+    position: sticky;
+    height: 100vh;
+    display: flex;
+    padding: 14px 10px;
   }
 
   #app.sidebar-collapsed .sidebar {
-    grid-template-columns: 34px minmax(0, 1fr) auto;
+    padding: 18px 8px;
+  }
+
+  .brand {
+    grid-template-columns: 34px minmax(0, 1fr);
+    min-height: 82px;
+    border-bottom: 1px solid var(--border);
+    padding: 2px 34px 13px 0;
   }
 
   #app.sidebar-collapsed .brand {
     grid-template-columns: 34px;
+    padding-right: 0;
+  }
+
+  .sidebar-toggle {
+    position: absolute;
+    top: 46px;
+    right: 2px;
+    display: grid;
+  }
+
+  .nav {
+    grid-template-columns: 1fr;
+  }
+
+  .nav button {
+    grid-template-columns: 28px minmax(0, 1fr);
+    justify-items: start;
+    min-height: 36px;
+    padding: 6px;
+  }
+
+  #app.sidebar-collapsed .nav button {
+    grid-template-columns: 1fr;
+    justify-items: center;
   }
 
   #app.sidebar-collapsed .brand-copy,
@@ -1072,15 +1082,11 @@ summary {
     display: none;
   }
 
-  #app.sidebar-collapsed .nav {
-    grid-template-columns: repeat(3, 38px);
-    justify-content: start;
-  }
-
-  #app.sidebar-collapsed .nav button {
-    grid-template-columns: 1fr;
-    justify-items: center;
-    padding: 8px;
+  .brand-mark,
+  #app.sidebar-collapsed .brand-mark {
+    width: 34px;
+    height: 34px;
+    font-size: 10px;
   }
 
   .two-col,

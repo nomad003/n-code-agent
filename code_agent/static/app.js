@@ -268,6 +268,7 @@
       },
     },
     mounted() {
+      this.syncSidebarClass();
       window.addEventListener("popstate", () => {
         this.view = pathToView(window.location.pathname);
         this.activateView();
@@ -309,9 +310,14 @@
         this.view = view;
         this.activateView();
       },
+      syncSidebarClass() {
+        const root = document.getElementById("app");
+        if (root) root.classList.toggle("sidebar-collapsed", this.shell.sidebarCollapsed);
+      },
       toggleSidebar() {
         this.shell.sidebarCollapsed = !this.shell.sidebarCollapsed;
         saveSidebarCollapsed(this.shell.sidebarCollapsed);
+        this.$nextTick(() => this.syncSidebarClass());
       },
       activateView() {
         if (this.view === "traces" && !this.traceFiles.length) this.loadTraces();
