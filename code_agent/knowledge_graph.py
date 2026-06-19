@@ -7,14 +7,30 @@ from dataclasses import dataclass
 
 from . import config
 
-LIST_FIELDS = {"tags", "symbols", "logs", "asserts", "question_types"}
+SEMANTIC_RELATIONS = (
+    "part_of",
+    "supplements",
+    "contradicts",
+    "supersedes",
+    "depends_on",
+)
+LIST_FIELDS = {
+    "tags",
+    "symbols",
+    "logs",
+    "asserts",
+    "question_types",
+    *SEMANTIC_RELATIONS,
+}
 
 RELATIONS = [
     {
         "id": "links_to",
         "label": "内部链接",
         "short_label": "link",
-        "description": "一个知识卡片正文通过 Markdown 链接引用另一个知识卡片。",
+        "description": (
+            "一个知识卡片正文通过 Markdown 链接引用另一个知识卡片。"
+        ),
         "source": "markdown_link",
     },
     {
@@ -35,21 +51,28 @@ RELATIONS = [
         "id": "emits_log",
         "label": "日志线索",
         "short_label": "log",
-        "description": "一个知识卡片在 logs 中声明了常见日志关键字或错误文本。",
+        "description": (
+            "一个知识卡片在 logs 中声明了常见日志关键字或错误文本。"
+        ),
         "source": "frontmatter_logs",
     },
     {
         "id": "checks_assert",
         "label": "断言线索",
         "short_label": "assert",
-        "description": "一个知识卡片在 asserts 中声明了常见断言、CHECK 或错误条件。",
+        "description": (
+            "一个知识卡片在 asserts 中声明了常见断言、CHECK 或错误条件。"
+        ),
         "source": "frontmatter_asserts",
     },
     {
         "id": "answers_question_type",
         "label": "问题类型",
         "short_label": "intent",
-        "description": "一个知识卡片适用于指定问题类型，例如 crash_stack、outage_log、feature_impl、config_impl。",
+        "description": (
+            "一个知识卡片适用于指定问题类型，例如 crash_stack、outage_log、"
+            "feature_impl、config_impl。"
+        ),
         "source": "frontmatter_question_types",
     },
     {
@@ -58,6 +81,46 @@ RELATIONS = [
         "short_label": "path",
         "description": "一个知识卡片描述了指定模块路径或代码资源。",
         "source": "frontmatter_resource",
+    },
+    {
+        "id": "part_of",
+        "label": "组成/从属",
+        "short_label": "part",
+        "description": (
+            "A part_of B：A 是 B 的一个组成部分，例如模块属于子系统、"
+            "配置链路属于框架。"
+        ),
+        "source": "frontmatter_relation",
+    },
+    {
+        "id": "supplements",
+        "label": "补充",
+        "short_label": "plus",
+        "description": "A supplements B：A 为 B 提供额外细节、示例或背景信息。",
+        "source": "frontmatter_relation",
+    },
+    {
+        "id": "contradicts",
+        "label": "冲突",
+        "short_label": "conflict",
+        "description": "A contradicts B：A 与 B 的描述存在不一致，需要人工复核。",
+        "source": "frontmatter_relation",
+    },
+    {
+        "id": "supersedes",
+        "label": "取代",
+        "short_label": "newer",
+        "description": (
+            "A supersedes B：A 是 B 的更新版本，B 不再是最新有效信息。"
+        ),
+        "source": "frontmatter_relation",
+    },
+    {
+        "id": "depends_on",
+        "label": "依赖",
+        "short_label": "dep",
+        "description": "A depends_on B：理解 A 需要先了解 B 的内容。",
+        "source": "frontmatter_relation",
     },
 ]
 
@@ -87,14 +150,20 @@ class KnowledgeCard:
 
 
 def repo_dir(repo: str) -> str:
-    return os.path.abspath(os.path.join(config.PROJECT_ROOT, "docs", "code-knowledge", repo))
+    return os.path.abspath(
+        os.path.join(config.PROJECT_ROOT, "docs", "code-knowledge", repo)
+    )
 
 
 def common_dir() -> str:
-    return os.path.abspath(os.path.join(config.PROJECT_ROOT, "docs", "code-knowledge", "common"))
+    return os.path.abspath(
+        os.path.join(config.PROJECT_ROOT, "docs", "code-knowledge", "common")
+    )
 
 
-def load_cards(repo: str | None = None, *, include_common: bool = True) -> list[KnowledgeCard]:
+def load_cards(
+    repo: str | None = None, *, include_common: bool = True
+) -> list[KnowledgeCard]:
     """Load OKF-style markdown cards, recursively and deterministically."""
     repo_name = repo or config.current_repo().name
     roots: list[tuple[str, str]] = []
@@ -189,6 +258,7 @@ def build_graph(repo: str | None = None) -> dict:
     edges: list[dict] = []
     concept_ids = {card.id for card in cards}
     node_ids: set[str] = set()
+    edge_ids: set[str] = set()
 
     def add_node(node: dict) -> None:
         if node["id"] in node_ids:
@@ -197,9 +267,13 @@ def build_graph(repo: str | None = None) -> dict:
         nodes.append(node)
 
     def add_edge(source: str, target: str, relation: str) -> None:
+        edge_id = f"{source}->{relation}->{target}"
+        if edge_id in edge_ids:
+            return
+        edge_ids.add(edge_id)
         edges.append(
             {
-                "id": f"{source}->{relation}->{target}",
+                "id": edge_id,
                 "source": source,
                 "target": target,
                 "relation": relation,
@@ -251,16 +325,61 @@ def build_graph(repo: str | None = None) -> dict:
         resource = card.meta.get("resource", "").strip()
         if resource:
             node_id = f"resource:{resource}"
-            add_node({"id": node_id, "kind": "resource", "title": resource, "type": "Resource"})
+            add_node(
+                {
+                    "id": node_id,
+                    "kind": "resource",
+                    "title": resource,
+                    "type": "Resource",
+                }
+            )
             add_edge(card.id, node_id, "documents_resource")
 
         base_dir = os.path.dirname(card.id)
         for target in markdown_links(card.body):
-            resolved = os.path.normpath(os.path.join(base_dir, target)).replace(os.sep, "/")
+            resolved = os.path.normpath(os.path.join(base_dir, target)).replace(
+                os.sep, "/"
+            )
             if resolved in concept_ids:
                 add_edge(card.id, resolved, "links_to")
+        for relation in SEMANTIC_RELATIONS:
+            for target in card.field_list(relation):
+                resolved = resolve_card_ref(card.id, target, concept_ids)
+                if resolved:
+                    add_edge(card.id, resolved, relation)
 
     return {"repo": repo_name, "nodes": nodes, "edges": edges, "relations": RELATIONS}
+
+
+def resolve_card_ref(source_id: str, ref: str, concept_ids: set[str]) -> str | None:
+    """Resolve a frontmatter relation target to a card id."""
+    target = (ref or "").strip().strip("`'\"")
+    if not target:
+        return None
+    link_match = re.search(r"\[[^\]]+\]\(([^)]+)\)", target)
+    if link_match:
+        target = link_match.group(1)
+    target = target.split("#", 1)[0].split("?", 1)[0].strip()
+    if not target:
+        return None
+    if not target.endswith(".md"):
+        target += ".md"
+    candidates = [
+        os.path.normpath(target).replace(os.sep, "/"),
+        os.path.normpath(os.path.join(os.path.dirname(source_id), target)).replace(
+            os.sep, "/"
+        ),
+    ]
+    for candidate in candidates:
+        if candidate in concept_ids:
+            return candidate
+    basename = os.path.basename(target)
+    matches = sorted(
+        card_id for card_id in concept_ids if os.path.basename(card_id) == basename
+    )
+    if len(matches) == 1:
+        return matches[0]
+    return None
 
 
 def format_map_for_prompt(query: str, *, limit: int = 12) -> str:
@@ -278,7 +397,10 @@ def format_map_for_prompt(query: str, *, limit: int = 12) -> str:
 
     lines = [
         "代码知识库地图（稳定导航；结论必须继续用工具核实）：",
-        "优先按 title/resource/symbols/logs/asserts/question_types 定位卡片；search/grep 只用于核实当前代码。",
+        (
+            "优先按 title/resource/symbols/logs/asserts/question_types 定位卡片；"
+            "search/grep 只用于核实当前代码。"
+        ),
     ]
     for card in selected:
         parts = []
@@ -287,7 +409,13 @@ def format_map_for_prompt(query: str, *, limit: int = 12) -> str:
         resource = card.meta.get("resource", "")
         if resource:
             parts.append(f"resource={resource}")
-        for field in ("symbols", "logs", "asserts", "question_types"):
+        for field in (
+            "symbols",
+            "logs",
+            "asserts",
+            "question_types",
+            *SEMANTIC_RELATIONS,
+        ):
             vals = card.field_list(field)
             if vals:
                 parts.append(f"{field}={', '.join(vals[:5])}")
@@ -306,11 +434,24 @@ def score_card(query: str, card: KnowledgeCard) -> int:
         card.description,
         card.body,
     ]
-    for key in ("tags", "symbols", "logs", "asserts", "question_types", "resource", "module"):
+    for key in (
+        "tags",
+        "symbols",
+        "logs",
+        "asserts",
+        "question_types",
+        *SEMANTIC_RELATIONS,
+        "resource",
+        "module",
+    ):
         hay_parts.append(card.meta.get(key, ""))
     hay = " ".join(hay_parts).lower()
     score = 0
-    tag_values = {item.lower() for key in LIST_FIELDS for item in meta_list(card.meta.get(key, ""))}
+    tag_values = {
+        item.lower()
+        for key in LIST_FIELDS
+        for item in meta_list(card.meta.get(key, ""))
+    }
     for term in terms:
         if term in hay:
             score += 3 if term in tag_values else 1

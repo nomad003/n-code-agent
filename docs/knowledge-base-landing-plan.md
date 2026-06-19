@@ -18,7 +18,7 @@
 | knowledge-base 机制 | code-agent 落地方式 |
 | --- | --- |
 | raw/wiki/schema 三层 | 保留为 `docs/code-knowledge/<repo>/` 的 OKF-style bundle；暂不引入 raw 投喂层 |
-| KnowledgeRelation 图谱 | 从 Markdown 链接和 frontmatter 派生轻量图谱 |
+| KnowledgeRelation 图谱 | 从 Markdown 链接和 frontmatter 派生轻量图谱，并支持五类语义关系字段 |
 | GraphCache prompt 注入 | 在 `CodeAgent._build_messages()` 注入“代码知识库地图” |
 | Skill Registry | 后续把 MCP/API 工具定义统一到一个 registry；本阶段不重构协议层 |
 | 问答沉淀 | 复用现有后台问答沉淀，增强落地卡片后可进入图谱 |
@@ -55,14 +55,17 @@ knowledge-base 实际代码允许五类关系，以 `schema/relations.md` 和 `R
 | `depends_on` | 依赖 | 理解 A 需要先读 B，例如配置链依赖表加载框架 |
 
 注意：knowledge-base 的 `schema/AGENTS.md` 里仍有 `implies/derived_from` 残留描述，但代码实际不允许这两类关系；后续借鉴时不采用。
+在 code-agent 中，这五类关系通过同名 frontmatter 字段维护，例如
+`depends_on: tableload-config.md, unit-skill-attr.md`。
 
 ## 分阶段执行
 
 ### Phase 1：知识地图可用
 
 - 递归读取 `docs/code-knowledge/<repo>/`，支持后续模块化子目录。
-- 统一解析 frontmatter，提取 `tags/symbols/logs/asserts/question_types/resource`。
+- 统一解析 frontmatter，提取 `tags/symbols/logs/asserts/question_types/resource` 和五类语义关系。
 - 图谱增加实体节点和关系：`owns_symbol`、`emits_log`、`checks_assert`、`answers_question_type`、`documents_resource`。
+- 图谱增加知识卡片语义边：`part_of`、`supplements`、`contradicts`、`supersedes`、`depends_on`。
 - 将图谱摘要注入 agent system prompt，要求模型先按地图导航，再用工具核实。
 
 ### Phase 2：沉淀治理增强

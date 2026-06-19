@@ -67,6 +67,36 @@
       short_label: "path",
       description: "frontmatter resource 声明了卡片描述的模块路径或代码资源。",
     },
+    {
+      id: "part_of",
+      label: "组成/从属",
+      short_label: "part",
+      description: "A part_of B：A 是 B 的一个组成部分。",
+    },
+    {
+      id: "supplements",
+      label: "补充",
+      short_label: "plus",
+      description: "A supplements B：A 为 B 提供额外细节、示例或背景信息。",
+    },
+    {
+      id: "contradicts",
+      label: "冲突",
+      short_label: "conflict",
+      description: "A contradicts B：A 与 B 的描述存在不一致，需要人工复核。",
+    },
+    {
+      id: "supersedes",
+      label: "取代",
+      short_label: "newer",
+      description: "A supersedes B：A 是 B 的更新版本，B 不再是最新有效信息。",
+    },
+    {
+      id: "depends_on",
+      label: "依赖",
+      short_label: "dep",
+      description: "A depends_on B：理解 A 需要先了解 B 的内容。",
+    },
   ];
 
   function pathToView(pathname) {

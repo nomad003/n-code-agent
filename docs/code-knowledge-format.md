@@ -69,7 +69,7 @@ code-agent 每次回答都从零遍历代码。它服务四类高频问题：
 - 显式关系：Markdown 内部链接，例如 `[单位、属性与技能](unit-skill-attr.md)`。
 - 派生关系：frontmatter 中的 tags、resource、symbols 等字段。
 
-当前图谱落地七类边：
+当前图谱落地十二类边：
 
 - `links_to`：概念通过 Markdown 内部链接指向另一个概念。
 - `tagged_with`：概念带有某个 tag。
@@ -78,9 +78,11 @@ code-agent 每次回答都从零遍历代码。它服务四类高频问题：
 - `checks_assert`：概念声明常见断言、CHECK 或错误条件。
 - `answers_question_type`：概念声明适用问题类型。
 - `documents_resource`：概念声明主要模块路径或代码资源。
-
-后续可以增加 `part_of`、`supplements`、`contradicts`、`supersedes`、`depends_on`，
-用于表达知识卡片之间更强的语义关系。
+- `part_of`：A 是 B 的组成部分。
+- `supplements`：A 补充 B 的细节、示例或背景。
+- `contradicts`：A 与 B 存在冲突，需要人工复核。
+- `supersedes`：A 取代 B，B 不再是最新有效信息。
+- `depends_on`：理解 A 需要先了解 B。
 
 ### 文件 Header / Frontmatter
 
@@ -99,11 +101,14 @@ symbols: XCombat, CombatUnit, SkillMgr
 logs: Combat, UnitLogErr
 asserts: CHECK_COND
 question_types: crash_stack, outage_log, feature_impl, config_impl
+depends_on: tableload-config.md, unit-skill-attr.md
+supplements: monster-config.md
 updated_at: 2026-06-18
 ---
 ```
 
 前端卡片预览会展示 header；agent 召回会读取 `title/tags/body`，后续索引会读取更多字段。
+语义关系字段可直接写卡片文件名或相对路径；当前只对已存在的知识卡片建边。
 
 ## 文件布局
 
@@ -169,6 +174,11 @@ updated_at: 2026-06-18
 | `logs` | 常见日志关键词 |
 | `asserts` | 常见断言/check 关键词 |
 | `question_types` | 适用问题类型 |
+| `part_of` | 本卡属于哪些上层知识卡 |
+| `supplements` | 本卡补充哪些知识卡 |
+| `contradicts` | 本卡与哪些知识卡存在冲突 |
+| `supersedes` | 本卡取代哪些旧知识卡 |
+| `depends_on` | 阅读本卡前建议先了解哪些知识卡 |
 | `updated_at` | 人工更新日期 |
 
 ## 正文模板
@@ -208,7 +218,7 @@ updated_at: 2026-06-18
 
 - 递归读取子目录，支持完整 OKF bundle。（已支持）
 - 给 frontmatter 建 SQLite/FTS 索引，提升日志、符号、assert 命中率。
-- UI 图谱展示模块链接、标签、符号、日志、断言、问题类型和资源路径。
+- UI 图谱展示模块链接、标签、符号、日志、断言、问题类型、资源路径和语义关系。
 - CI 校验 frontmatter 必填字段、内部链接、重复 tags。
 
 ## 第一阶段落地范围
