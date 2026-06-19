@@ -22,6 +22,7 @@ def test_knowledge_page_smoke():
     assert "/knowledge/api" in html
     assert "/knowledge/graph" in html
     assert "调查" in html and "复盘" in html and "知识" in html and "图谱" in html
+    assert "theme-toggle" in html
     assert "markdown-preview" in html
     assert "brand-mark" not in html
 

@@ -33,6 +33,88 @@
   --r-full: 9999px;
   --shadow-panel: 0 18px 60px rgba(0, 0, 0, 0.28);
   --graph-bg: #0d1424;
+  --body-grid-x: rgba(79, 142, 247, 0.035);
+  --body-grid-y: rgba(79, 142, 247, 0.026);
+  --body-grad-start: #07091a;
+  --body-grad-mid: #090d1d;
+  --body-grad-end: #07091a;
+  --sidebar-bg: rgba(12, 16, 32, 0.94);
+  --panel-bg: rgba(12, 16, 32, 0.94);
+  --code-bg: #060916;
+  --code-bg-soft: #080d1c;
+  --code-text: #d7e7ff;
+  --primary-text: #07101f;
+  --status-done-bg: rgba(7, 11, 24, 0.48);
+  --graph-overlay-bg: rgba(7, 11, 24, 0.86);
+  --graph-control-bg: rgba(17, 25, 41, 0.92);
+  --graph-control-bg-soft: rgba(17, 25, 41, 0.78);
+  --graph-tile-bg: rgba(17, 25, 41, 0.72);
+  --graph-empty-bg: rgba(7, 11, 24, 0.82);
+  --graph-tooltip-bg: rgba(13, 17, 23, 0.92);
+  --graph-tooltip-border: #30363d;
+  --graph-tooltip-text: #e6edf3;
+  --graph-edge: rgba(148, 163, 184, 0.22);
+  --graph-edge-active: rgba(190, 220, 255, 0.9);
+  --graph-edge-dim: rgba(148, 163, 184, 0.04);
+  --graph-edge-label: #8b949e;
+  --graph-label: rgba(230, 237, 243, 0.8);
+  --graph-label-muted: rgba(230, 237, 243, 0.5);
+  --graph-label-strong: #ffffff;
+}
+
+html.theme-light {
+  color-scheme: light;
+  --bg: #eef3fb;
+  --surface: #ffffff;
+  --surface-2: #f7faff;
+  --surface-3: #e7edf7;
+  --surface-4: #dce6f3;
+  --border: #d5dfed;
+  --border-2: #b9c8dc;
+  --border-hi: #7fa8ec;
+  --blue: #2764d8;
+  --blue-dim: rgba(39, 100, 216, 0.08);
+  --blue-mid: rgba(39, 100, 216, 0.13);
+  --blue-glow: rgba(39, 100, 216, 0.18);
+  --blue-hi: #1e55c4;
+  --cyan: #0891b2;
+  --violet: #7c3aed;
+  --green: #059669;
+  --amber: #b45309;
+  --orange: #c2410c;
+  --red: #dc2626;
+  --text: #162033;
+  --text-2: #526278;
+  --text-3: #8491a5;
+  --shadow-panel: 0 18px 54px rgba(28, 48, 83, 0.12);
+  --graph-bg: #f3f7ff;
+  --body-grid-x: rgba(39, 100, 216, 0.055);
+  --body-grid-y: rgba(39, 100, 216, 0.04);
+  --body-grad-start: #f5f8fd;
+  --body-grad-mid: #eef3fb;
+  --body-grad-end: #f9fbff;
+  --sidebar-bg: rgba(255, 255, 255, 0.9);
+  --panel-bg: rgba(255, 255, 255, 0.92);
+  --code-bg: #eef3fa;
+  --code-bg-soft: #e8eef7;
+  --code-text: #263247;
+  --primary-text: #ffffff;
+  --status-done-bg: rgba(255, 255, 255, 0.62);
+  --graph-overlay-bg: rgba(255, 255, 255, 0.9);
+  --graph-control-bg: rgba(247, 250, 255, 0.95);
+  --graph-control-bg-soft: rgba(247, 250, 255, 0.88);
+  --graph-tile-bg: rgba(255, 255, 255, 0.82);
+  --graph-empty-bg: rgba(255, 255, 255, 0.9);
+  --graph-tooltip-bg: rgba(255, 255, 255, 0.96);
+  --graph-tooltip-border: #cbd5e1;
+  --graph-tooltip-text: #162033;
+  --graph-edge: rgba(82, 98, 120, 0.28);
+  --graph-edge-active: rgba(39, 100, 216, 0.72);
+  --graph-edge-dim: rgba(82, 98, 120, 0.08);
+  --graph-edge-label: #526278;
+  --graph-label: rgba(22, 32, 51, 0.78);
+  --graph-label-muted: rgba(22, 32, 51, 0.56);
+  --graph-label-strong: #162033;
 }
 
 * {
@@ -48,9 +130,9 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    linear-gradient(90deg, rgba(79, 142, 247, 0.035) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(79, 142, 247, 0.026) 1px, transparent 1px),
-    linear-gradient(180deg, #07091a 0%, #090d1d 48%, #07091a 100%);
+    linear-gradient(90deg, var(--body-grid-x) 1px, transparent 1px),
+    linear-gradient(180deg, var(--body-grid-y) 1px, transparent 1px),
+    linear-gradient(180deg, var(--body-grad-start) 0%, var(--body-grad-mid) 48%, var(--body-grad-end) 100%);
   background-size: 40px 40px, 40px 40px, auto;
   color: var(--text);
   font-family: var(--font);
@@ -81,7 +163,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  background: rgba(12, 16, 32, 0.94);
+  background: var(--sidebar-bg);
   border-right: 1px solid var(--border);
   backdrop-filter: blur(18px);
 }
@@ -211,7 +293,7 @@ button:disabled {
 
 .nav button.active .nav-icon {
   background: var(--blue);
-  color: #07101f;
+  color: var(--primary-text);
 }
 
 .side-note {
@@ -366,8 +448,42 @@ h2 {
 .topbar-graph .status.done,
 .topbar-graph .status:not(.busy) {
   border-color: rgba(148, 163, 184, 0.14);
-  background: rgba(7, 11, 24, 0.48);
+  background: var(--status-done-bg);
   color: var(--text-3);
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.theme-toggle {
+  min-height: 30px;
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.theme-toggle span {
+  min-width: 28px;
+  min-height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-full);
+}
+
+.theme-toggle span.active {
+  background: var(--blue);
+  color: var(--primary-text);
 }
 
 .workspace {
@@ -388,7 +504,7 @@ h2 {
   min-width: 0;
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  background: rgba(12, 16, 32, 0.94);
+  background: var(--panel-bg);
   box-shadow: var(--shadow-panel);
   padding: 16px;
 }
@@ -490,7 +606,7 @@ input::placeholder {
 .primary {
   border-color: transparent;
   background: var(--blue);
-  color: #07101f;
+  color: var(--primary-text);
   font-weight: 800;
   box-shadow: 0 2px 16px var(--blue-glow);
 }
@@ -519,8 +635,8 @@ pre {
   word-break: break-word;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
-  background: #060916;
-  color: #d7e7ff;
+  background: var(--code-bg);
+  color: var(--code-text);
   padding: 14px;
   font-family: var(--mono);
   font-size: 13px;
@@ -709,7 +825,7 @@ summary {
 .markdown-preview code {
   border: 1px solid var(--border-2);
   border-radius: var(--r-xs);
-  background: #080d1c;
+  background: var(--code-bg-soft);
   color: var(--blue-hi);
   padding: 1px 5px;
   font-family: var(--mono);
@@ -719,7 +835,7 @@ summary {
 .markdown-preview pre {
   min-height: 0;
   margin: 12px 0 16px;
-  background: #060916;
+  background: var(--code-bg);
 }
 
 .markdown-preview pre code {
@@ -851,7 +967,7 @@ summary {
   position: absolute;
   z-index: 5;
   border: 1px solid rgba(148, 163, 184, 0.18);
-  background: rgba(7, 11, 24, 0.86);
+  background: var(--graph-overlay-bg);
   box-shadow: 0 14px 42px rgba(0, 0, 0, 0.28);
 }
 
@@ -898,7 +1014,7 @@ summary {
 .graph-repo-select {
   width: 138px;
   border-radius: var(--r-md);
-  background: rgba(17, 25, 41, 0.92);
+  background: var(--graph-control-bg);
   font-family: var(--mono);
   font-size: 12px;
 }
@@ -965,7 +1081,7 @@ summary {
 .graph-chip {
   min-height: 0;
   border: 1px solid rgba(148, 163, 184, 0.16);
-  background: rgba(17, 25, 41, 0.78);
+  background: var(--graph-control-bg-soft);
   color: var(--text-2);
   cursor: pointer;
   transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
@@ -1031,7 +1147,7 @@ summary {
   min-width: 68px;
   padding: 7px 10px;
   border-radius: var(--r-md);
-  background: rgba(17, 25, 41, 0.72);
+  background: var(--graph-tile-bg);
   border: 1px solid rgba(148, 163, 184, 0.12);
 }
 
@@ -1061,7 +1177,7 @@ summary {
   width: min(520px, calc(100% - 48px));
   margin: 0;
   transform: translate(-50%, -50%);
-  background: rgba(7, 11, 24, 0.82);
+  background: var(--graph-empty-bg);
 }
 
 .graph-status {
@@ -1076,12 +1192,12 @@ summary {
 .graph-tooltip {
   position: fixed;
   pointer-events: none;
-  background: rgba(13, 17, 23, 0.92);
-  border: 1px solid #30363d;
+  background: var(--graph-tooltip-bg);
+  border: 1px solid var(--graph-tooltip-border);
   border-radius: var(--r-md);
   padding: 8px 12px;
   font-size: 12px;
-  color: #e6edf3;
+  color: var(--graph-tooltip-text);
   z-index: 1000;
   max-width: 340px;
   display: none;
@@ -1097,7 +1213,7 @@ summary {
 .graph-tooltip-group,
 .graph-tooltip-deg,
 .graph-tooltip-edge {
-  color: #8b949e;
+  color: var(--graph-edge-label);
   font-size: 11px;
 }
 

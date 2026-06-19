@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Code Agent Console</title>
   <meta name="code-agent-apis" content="/ask /diagnose /repos /knowledge/api /admin/llm-traces/api">
+  <script>
+    try {
+      if (window.localStorage.getItem("code-agent.theme") === "light") {
+        document.documentElement.classList.add("theme-light");
+      }
+    } catch (_err) {}
+  </script>
   <link rel="stylesheet" href="/static/app.css">
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
@@ -51,7 +58,13 @@
           <h1>{{ viewTitle }}</h1>
           <p>{{ viewSubtitle }}</p>
         </div>
-        <div class="status" :class="{ busy: loading, done: !loading && statusText === '完成' }">{{ loading ? '处理中' : statusText }}</div>
+        <div class="topbar-actions">
+          <button class="theme-toggle" type="button" @click="toggleTheme" :aria-label="shell.theme === 'dark' ? '切换亮色模式' : '切换暗色模式'" :title="shell.theme === 'dark' ? '切换亮色模式' : '切换暗色模式'">
+            <span :class="{ active: shell.theme === 'dark' }">暗</span>
+            <span :class="{ active: shell.theme === 'light' }">亮</span>
+          </button>
+          <div class="status" :class="{ busy: loading, done: !loading && statusText === '完成' }">{{ loading ? '处理中' : statusText }}</div>
+        </div>
       </header>
 
       <section v-if="!vueReady" class="notice danger">

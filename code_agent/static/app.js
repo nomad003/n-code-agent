@@ -139,6 +139,33 @@
     }
   }
 
+  function readTheme() {
+    try {
+      return window.localStorage.getItem("code-agent.theme") === "light" ? "light" : "dark";
+    } catch (_err) {
+      return "dark";
+    }
+  }
+
+  function saveTheme(value) {
+    try {
+      window.localStorage.setItem("code-agent.theme", value);
+    } catch (_err) {
+      // Local storage can be disabled in embedded browsers; the current session still works.
+    }
+  }
+
+  function applyDocumentTheme(value) {
+    document.documentElement.classList.toggle("theme-light", value === "light");
+  }
+
+  function cssVar(name, fallback) {
+    const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return value || fallback;
+  }
+
+  applyDocumentTheme(readTheme());
+
   const app = Vue.createApp({
     data() {
       return {
@@ -148,6 +175,7 @@
         statusText: "就绪",
         shell: {
           sidebarCollapsed: readSidebarCollapsed(),
+          theme: readTheme(),
         },
         defaultRepo: "",
         repos: [],
@@ -272,6 +300,7 @@
     },
     mounted() {
       this.syncSidebarClass();
+      this.syncThemeClass();
       window.addEventListener("popstate", () => {
         this.view = pathToView(window.location.pathname);
         this.activateView();
@@ -317,10 +346,19 @@
         const root = document.getElementById("app");
         if (root) root.classList.toggle("sidebar-collapsed", this.shell.sidebarCollapsed);
       },
+      syncThemeClass() {
+        applyDocumentTheme(this.shell.theme);
+      },
       toggleSidebar() {
         this.shell.sidebarCollapsed = !this.shell.sidebarCollapsed;
         saveSidebarCollapsed(this.shell.sidebarCollapsed);
         this.$nextTick(() => this.syncSidebarClass());
+      },
+      toggleTheme() {
+        this.shell.theme = this.shell.theme === "dark" ? "light" : "dark";
+        saveTheme(this.shell.theme);
+        this.syncThemeClass();
+        this.$nextTick(() => this.refreshGraphTheme());
       },
       activateView() {
         if (this.view !== "graph") this.destroyKnowledgeGraphVis();
@@ -462,8 +500,10 @@
         return GRAPH_GROUPS[group] || GRAPH_GROUPS.other;
       },
       getGraphBg() {
-        const value = getComputedStyle(document.documentElement).getPropertyValue("--graph-bg").trim();
-        return value || "#0d1424";
+        return cssVar("--graph-bg", "#0d1424");
+      },
+      graphColor(name, fallback) {
+        return cssVar(name, fallback);
       },
       buildKnowledgeGraphVisData() {
         const rawNodes = this.knowledge.graph.nodes || [];
@@ -536,7 +576,7 @@
           },
           shadow: { enabled: false },
           opacity: 0.48,
-          font: { color: "rgba(230,237,243,0.5)", size: 11 },
+          font: { color: this.graphColor("--graph-label-muted", "rgba(230,237,243,0.5)"), size: 11 },
         };
       },
       nodeDim(node) {
@@ -564,7 +604,7 @@
           },
           shadow: { enabled: false },
           opacity: 0.85,
-          font: { color: "rgba(230,237,243,0.8)", size: 11 },
+          font: { color: this.graphColor("--graph-label", "rgba(230,237,243,0.8)"), size: 11 },
         };
       },
       nodeHovered(node) {
@@ -579,30 +619,56 @@
           borderWidth: 2,
           shadow: { enabled: true, color: meta.glow.replace(/[\d.]+\)$/, "0.75)"), size: 18, x: 0, y: 0 },
           opacity: 1,
-          font: { color: "#ffffff", size: 13 },
+          font: { color: this.graphColor("--graph-label-strong", "#ffffff"), size: 13 },
         };
       },
       edgeStyle(active) {
         const bg = this.getGraphBg();
         if (active === null) {
           return {
-            color: { color: "rgba(148,163,184,0.22)", highlight: "rgba(148,163,184,0.22)", hover: "rgba(148,163,184,0.22)", inherit: false },
+            color: {
+              color: this.graphColor("--graph-edge", "rgba(148,163,184,0.22)"),
+              highlight: this.graphColor("--graph-edge", "rgba(148,163,184,0.22)"),
+              hover: this.graphColor("--graph-edge", "rgba(148,163,184,0.22)"),
+              inherit: false,
+            },
             width: 1,
-            font: { size: this.knowledge.graphShowEdgeLabels ? 10 : 0, color: "#8b949e", strokeWidth: 2, strokeColor: bg },
+            font: { size: this.knowledge.graphShowEdgeLabels ? 10 : 0, color: this.graphColor("--graph-edge-label", "#8b949e"), strokeWidth: 2, strokeColor: bg },
           };
         }
         if (active) {
           return {
-            color: { color: "rgba(190,220,255,0.9)", highlight: "rgba(190,220,255,0.9)", hover: "rgba(190,220,255,0.9)", inherit: false },
+            color: {
+              color: this.graphColor("--graph-edge-active", "rgba(190,220,255,0.9)"),
+              highlight: this.graphColor("--graph-edge-active", "rgba(190,220,255,0.9)"),
+              hover: this.graphColor("--graph-edge-active", "rgba(190,220,255,0.9)"),
+              inherit: false,
+            },
             width: 2.5,
-            font: { size: 11, color: "#a8c4e0", strokeWidth: 2, strokeColor: bg },
+            font: { size: 11, color: this.graphColor("--graph-edge-label", "#a8c4e0"), strokeWidth: 2, strokeColor: bg },
           };
         }
         return {
-          color: { color: "rgba(148,163,184,0.04)", highlight: "rgba(148,163,184,0.04)", hover: "rgba(148,163,184,0.04)", inherit: false },
+          color: {
+            color: this.graphColor("--graph-edge-dim", "rgba(148,163,184,0.04)"),
+            highlight: this.graphColor("--graph-edge-dim", "rgba(148,163,184,0.04)"),
+            hover: this.graphColor("--graph-edge-dim", "rgba(148,163,184,0.04)"),
+            inherit: false,
+          },
           width: 0.5,
           font: { size: 0 },
         };
+      },
+      refreshGraphTheme() {
+        const graph = this.knowledge.graphVis;
+        if (!graph) return;
+        const bg = this.getGraphBg();
+        graph.network.setOptions({
+          nodes: { font: { strokeColor: bg } },
+          edges: { font: { strokeColor: bg } },
+        });
+        if (graph.pinnedSet) this.applyKnowledgePinnedHighlight(Array.from(graph.pinnedSet));
+        else this.applyKnowledgeNodeStyles();
       },
       applyKnowledgeNodeStyles() {
         const graph = this.knowledge.graphVis;
@@ -732,7 +798,7 @@
             borderWidth: 0,
             borderWidthSelected: 3,
             font: {
-              color: "#e6edf3",
+              color: this.graphColor("--graph-label", "#e6edf3"),
               size: 11,
               face: "-apple-system, \"Segoe UI\", sans-serif",
               vadjust: -2,
@@ -743,7 +809,12 @@
           },
           edges: {
             arrows: { to: { enabled: true, scaleFactor: 0.4 } },
-            color: { color: "rgba(148,163,184,0.22)", highlight: "rgba(148,163,184,0.22)", hover: "rgba(148,163,184,0.22)", inherit: false },
+            color: {
+              color: this.graphColor("--graph-edge", "rgba(148,163,184,0.22)"),
+              highlight: this.graphColor("--graph-edge", "rgba(148,163,184,0.22)"),
+              hover: this.graphColor("--graph-edge", "rgba(148,163,184,0.22)"),
+              inherit: false,
+            },
             font: { size: 0 },
             smooth: { type: "continuous", roundness: 0.2 },
             width: 0.8,
@@ -876,7 +947,7 @@
           edges: {
             font: {
               size: this.knowledge.graphShowEdgeLabels ? 10 : 0,
-              color: "#8b949e",
+              color: this.graphColor("--graph-edge-label", "#8b949e"),
               strokeWidth: 2,
               strokeColor: this.getGraphBg(),
             },
