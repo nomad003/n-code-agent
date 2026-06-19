@@ -119,6 +119,9 @@
         view: pathToView(window.location.pathname),
         loading: false,
         statusText: "就绪",
+        shell: {
+          sidebarCollapsed: false,
+        },
         defaultRepo: "",
         repos: [],
         selectedRepo: "",

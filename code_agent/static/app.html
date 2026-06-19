@@ -9,19 +9,31 @@
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 </head>
 <body>
-  <div id="app" v-cloak>
+  <div id="app" :class="{ 'sidebar-collapsed': shell.sidebarCollapsed }" v-cloak>
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-mark">CA</div>
-        <div>
+        <div class="brand-copy">
           <div class="brand-title">Code Agent Workbench</div>
           <div class="brand-subtitle">代码调查 / 调用复盘 / 知识沉淀</div>
         </div>
+        <button class="sidebar-toggle" type="button" @click="shell.sidebarCollapsed = !shell.sidebarCollapsed" :aria-label="shell.sidebarCollapsed ? '展开边栏' : '收起边栏'" :title="shell.sidebarCollapsed ? '展开边栏' : '收起边栏'">
+          <span>{{ shell.sidebarCollapsed ? '>' : '<' }}</span>
+        </button>
       </div>
       <nav class="nav">
-        <button :class="{ active: view === 'ask' }" @click="go('ask', '/ui')">调查</button>
-        <button :class="{ active: view === 'traces' }" @click="go('traces', '/admin/llm-traces')">复盘</button>
-        <button :class="{ active: view === 'knowledge' }" @click="go('knowledge', '/knowledge')">知识</button>
+        <button :class="{ active: view === 'ask' }" @click="go('ask', '/ui')" title="代码调查">
+          <span class="nav-icon">Q</span>
+          <span class="nav-text">调查</span>
+        </button>
+        <button :class="{ active: view === 'traces' }" @click="go('traces', '/admin/llm-traces')" title="调用复盘">
+          <span class="nav-icon">T</span>
+          <span class="nav-text">复盘</span>
+        </button>
+        <button :class="{ active: view === 'knowledge' }" @click="go('knowledge', '/knowledge')" title="知识工作台">
+          <span class="nav-icon">K</span>
+          <span class="nav-text">知识</span>
+        </button>
       </nav>
       <div class="side-note">
         <div class="label">当前仓库</div>
