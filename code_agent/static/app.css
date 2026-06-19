@@ -1,7 +1,9 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
 :root {
   color-scheme: dark;
-  --font: "Plus Jakarta Sans", "PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --mono: "JetBrains Mono", "SF Mono", Consolas, "Liberation Mono", monospace;
+  --font: "Plus Jakarta Sans", "PingFang SC", "Microsoft YaHei", -apple-system, sans-serif;
+  --mono: "JetBrains Mono", "SF Mono", "Consolas", monospace;
   --bg: #07091a;
   --surface: #0c1020;
   --surface-2: #111929;
@@ -44,7 +46,6 @@
   --code-bg-soft: #080d1c;
   --code-text: #d7e7ff;
   --primary-text: #07101f;
-  --status-done-bg: rgba(7, 11, 24, 0.48);
   --graph-overlay-bg: rgba(7, 11, 24, 0.86);
   --graph-control-bg: rgba(17, 25, 41, 0.92);
   --graph-control-bg-soft: rgba(17, 25, 41, 0.78);
@@ -99,7 +100,6 @@ html.theme-light {
   --code-bg-soft: #e8eef7;
   --code-text: #263247;
   --primary-text: #ffffff;
-  --status-done-bg: rgba(255, 255, 255, 0.62);
   --graph-overlay-bg: rgba(255, 255, 255, 0.9);
   --graph-control-bg: rgba(247, 250, 255, 0.95);
   --graph-control-bg-soft: rgba(247, 250, 255, 0.88);
@@ -443,13 +443,6 @@ h2 {
   color: var(--cyan);
   border-color: rgba(34, 211, 238, 0.42);
   background: rgba(34, 211, 238, 0.08);
-}
-
-.topbar-graph .status.done,
-.topbar-graph .status:not(.busy) {
-  border-color: rgba(148, 163, 184, 0.14);
-  background: var(--status-done-bg);
-  color: var(--text-3);
 }
 
 .topbar-actions {

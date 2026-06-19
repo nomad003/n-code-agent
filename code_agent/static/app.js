@@ -800,7 +800,7 @@
             font: {
               color: this.graphColor("--graph-label", "#e6edf3"),
               size: 11,
-              face: "-apple-system, \"Segoe UI\", sans-serif",
+              face: cssVar("--font", "\"Plus Jakarta Sans\", \"PingFang SC\", \"Microsoft YaHei\", -apple-system, sans-serif"),
               vadjust: -2,
               strokeWidth: 3,
               strokeColor: this.getGraphBg(),
