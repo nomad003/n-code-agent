@@ -149,7 +149,7 @@ GET /knowledge
 | `GET /knowledge/api?repo=<repo>` | 列出知识卡片 |
 | `GET /knowledge/api/{repo}/{file}` | 读取知识卡片，返回 `content`、`body`、`meta` |
 | `POST /knowledge/api` | 保存知识卡片 |
-| `GET /knowledge/api/graph?repo=<repo>` | 返回知识图谱节点和边，包含概念、标签、内部链接关系 |
+| `GET /knowledge/api/graph?repo=<repo>` | 返回知识图谱节点、边和 `relations` 元数据，包含概念、标签、内部链接关系 |
 | `GET /knowledge/api/qa?repo=<repo>` | 列出后台知识飞轮沉淀的历史问答 |
 | `POST /knowledge/api/qa/ask` | 在知识库后台追问模型，返回待人工审核的答案 |
 | `POST /knowledge/api/precipitate` | 将人工认可的问答落地为 `Code Playbook` 知识卡 |
@@ -161,6 +161,13 @@ GET /knowledge
 3. 人工编辑标题、标签和沉淀结论。
 4. 确认答案质量后调用 `precipitate` 落地成 Markdown 知识卡。
 5. 后续类似问题会通过模块知识卡召回这份 `Code Playbook`，但仍要求 agent 用工具核实当前代码。
+
+图谱 relation 当前定义：
+
+| relation | 含义 | 来源 |
+|----------|------|------|
+| `links_to` | 一个知识卡片正文通过 Markdown 链接引用另一个知识卡片 | Markdown 内部链接 |
+| `tagged_with` | 一个知识卡片在 frontmatter `tags` 中声明了该标签 | 卡片 frontmatter |
 
 ### `POST /diagnose`
 

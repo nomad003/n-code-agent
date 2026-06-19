@@ -32,6 +32,7 @@ def test_knowledge_graph_page_smoke():
     assert "Code Agent Workbench" in html
     assert "知识图谱" in html
     assert "graph-canvas" in html
+    assert "关系说明" in html
 
 
 def test_knowledge_save_list_read(knowledge_env):
@@ -77,6 +78,10 @@ def test_knowledge_graph_links_and_tags(knowledge_env):
     assert {"a.md", "b.md", "tag:scene", "tag:level"} <= node_ids
     assert any(e["source"] == "a.md" and e["target"] == "b.md" for e in graph["edges"])
     assert any(e["relation"] == "tagged_with" for e in graph["edges"])
+    relations = {item["id"]: item for item in graph["relations"]}
+    assert relations["links_to"]["label"] == "内部链接"
+    assert relations["tagged_with"]["label"] == "标签归类"
+    assert "Markdown" in relations["links_to"]["description"]
 
 
 def test_knowledge_precipitate_creates_card(knowledge_env):

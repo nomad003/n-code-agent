@@ -460,7 +460,7 @@ def knowledge_graph(repo: str | None = None) -> dict:
                         "relation": "links_to",
                     }
                 )
-    return {"repo": repo_name, "nodes": nodes, "edges": edges}
+    return {"repo": repo_name, "nodes": nodes, "edges": edges, "relations": _KNOWLEDGE_GRAPH_RELATIONS}
 
 
 @app.get("/knowledge/api/qa")
@@ -489,6 +489,21 @@ def knowledge_precipitate(req: KnowledgePrecipitateRequest) -> dict:
 
 
 _CARD_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*\.md$")
+
+_KNOWLEDGE_GRAPH_RELATIONS = [
+    {
+        "id": "links_to",
+        "label": "内部链接",
+        "description": "一个知识卡片正文通过 Markdown 链接引用另一个知识卡片。",
+        "source": "markdown_link",
+    },
+    {
+        "id": "tagged_with",
+        "label": "标签归类",
+        "description": "一个知识卡片在 frontmatter tags 中声明了该标签。",
+        "source": "frontmatter_tags",
+    },
+]
 
 
 def _knowledge_repo_dir(repo: str) -> str:

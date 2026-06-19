@@ -19,6 +19,21 @@
     other: { label: "其他", color: "#fb7185", glow: "rgba(251,113,133,0.45)" },
   };
 
+  const GRAPH_RELATIONS = [
+    {
+      id: "links_to",
+      label: "内部链接",
+      short_label: "link",
+      description: "正文 Markdown 链接指向另一个知识卡片。",
+    },
+    {
+      id: "tagged_with",
+      label: "标签归类",
+      short_label: "tag",
+      description: "frontmatter tags 声明了该标签。",
+    },
+  ];
+
   function pathToView(pathname) {
     if (pathname.indexOf("/admin/llm-traces") === 0) return "traces";
     if (pathname.indexOf("/knowledge/graph") === 0) return "graph";
@@ -201,6 +216,7 @@
           meta: {},
           editing: false,
           graph: { nodes: [], edges: [] },
+          graphRelations: GRAPH_RELATIONS.slice(),
           graphSourceRepo: "",
           graphSearch: "",
           graphGroups: [],
@@ -499,6 +515,17 @@
       graphGroupMeta(group) {
         return GRAPH_GROUPS[group] || GRAPH_GROUPS.other;
       },
+      graphRelationMeta(relation) {
+        const remote = this.knowledge.graphRelations.find((item) => item.id === relation);
+        const local = GRAPH_RELATIONS.find((item) => item.id === relation);
+        if (remote || local) return Object.assign({}, local || {}, remote || {});
+        return {
+          id: relation || "unknown",
+          label: relation || "未知关系",
+          short_label: relation || "unknown",
+          description: "当前 relation 尚未登记含义。",
+        };
+      },
       getGraphBg() {
         return cssVar("--graph-bg", "#0d1424");
       },
@@ -535,13 +562,17 @@
             value: Math.max(10, Math.min(36, 10 + (degree[node.id] || 0) * 3)),
           };
         });
-        const edges = rawEdges.map((edge, index) => ({
-          id: edge.id || `${edge.source}->${edge.target}-${index}`,
-          from: edge.source,
-          to: edge.target,
-          label: edge.relation === "tagged_with" ? "tag" : "link",
-          title: edge.relation === "tagged_with" ? "标签关系" : "内部链接",
-        }));
+        const edges = rawEdges.map((edge, index) => {
+          const relation = this.graphRelationMeta(edge.relation);
+          return {
+            id: edge.id || `${edge.source}->${edge.target}-${index}`,
+            from: edge.source,
+            to: edge.target,
+            relation: relation.id,
+            label: relation.short_label || relation.id,
+            title: relation.description,
+          };
+        });
         const order = Object.keys(GRAPH_GROUPS);
         groups.sort((a, b) => order.indexOf(a) - order.indexOf(b));
         return { nodes, edges, groups };
@@ -899,7 +930,8 @@
           const edge = edges.get(params.edge);
           const tooltip = this.$refs.graphTooltip;
           if (!edge || !tooltip) return;
-          tooltip.innerHTML = `<div class="graph-tooltip-edge">${escapeHtml(edge.title || edge.label || "")}</div>`;
+          const relation = this.graphRelationMeta(edge.relation);
+          tooltip.innerHTML = `<div class="graph-tooltip-name">${escapeHtml(relation.label || relation.id)}</div><div class="graph-tooltip-edge">${escapeHtml(relation.description || edge.title || "")}</div><div class="graph-tooltip-deg">${escapeHtml(relation.id || edge.label || "")}</div>`;
           tooltip.style.display = "block";
         });
         network.on("blurEdge", () => {
@@ -1010,6 +1042,7 @@
             nodes: data.nodes || [],
             edges: data.edges || [],
           };
+          this.knowledge.graphRelations = data.relations || GRAPH_RELATIONS.slice();
           this.knowledge.graphSourceRepo = repo;
           this.prepareKnowledgeGraphVis();
           this.$nextTick(() => this.initKnowledgeGraphVis());

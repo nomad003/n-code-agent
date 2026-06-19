@@ -302,6 +302,16 @@
                   <span class="graph-chip-dot" :style="{ background: group.color }"></span>{{ group.label }}
                 </button>
               </div>
+              <details class="graph-relations">
+                <summary>关系说明</summary>
+                <div class="graph-relation-list">
+                  <div v-for="relation in knowledge.graphRelations" :key="relation.id" class="graph-relation-item">
+                    <code>{{ relation.id }}</code>
+                    <strong>{{ relation.label }}</strong>
+                    <span>{{ relation.description }}</span>
+                  </div>
+                </div>
+              </details>
               <div class="graph-actions">
                 <button class="graph-btn" :class="{ active: knowledge.graphShowEdgeLabels }" @click="toggleGraphEdgeLabels">边标签</button>
                 <button class="graph-btn" @click="rerunKnowledgeGraphPhysics">重新布局</button>
