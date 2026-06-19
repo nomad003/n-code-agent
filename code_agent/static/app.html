@@ -51,7 +51,7 @@
           <h1>{{ viewTitle }}</h1>
           <p>{{ viewSubtitle }}</p>
         </div>
-        <div class="status" :class="{ busy: loading }">{{ loading ? '处理中' : statusText }}</div>
+        <div class="status" :class="{ busy: loading, done: !loading && statusText === '完成' }">{{ loading ? '处理中' : statusText }}</div>
       </header>
 
       <section v-if="!vueReady" class="notice danger">
@@ -260,17 +260,15 @@
         <div class="graph-shell">
           <div class="graph-wrap">
             <div class="graph-overlay graph-overlay-main">
-              <div class="graph-source">
-                <span>图谱来源</span>
+              <div v-if="knowledge.graphSourceRepo && knowledge.graphSourceRepo !== selectedRepo" class="graph-source">
+                <span>来源</span>
                 <strong>{{ knowledge.graphSourceRepo || selectedRepo }}</strong>
               </div>
-              <label class="graph-repo-picker">仓库
-                <select v-model="selectedRepo" @change="loadKnowledgeGraph">
-                  <option v-for="repo in repos" :key="repo.name" :value="repo.name">
-                    {{ repo.name }}
-                  </option>
-                </select>
-              </label>
+              <select class="graph-repo-select" v-model="selectedRepo" @change="loadKnowledgeGraph" aria-label="选择仓库">
+                <option v-for="repo in repos" :key="repo.name" :value="repo.name">
+                  {{ repo.name }}
+                </option>
+              </select>
               <button class="ghost" @click="loadKnowledgeGraph">刷新</button>
               <label class="graph-search-box">
                 <svg class="graph-search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">

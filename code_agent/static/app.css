@@ -363,6 +363,13 @@ h2 {
   background: rgba(34, 211, 238, 0.08);
 }
 
+.topbar-graph .status.done,
+.topbar-graph .status:not(.busy) {
+  border-color: rgba(148, 163, 184, 0.14);
+  background: rgba(7, 11, 24, 0.48);
+  color: var(--text-3);
+}
+
 .workspace {
   display: grid;
   gap: 14px;
@@ -882,21 +889,18 @@ summary {
   font-size: 13px;
 }
 
-.graph-repo-picker {
-  min-width: 136px;
-}
-
-.graph-overlay-main label {
-  color: var(--text-3);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-}
-
 .graph-overlay-main select,
 .graph-overlay-main button,
 .graph-overlay-main input {
   min-height: 34px;
+}
+
+.graph-repo-select {
+  width: 138px;
+  border-radius: var(--r-md);
+  background: rgba(17, 25, 41, 0.92);
+  font-family: var(--mono);
+  font-size: 12px;
 }
 
 .graph-overlay-main .ghost {
@@ -909,6 +913,7 @@ summary {
   flex: 1;
   min-width: 230px;
   max-width: 320px;
+  display: block;
 }
 
 .graph-search-icon {
@@ -1332,10 +1337,14 @@ summary {
   }
 
   .graph-source,
-  .graph-repo-picker,
+  .graph-repo-select,
   .graph-search-box {
     min-width: 100%;
     max-width: none;
+  }
+
+  .graph-repo-select {
+    width: 100%;
   }
 
   .graph-stats-rail {
