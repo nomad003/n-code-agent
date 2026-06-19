@@ -45,8 +45,8 @@
       </button>
     </aside>
 
-    <main class="main">
-      <header class="topbar">
+    <main class="main" :class="{ 'main-graph': view === 'graph' }">
+      <header class="topbar" :class="{ 'topbar-graph': view === 'graph' }">
         <div>
           <h1>{{ viewTitle }}</h1>
           <p>{{ viewSubtitle }}</p>
@@ -257,11 +257,14 @@
       </section>
 
       <section v-if="view === 'graph'" class="workspace graph-page">
-        <div class="panel graph-panel">
-          <div class="panel-head">
-            <h2>知识图谱</h2>
-            <div class="graph-head-actions">
-              <label>仓库
+        <div class="graph-shell">
+          <div class="graph-wrap">
+            <div class="graph-overlay graph-overlay-main">
+              <div class="graph-source">
+                <span>图谱来源</span>
+                <strong>{{ knowledge.graphSourceRepo || selectedRepo }}</strong>
+              </div>
+              <label class="graph-repo-picker">仓库
                 <select v-model="selectedRepo" @change="loadKnowledgeGraph">
                   <option v-for="repo in repos" :key="repo.name" :value="repo.name">
                     {{ repo.name }}
@@ -269,31 +272,33 @@
                 </select>
               </label>
               <button class="ghost" @click="loadKnowledgeGraph">刷新</button>
+              <label class="graph-search-box">
+                <svg class="graph-search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <circle cx="6.5" cy="6.5" r="4"></circle><line x1="10" y1="10" x2="14" y2="14"></line>
+                </svg>
+                <input v-model="knowledge.graphSearch" class="graph-search-inp" placeholder="搜索模块、标签、文件名..." autocomplete="off" spellcheck="false" @input="searchKnowledgeGraph" @keydown.enter.prevent="searchKnowledgeGraph" @keydown.esc.prevent="clearGraphSearch">
+              </label>
             </div>
-          </div>
-          <div class="hint">图谱来源：{{ knowledge.graphSourceRepo || selectedRepo }}</div>
-          <div class="metrics compact-metrics">
-            <div><strong>{{ graphStats.concepts }}</strong><span>概念</span></div>
-            <div><strong>{{ graphStats.tags }}</strong><span>标签</span></div>
-            <div><strong>{{ graphStats.edges }}</strong><span>关系</span></div>
-          </div>
-          <div class="graph-wrap">
+
+            <div class="graph-stats-rail">
+              <div><strong>{{ graphStats.concepts }}</strong><span>概念</span></div>
+              <div><strong>{{ graphStats.tags }}</strong><span>标签</span></div>
+              <div><strong>{{ graphStats.edges }}</strong><span>关系</span></div>
+            </div>
+
             <div class="graph-toolbar">
-              <svg class="graph-search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
-                <circle cx="6.5" cy="6.5" r="4"></circle><line x1="10" y1="10" x2="14" y2="14"></line>
-              </svg>
-              <input v-model="knowledge.graphSearch" class="graph-search-inp" placeholder="搜索模块、标签、文件名..." autocomplete="off" spellcheck="false" @input="searchKnowledgeGraph" @keydown.enter.prevent="searchKnowledgeGraph" @keydown.esc.prevent="clearGraphSearch">
-              <div class="graph-toolbar-sep"></div>
               <div class="graph-chips">
                 <button v-for="group in knowledge.graphGroups" :key="group.id" class="graph-chip" :class="{ active: knowledge.graphActiveGroups.indexOf(group.id) >= 0 }" @click="toggleGraphGroup(group.id)">
                   <span class="graph-chip-dot" :style="{ background: group.color }"></span>{{ group.label }}
                 </button>
               </div>
-              <div class="graph-toolbar-sep"></div>
-              <button class="graph-btn" :class="{ active: knowledge.graphShowEdgeLabels }" @click="toggleGraphEdgeLabels">显示边标签</button>
-              <button class="graph-btn" @click="rerunKnowledgeGraphPhysics">重新布局</button>
-              <button class="graph-btn" @click="fitKnowledgeGraph">适应窗口</button>
+              <div class="graph-actions">
+                <button class="graph-btn" :class="{ active: knowledge.graphShowEdgeLabels }" @click="toggleGraphEdgeLabels">边标签</button>
+                <button class="graph-btn" @click="rerunKnowledgeGraphPhysics">重新布局</button>
+                <button class="graph-btn" @click="fitKnowledgeGraph">适应窗口</button>
+              </div>
             </div>
+
             <div v-if="!graphStats.concepts && !graphStats.tags" class="notice graph-empty">当前仓库没有可展示的知识图谱节点。请切换到 {{ defaultRepo || '默认聚合仓库' }}，或先新增知识卡片。</div>
             <div v-else-if="!knowledge.graphVisAvailable" class="notice graph-empty">vis-network 没有加载成功，请检查浏览器是否能访问 CDN。</div>
             <div v-show="graphStats.concepts || graphStats.tags" id="graph-canvas" ref="graphCanvas"></div>
