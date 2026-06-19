@@ -7,6 +7,7 @@
   <meta name="code-agent-apis" content="/ask /diagnose /repos /knowledge/api /admin/llm-traces/api">
   <link rel="stylesheet" href="/static/app.css">
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
 </head>
 <body>
   <div id="app" :class="{ 'sidebar-collapsed': shell.sidebarCollapsed }" v-cloak>
@@ -210,49 +211,29 @@
             <div><strong>{{ graphStats.tags }}</strong><span>标签</span></div>
             <div><strong>{{ graphStats.edges }}</strong><span>关系</span></div>
           </div>
-          <div class="graph-tools">
-            <label>搜索
-              <input v-model="knowledge.graphSearch" placeholder="模块、标签、文件名">
-            </label>
-            <label>关系
-              <select v-model="knowledge.graphRelation">
-                <option value="all">全部关系</option>
-                <option value="links_to">内部链接</option>
-                <option value="tagged_with">标签关系</option>
-              </select>
-            </label>
-            <button class="ghost" @click="resetGraphView">重置视图</button>
-          </div>
-          <div class="graph-stage">
-            <div class="graph-wrap">
-              <div class="notice" v-if="!graphNodes.length">当前仓库没有可展示的知识图谱节点。请切换到 {{ defaultRepo || '默认聚合仓库' }}，或先新增知识卡片。</div>
-              <svg viewBox="0 0 1120 680" role="img" aria-label="知识图谱" @wheel.prevent="zoomGraph" @pointerdown.self="panGraphStart" @pointermove="moveGraphPointer" @pointerup="endGraphPointer" @pointerleave="endGraphPointer">
-                <g :transform="'translate(' + knowledge.graphView.x + ',' + knowledge.graphView.y + ') scale(' + knowledge.graphView.scale + ')'">
-                  <line v-for="edge in graphEdges" :key="edge.id" :x1="edge.x1" :y1="edge.y1" :x2="edge.x2" :y2="edge.y2" :class="'edge ' + edge.relation + (edge.dim ? ' dim' : '')"></line>
-                  <g v-for="node in graphNodes" :key="node.id" :transform="'translate(' + node.x + ',' + node.y + ')'" :class="'graph-node ' + (node.active ? 'active' : '') + (node.dim ? ' dim' : '')" @pointerdown.stop="startNodeDrag(node, $event)" @click.stop="selectGraphNode(node)">
-                    <circle :r="node.radius" :class="'node ' + node.kind"></circle>
-                    <text text-anchor="middle" :y="node.radius + 16">{{ node.title }}</text>
-                  </g>
-                </g>
+          <div class="graph-wrap">
+            <div class="graph-toolbar">
+              <svg class="graph-search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="6.5" cy="6.5" r="4"></circle><line x1="10" y1="10" x2="14" y2="14"></line>
               </svg>
-            </div>
-            <aside class="graph-detail">
-              <div class="section-label">选中节点</div>
-              <h3>{{ selectedGraphNode ? selectedGraphNode.title : '未选择' }}</h3>
-              <p>{{ selectedGraphNode ? (selectedGraphNode.description || selectedGraphNode.type || selectedGraphNode.id) : '点击概念节点查看说明，双击列表项可打开知识卡。' }}</p>
-              <div class="tag-row" v-if="selectedGraphNode && selectedGraphNode.tags">
-                <span v-for="tag in selectedGraphNode.tags" :key="tag">{{ tag }}</span>
+              <input v-model="knowledge.graphSearch" class="graph-search-inp" placeholder="搜索模块、标签、文件名..." autocomplete="off" spellcheck="false" @input="searchKnowledgeGraph" @keydown.enter.prevent="searchKnowledgeGraph" @keydown.esc.prevent="clearGraphSearch">
+              <div class="graph-toolbar-sep"></div>
+              <div class="graph-chips">
+                <button v-for="group in knowledge.graphGroups" :key="group.id" class="graph-chip" :class="{ active: knowledge.graphActiveGroups.indexOf(group.id) >= 0 }" @click="toggleGraphGroup(group.id)">
+                  <span class="graph-chip-dot" :style="{ background: group.color }"></span>{{ group.label }}
+                </button>
               </div>
-              <button class="primary" v-if="selectedGraphNode && selectedGraphNode.kind === 'concept'" @click="loadCard(selectedGraphNode.id)">打开知识卡</button>
-            </aside>
+              <div class="graph-toolbar-sep"></div>
+              <button class="graph-btn" :class="{ active: knowledge.graphShowEdgeLabels }" @click="toggleGraphEdgeLabels">显示边标签</button>
+              <button class="graph-btn" @click="rerunKnowledgeGraphPhysics">重新布局</button>
+              <button class="graph-btn" @click="fitKnowledgeGraph">适应窗口</button>
+            </div>
+            <div v-if="!graphStats.concepts && !graphStats.tags" class="notice graph-empty">当前仓库没有可展示的知识图谱节点。请切换到 {{ defaultRepo || '默认聚合仓库' }}，或先新增知识卡片。</div>
+            <div v-else-if="!knowledge.graphVisAvailable" class="notice graph-empty">vis-network 没有加载成功，请检查浏览器是否能访问 CDN。</div>
+            <div v-show="graphStats.concepts || graphStats.tags" id="graph-canvas" ref="graphCanvas"></div>
+            <div class="graph-status">{{ knowledge.graphStatus }}</div>
           </div>
-          <div class="graph-list">
-            <button v-for="node in graphConcepts" :key="node.id" class="list-item" @click="loadCard(node.id)">
-              <span>{{ node.title }}</span>
-              <small>{{ node.id }} · {{ node.type }}</small>
-            </button>
-          </div>
-          <div class="hint">拖拽空白处移动画布，滚轮缩放；节点采用松散力导向布局，实线表示 Markdown 内部链接，虚线表示标签关系。</div>
+          <div ref="graphTooltip" class="graph-tooltip"></div>
         </div>
 
         <div v-if="knowledge.mode === 'qa'" class="panel qa-panel">

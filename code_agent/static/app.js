@@ -9,6 +9,16 @@
 15:04:47:429[61285][0000006133] [Error] InitEnemySkill(skillcore.cpp:81) Check cond: <false> failed
 15:04:47:429[61285][0000006133] [Error] Log_FlushOnExit(LogInit.cpp:347) *************** Error Exit ***************`;
 
+  const GRAPH_GROUPS = {
+    module: { label: "模块", color: "#a78bfa", glow: "rgba(167,139,250,0.55)" },
+    playbook: { label: "手册", color: "#38bdf8", glow: "rgba(56,189,248,0.55)" },
+    qa: { label: "问答", color: "#34d399", glow: "rgba(52,211,153,0.55)" },
+    config: { label: "配置", color: "#fbbf24", glow: "rgba(251,191,36,0.55)" },
+    code: { label: "代码", color: "#60a5fa", glow: "rgba(96,165,250,0.55)" },
+    tag: { label: "标签", color: "#94a3b8", glow: "rgba(148,163,184,0.35)" },
+    other: { label: "其他", color: "#fb7185", glow: "rgba(251,113,133,0.45)" },
+  };
+
   function pathToView(pathname) {
     if (pathname.indexOf("/admin/llm-traces") === 0) return "traces";
     if (pathname.indexOf("/knowledge") === 0) return "knowledge";
@@ -112,24 +122,6 @@
     return html.join("\n") || '<p class="empty">选择或新建一个知识卡片。</p>';
   }
 
-  function hashString(text) {
-    let hash = 2166136261;
-    for (const char of String(text || "")) {
-      hash ^= char.charCodeAt(0);
-      hash = Math.imul(hash, 16777619);
-    }
-    return hash >>> 0;
-  }
-
-  function stableRandom(id, salt) {
-    let seed = hashString(String(id) + ":" + String(salt));
-    seed += 0x6d2b79f5;
-    let value = seed;
-    value = Math.imul(value ^ (value >>> 15), value | 1);
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
-  }
-
   function readSidebarCollapsed() {
     try {
       return window.localStorage.getItem("code-agent.sidebarCollapsed") === "1";
@@ -181,13 +173,13 @@
           editing: false,
           graph: { nodes: [], edges: [] },
           graphSourceRepo: "",
-          graphPositions: {},
           graphSearch: "",
-          graphRelation: "all",
-          graphSelectedId: "",
-          graphDrag: null,
-          graphPan: null,
-          graphView: { x: 0, y: 0, scale: 1 },
+          graphGroups: [],
+          graphActiveGroups: [],
+          graphStatus: "0 节点 · 0 关系",
+          graphVisAvailable: true,
+          graphShowEdgeLabels: false,
+          graphVis: null,
           qaItems: [],
           qa: null,
           curateQuestion: "",
@@ -266,54 +258,6 @@
           value,
         }));
       },
-      graphNodes() {
-        const nodes = this.knowledge.graph.nodes || [];
-        if (!nodes.length) return [];
-        const query = this.knowledge.graphSearch.trim().toLowerCase();
-        const linked = new Set();
-        for (const edge of this.filteredGraphEdgesRaw) {
-          linked.add(edge.source);
-          linked.add(edge.target);
-        }
-        return nodes.map((node) => {
-          const pos = this.knowledge.graphPositions[node.id] || { x: 480, y: 280 };
-          const text = [node.id, node.title, node.type, node.description, ...(node.tags || [])].join(" ").toLowerCase();
-          const matches = !query || text.includes(query);
-          const active = node.id === this.knowledge.graphSelectedId || matches && query;
-          return {
-            ...node,
-            x: Math.round(pos.x),
-            y: Math.round(pos.y),
-            radius: node.kind === "concept" ? 10 + Math.min((node.tags || []).length, 6) : 5.5,
-            active,
-            dim: Boolean(query && !matches && !linked.has(node.id)),
-          };
-        });
-      },
-      filteredGraphEdgesRaw() {
-        const relation = this.knowledge.graphRelation;
-        return (this.knowledge.graph.edges || []).filter((edge) => relation === "all" || edge.relation === relation);
-      },
-      graphEdges() {
-        const byId = new Map(this.graphNodes.map((node) => [node.id, node]));
-        const query = this.knowledge.graphSearch.trim().toLowerCase();
-        return this.filteredGraphEdgesRaw
-          .map((edge, index) => {
-            const source = byId.get(edge.source);
-            const target = byId.get(edge.target);
-            if (!source || !target) return null;
-            return {
-              id: `${edge.source}->${edge.target}-${index}`,
-              relation: edge.relation || "links_to",
-              x1: source.x,
-              y1: source.y,
-              x2: target.x,
-              y2: target.y,
-              dim: Boolean(query && source.dim && target.dim),
-            };
-          })
-          .filter(Boolean);
-      },
       graphStats() {
         const nodes = this.knowledge.graph.nodes || [];
         return {
@@ -321,18 +265,6 @@
           tags: nodes.filter((node) => node.kind === "tag").length,
           edges: (this.knowledge.graph.edges || []).length,
         };
-      },
-      graphConcepts() {
-        const query = this.knowledge.graphSearch.trim().toLowerCase();
-        return (this.knowledge.graph.nodes || [])
-          .filter((node) => node.kind === "concept")
-          .filter((node) => {
-            if (!query) return true;
-            return [node.id, node.title, node.type, node.description, ...(node.tags || [])].join(" ").toLowerCase().includes(query);
-          });
-      },
-      selectedGraphNode() {
-        return (this.knowledge.graph.nodes || []).find((node) => node.id === this.knowledge.graphSelectedId) || null;
       },
     },
     mounted() {
@@ -504,6 +436,441 @@
         if (mode === "graph") await this.loadKnowledgeGraph();
         if (mode === "qa") await this.loadKnowledgeQa();
       },
+      graphGroupForNode(node) {
+        if (node.kind === "tag") return "tag";
+        const text = [node.type, node.title, node.description, ...(node.tags || [])].join(" ").toLowerCase();
+        if (text.includes("qa") || text.includes("curated") || text.includes("问答")) return "qa";
+        if (text.includes("playbook") || text.includes("手册") || text.includes("排查")) return "playbook";
+        if (text.includes("config") || text.includes("配置") || text.includes("table")) return "config";
+        if (text.includes("code") || text.includes("代码")) return "code";
+        if (text.includes("module") || text.includes("模块")) return "module";
+        return "other";
+      },
+      graphGroupMeta(group) {
+        return GRAPH_GROUPS[group] || GRAPH_GROUPS.other;
+      },
+      getGraphBg() {
+        const value = getComputedStyle(document.documentElement).getPropertyValue("--graph-bg").trim();
+        return value || "#0d1424";
+      },
+      buildKnowledgeGraphVisData() {
+        const rawNodes = this.knowledge.graph.nodes || [];
+        const rawEdges = this.knowledge.graph.edges || [];
+        const degree = {};
+        rawNodes.forEach((node) => {
+          degree[node.id] = 0;
+        });
+        rawEdges.forEach((edge) => {
+          if (degree[edge.source] !== undefined) degree[edge.source] += 1;
+          if (degree[edge.target] !== undefined) degree[edge.target] += 1;
+        });
+        const groups = [];
+        const seenGroups = new Set();
+        const nodes = rawNodes.map((node) => {
+          const group = this.graphGroupForNode(node);
+          if (!seenGroups.has(group)) {
+            seenGroups.add(group);
+            groups.push(group);
+          }
+          const label = node.kind === "tag" ? String(node.title || node.id).replace(/^tag:/, "") : (node.title || node.id);
+          return {
+            id: node.id,
+            label,
+            title: node.description || node.type || node.id,
+            group,
+            kind: node.kind,
+            degree: degree[node.id] || 0,
+            value: Math.max(10, Math.min(36, 10 + (degree[node.id] || 0) * 3)),
+          };
+        });
+        const edges = rawEdges.map((edge, index) => ({
+          id: edge.id || `${edge.source}->${edge.target}-${index}`,
+          from: edge.source,
+          to: edge.target,
+          label: edge.relation === "tagged_with" ? "tag" : "link",
+          title: edge.relation === "tagged_with" ? "标签关系" : "内部链接",
+        }));
+        const order = Object.keys(GRAPH_GROUPS);
+        groups.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+        return { nodes, edges, groups };
+      },
+      prepareKnowledgeGraphVis() {
+        const data = this.buildKnowledgeGraphVisData();
+        this.knowledge.graphGroups = data.groups.map((group) => ({
+          id: group,
+          label: this.graphGroupMeta(group).label,
+          color: this.graphGroupMeta(group).color,
+        }));
+        this.knowledge.graphActiveGroups = data.groups.slice();
+        this.knowledge.graphStatus = `${data.nodes.length} 节点 · ${data.edges.length} 关系`;
+        this.knowledge.graphShowEdgeLabels = false;
+      },
+      destroyKnowledgeGraphVis() {
+        const current = this.knowledge.graphVis;
+        if (!current) return;
+        if (current.tooltipMove) document.removeEventListener("mousemove", current.tooltipMove);
+        if (current.network) current.network.destroy();
+        this.knowledge.graphVis = null;
+      },
+      nodeFullColor(node) {
+        const meta = this.graphGroupMeta(node.group);
+        return {
+          color: {
+            background: meta.color,
+            border: meta.color,
+            highlight: { background: meta.color, border: meta.color },
+            hover: { background: meta.color, border: meta.color },
+          },
+          shadow: { enabled: true, color: meta.glow.replace(/[\d.]+\)$/, "0.2)"), size: 8, x: 0, y: 0 },
+          opacity: 0.35,
+          font: { color: "rgba(230,237,243,0.35)", size: 11 },
+        };
+      },
+      nodeDim(node) {
+        const meta = this.graphGroupMeta(node.group);
+        return {
+          color: {
+            background: meta.color,
+            border: meta.color,
+            highlight: { background: meta.color, border: meta.color },
+            hover: { background: meta.color, border: meta.color },
+          },
+          shadow: { enabled: false },
+          opacity: 0.06,
+          font: { color: "rgba(0,0,0,0)" },
+        };
+      },
+      nodeNeighbor(node) {
+        const meta = this.graphGroupMeta(node.group);
+        return {
+          color: {
+            background: meta.color,
+            border: meta.color,
+            highlight: { background: meta.color, border: meta.color },
+            hover: { background: meta.color, border: meta.color },
+          },
+          shadow: { enabled: true, color: meta.glow.replace(/[\d.]+\)$/, "0.5)"), size: 18, x: 0, y: 0 },
+          opacity: 0.85,
+          font: { color: "rgba(230,237,243,0.8)", size: 11 },
+        };
+      },
+      nodeHovered(node) {
+        const meta = this.graphGroupMeta(node.group);
+        return {
+          color: {
+            background: meta.color,
+            border: "#ffffff",
+            highlight: { background: meta.color, border: "#ffffff" },
+            hover: { background: meta.color, border: "#ffffff" },
+          },
+          borderWidth: 2,
+          shadow: { enabled: true, color: meta.glow.replace(/[\d.]+\)$/, "1)"), size: 38, x: 0, y: 0 },
+          opacity: 1,
+          font: { color: "#ffffff", size: 13 },
+        };
+      },
+      edgeStyle(active) {
+        const bg = this.getGraphBg();
+        if (active === null) {
+          return {
+            color: { color: "rgba(148,163,184,0.22)", highlight: "rgba(148,163,184,0.22)", hover: "rgba(148,163,184,0.22)", inherit: false },
+            width: 1,
+            font: { size: this.knowledge.graphShowEdgeLabels ? 10 : 0, color: "#8b949e", strokeWidth: 2, strokeColor: bg },
+          };
+        }
+        if (active) {
+          return {
+            color: { color: "rgba(190,220,255,0.9)", highlight: "rgba(190,220,255,0.9)", hover: "rgba(190,220,255,0.9)", inherit: false },
+            width: 2.5,
+            font: { size: 11, color: "#a8c4e0", strokeWidth: 2, strokeColor: bg },
+          };
+        }
+        return {
+          color: { color: "rgba(148,163,184,0.04)", highlight: "rgba(148,163,184,0.04)", hover: "rgba(148,163,184,0.04)", inherit: false },
+          width: 0.5,
+          font: { size: 0 },
+        };
+      },
+      bringKnowledgeEdgesToFront(edgeIds) {
+        const graph = this.knowledge.graphVis;
+        if (!graph || !edgeIds.length) return;
+        const items = edgeIds.map((id) => graph.edges.get(id)).filter(Boolean);
+        graph.edges.remove(edgeIds);
+        graph.edges.add(items);
+      },
+      applyKnowledgeNodeStyles() {
+        const graph = this.knowledge.graphVis;
+        if (!graph) return;
+        graph.nodeData.forEach((node) => {
+          const current = graph.nodes.get(node.id);
+          if (!current || current.hidden) return;
+          graph.nodes.update(Object.assign({ id: node.id }, this.nodeFullColor(node)));
+        });
+        graph.edgeData.forEach((edge) => {
+          graph.edges.update(Object.assign({ id: edge.id }, this.edgeStyle(null)));
+        });
+      },
+      applyKnowledgeHoverHighlight(hoveredId) {
+        const graph = this.knowledge.graphVis;
+        if (!graph) return;
+        const neighbors = new Set([hoveredId]);
+        graph.edgeData.forEach((edge) => {
+          if (edge.from === hoveredId) neighbors.add(edge.to);
+          if (edge.to === hoveredId) neighbors.add(edge.from);
+        });
+        graph.nodes.forEach((node) => {
+          if (node.hidden) return;
+          if (node.id === hoveredId) {
+            graph.nodes.update(Object.assign({ id: node.id }, this.nodeHovered(node)));
+          } else if (neighbors.has(node.id)) {
+            graph.nodes.update(Object.assign({ id: node.id }, this.nodeNeighbor(node)));
+          } else {
+            graph.nodes.update(Object.assign({ id: node.id }, this.nodeDim(node)));
+          }
+        });
+        const activeIds = [];
+        graph.edgeData.forEach((edge) => {
+          const connected = edge.from === hoveredId || edge.to === hoveredId;
+          graph.edges.update(Object.assign({ id: edge.id }, this.edgeStyle(connected)));
+          if (connected) activeIds.push(edge.id);
+        });
+        this.bringKnowledgeEdgesToFront(activeIds);
+      },
+      applyKnowledgePinnedHighlight(idList) {
+        const graph = this.knowledge.graphVis;
+        if (!graph) return;
+        graph.pinnedSet = idList && idList.length ? new Set(idList) : null;
+        if (!graph.pinnedSet) {
+          this.applyKnowledgeNodeStyles();
+          return;
+        }
+        const neighbors = new Set(graph.pinnedSet);
+        graph.edgeData.forEach((edge) => {
+          if (graph.pinnedSet.has(edge.from)) neighbors.add(edge.to);
+          if (graph.pinnedSet.has(edge.to)) neighbors.add(edge.from);
+        });
+        graph.nodes.forEach((node) => {
+          if (node.hidden) return;
+          if (graph.pinnedSet.has(node.id)) {
+            graph.nodes.update(Object.assign({ id: node.id }, this.nodeHovered(node)));
+          } else if (neighbors.has(node.id)) {
+            graph.nodes.update(Object.assign({ id: node.id }, this.nodeNeighbor(node)));
+          } else {
+            graph.nodes.update(Object.assign({ id: node.id }, this.nodeDim(node)));
+          }
+        });
+        const activeIds = [];
+        graph.edgeData.forEach((edge) => {
+          const connected = graph.pinnedSet.has(edge.from) || graph.pinnedSet.has(edge.to);
+          graph.edges.update(Object.assign({ id: edge.id }, this.edgeStyle(connected)));
+          if (connected) activeIds.push(edge.id);
+        });
+        this.bringKnowledgeEdgesToFront(activeIds);
+      },
+      applyKnowledgeGraphFilter() {
+        const graph = this.knowledge.graphVis;
+        if (!graph) return;
+        const active = new Set(this.knowledge.graphActiveGroups);
+        const hidden = new Set(graph.nodeData.filter((node) => !active.has(node.group)).map((node) => node.id));
+        graph.nodes.forEach((node) => {
+          graph.nodes.update({ id: node.id, hidden: hidden.has(node.id) });
+        });
+        graph.edges.forEach((edge) => {
+          graph.edges.update({ id: edge.id, hidden: hidden.has(edge.from) || hidden.has(edge.to) });
+        });
+        this.updateKnowledgeGraphStatus();
+      },
+      updateKnowledgeGraphStatus() {
+        const graph = this.knowledge.graphVis;
+        if (!graph) return;
+        const active = new Set(this.knowledge.graphActiveGroups);
+        const visibleNodes = graph.nodeData.filter((node) => active.has(node.group)).length;
+        const visibleEdges = graph.edgeData.filter((edge) => {
+          const from = graph.nodes.get(edge.from);
+          const to = graph.nodes.get(edge.to);
+          return from && !from.hidden && to && !to.hidden;
+        }).length;
+        this.knowledge.graphStatus = `${visibleNodes} 节点 · ${visibleEdges} 关系`;
+      },
+      initKnowledgeGraphVis() {
+        this.destroyKnowledgeGraphVis();
+        const container = this.$refs.graphCanvas;
+        if (!container || !window.vis || !window.vis.Network) {
+          this.knowledge.graphVisAvailable = false;
+          return;
+        }
+        const data = this.buildKnowledgeGraphVisData();
+        if (!data.nodes.length) return;
+        this.knowledge.graphVisAvailable = true;
+        const nodes = new window.vis.DataSet(data.nodes);
+        const edges = new window.vis.DataSet(data.edges);
+        const options = {
+          layout: { randomSeed: 7 },
+          nodes: {
+            shape: "dot",
+            scaling: { min: 10, max: 36 },
+            borderWidth: 0,
+            borderWidthSelected: 3,
+            font: {
+              color: "#e6edf3",
+              size: 11,
+              face: "-apple-system, \"Segoe UI\", sans-serif",
+              vadjust: -2,
+              strokeWidth: 3,
+              strokeColor: this.getGraphBg(),
+            },
+            shadow: { enabled: true, size: 18, x: 0, y: 0, color: "rgba(0,0,0,0)" },
+          },
+          edges: {
+            arrows: { to: { enabled: true, scaleFactor: 0.4 } },
+            color: { color: "rgba(148,163,184,0.22)", highlight: "rgba(148,163,184,0.22)", hover: "rgba(148,163,184,0.22)", inherit: false },
+            font: { size: 0 },
+            smooth: { type: "continuous", roundness: 0.2 },
+            width: 0.8,
+            selectionWidth: 0,
+            hoverWidth: 0,
+          },
+          interaction: {
+            hover: true,
+            tooltipDelay: 100,
+            navigationButtons: false,
+            keyboard: { enabled: true, bindToWindow: false },
+            multiselect: false,
+            selectEdges: false,
+            zoomView: true,
+          },
+          physics: {
+            enabled: true,
+            solver: "forceAtlas2Based",
+            forceAtlas2Based: {
+              gravitationalConstant: -40,
+              centralGravity: 0.01,
+              springLength: 200,
+              springConstant: 0.03,
+              damping: 0.55,
+              avoidOverlap: 0.6,
+            },
+            stabilization: { iterations: 500, updateInterval: 20 },
+          },
+        };
+        const network = new window.vis.Network(container, { nodes, edges }, options);
+        const tooltipMove = (event) => {
+          const tooltip = this.$refs.graphTooltip;
+          if (!tooltip) return;
+          tooltip.style.left = `${event.clientX + 16}px`;
+          tooltip.style.top = `${event.clientY - 10}px`;
+        };
+        document.addEventListener("mousemove", tooltipMove);
+        this.knowledge.graphVis = {
+          network,
+          nodes,
+          edges,
+          nodeData: data.nodes,
+          edgeData: data.edges,
+          pinnedSet: null,
+          tooltipMove,
+        };
+        this.applyKnowledgeNodeStyles();
+        this.applyKnowledgeGraphFilter();
+
+        network.on("hoverNode", (params) => {
+          this.applyKnowledgeHoverHighlight(params.node);
+          const node = nodes.get(params.node);
+          const tooltip = this.$refs.graphTooltip;
+          if (!node || !tooltip) return;
+          const meta = this.graphGroupMeta(node.group);
+          tooltip.innerHTML = `<div class="graph-tooltip-name" style="color:${meta.color}">${escapeHtml(node.label || node.id)}</div><div class="graph-tooltip-group">${escapeHtml(meta.label)}</div><div class="graph-tooltip-deg">连接数 ${node.degree || 0}</div>`;
+          tooltip.style.display = "block";
+        });
+        network.on("blurNode", () => {
+          const tooltip = this.$refs.graphTooltip;
+          if (tooltip) tooltip.style.display = "none";
+          const graph = this.knowledge.graphVis;
+          if (graph && graph.pinnedSet) this.applyKnowledgePinnedHighlight(Array.from(graph.pinnedSet));
+          else this.applyKnowledgeNodeStyles();
+        });
+        network.on("hoverEdge", (params) => {
+          const edge = edges.get(params.edge);
+          const tooltip = this.$refs.graphTooltip;
+          if (!edge || !tooltip) return;
+          tooltip.innerHTML = `<div class="graph-tooltip-edge">${escapeHtml(edge.title || edge.label || "")}</div>`;
+          tooltip.style.display = "block";
+        });
+        network.on("blurEdge", () => {
+          const tooltip = this.$refs.graphTooltip;
+          if (tooltip) tooltip.style.display = "none";
+        });
+        network.on("doubleClick", (params) => {
+          const id = params.nodes && params.nodes[0];
+          const node = id ? nodes.get(id) : null;
+          if (node && node.kind === "concept") this.loadCard(node.id);
+        });
+        network.on("stabilizationIterationsDone", () => {
+          network.fit({ animation: { duration: 600, easingFunction: "easeInOutQuad" } });
+          network.setOptions({ physics: { enabled: false } });
+          this.updateKnowledgeGraphStatus();
+        });
+      },
+      toggleGraphGroup(group) {
+        const active = new Set(this.knowledge.graphActiveGroups);
+        if (active.has(group)) active.delete(group);
+        else active.add(group);
+        this.knowledge.graphActiveGroups = Array.from(active);
+        this.applyKnowledgeGraphFilter();
+      },
+      toggleGraphEdgeLabels() {
+        this.knowledge.graphShowEdgeLabels = !this.knowledge.graphShowEdgeLabels;
+        const graph = this.knowledge.graphVis;
+        if (!graph) return;
+        graph.network.setOptions({
+          edges: {
+            font: {
+              size: this.knowledge.graphShowEdgeLabels ? 10 : 0,
+              color: "#8b949e",
+              strokeWidth: 2,
+              strokeColor: this.getGraphBg(),
+            },
+          },
+        });
+        if (!this.knowledge.graphShowEdgeLabels) this.applyKnowledgeNodeStyles();
+      },
+      rerunKnowledgeGraphPhysics() {
+        const graph = this.knowledge.graphVis;
+        if (!graph) return;
+        graph.network.setOptions({
+          physics: {
+            enabled: true,
+            forceAtlas2Based: { gravitationalConstant: -40, springLength: 200, springConstant: 0.03, damping: 0.55, avoidOverlap: 0.6 },
+            stabilization: { iterations: 300 },
+          },
+        });
+      },
+      fitKnowledgeGraph() {
+        const graph = this.knowledge.graphVis;
+        if (graph) graph.network.fit({ animation: { duration: 400 } });
+      },
+      searchKnowledgeGraph() {
+        const graph = this.knowledge.graphVis;
+        if (!graph) return;
+        const query = this.knowledge.graphSearch.trim().toLowerCase();
+        if (!query) {
+          graph.network.fit();
+          graph.network.unselectAll();
+          this.applyKnowledgePinnedHighlight(null);
+          return;
+        }
+        const matched = graph.nodeData
+          .filter((node) => [node.id, node.label, node.title, node.group].join(" ").toLowerCase().includes(query))
+          .map((node) => node.id);
+        if (!matched.length) return;
+        graph.network.selectNodes(matched);
+        this.applyKnowledgePinnedHighlight(matched);
+        graph.network.fit({ nodes: matched, animation: { duration: 500 } });
+      },
+      clearGraphSearch() {
+        this.knowledge.graphSearch = "";
+        this.searchKnowledgeGraph();
+      },
       async loadKnowledgeGraph() {
         await this.withLoading("加载图谱", async () => {
           let repo = this.selectedRepo;
@@ -523,240 +890,9 @@
             edges: data.edges || [],
           };
           this.knowledge.graphSourceRepo = repo;
-          this.layoutGraph();
+          this.prepareKnowledgeGraphVis();
+          this.$nextTick(() => this.initKnowledgeGraphVis());
         });
-      },
-      layoutGraph() {
-        const nodes = this.knowledge.graph.nodes || [];
-        const edges = this.knowledge.graph.edges || [];
-        const positions = {};
-        const velocity = {};
-        const degree = {};
-        const neighbours = {};
-        const width = 1120;
-        const height = 680;
-        const centerX = width / 2;
-        const centerY = height / 2;
-        const concepts = nodes.filter((node) => node.kind === "concept");
-        const tags = nodes.filter((node) => node.kind === "tag");
-
-        nodes.forEach((node) => {
-          degree[node.id] = 0;
-          neighbours[node.id] = [];
-        });
-        edges.forEach((edge) => {
-          if (degree[edge.source] !== undefined) degree[edge.source] += 1;
-          if (degree[edge.target] !== undefined) degree[edge.target] += 1;
-          if (neighbours[edge.source]) neighbours[edge.source].push(edge.target);
-          if (neighbours[edge.target]) neighbours[edge.target].push(edge.source);
-        });
-
-        const maxRadius = Math.min(width, height) * 0.45;
-        const contentRadius = maxRadius * 0.82;
-        const tagRadius = maxRadius * 0.9;
-        const xScale = 1.32;
-        const homes = {};
-
-        function radialPosition(angle, radius) {
-          return {
-            x: centerX + Math.cos(angle) * radius * xScale,
-            y: centerY + Math.sin(angle) * radius,
-          };
-        }
-
-        function clampRadial(pos) {
-          const dx = (pos.x - centerX) / xScale;
-          const dy = pos.y - centerY;
-          const radius = Math.sqrt(dx * dx + dy * dy);
-          if (radius <= maxRadius) return;
-          const scale = maxRadius / Math.max(radius, 1);
-          pos.x = centerX + dx * scale * xScale;
-          pos.y = centerY + dy * scale;
-        }
-
-        function cloudRadius(node, focus, layer) {
-          const depth = Math.pow(stableRandom(node.id, "cloud-depth"), 0.82);
-          const innerBias = stableRandom(node.id, "cloud-inner");
-          const degreeBias = (1 - focus) * 52;
-          const rankBias = Math.pow(layer, 0.7) * 48;
-          const centerPull = innerBias < 0.24 ? -46 : innerBias > 0.88 ? 32 : 0;
-          return Math.max(
-            34,
-            Math.min(contentRadius, 46 + depth * 128 + degreeBias + rankBias + centerPull)
-          );
-        }
-
-        const groupMap = new Map();
-        concepts.forEach((node) => {
-          const tagsForNode = node.tags || [];
-          const group = tagsForNode[0] || "core";
-          if (!groupMap.has(group)) groupMap.set(group, []);
-          groupMap.get(group).push(node);
-        });
-
-        const groupKeys = Array.from(groupMap.keys()).sort((a, b) => {
-          const degA = groupMap.get(a).reduce((sum, node) => sum + (degree[node.id] || 0), 0);
-          const degB = groupMap.get(b).reduce((sum, node) => sum + (degree[node.id] || 0), 0);
-          return degB - degA || a.localeCompare(b);
-        });
-
-        groupKeys.forEach((group, groupIndex) => {
-          const groupNodes = groupMap.get(group).sort((a, b) => (degree[b.id] || 0) - (degree[a.id] || 0) || a.id.localeCompare(b.id));
-          const baseAngle = groupKeys.length > 1
-            ? (Math.PI * 2 * groupIndex) / groupKeys.length + (stableRandom(group, "group-angle") - 0.5) * 0.34
-            : 0;
-          groupNodes.forEach((node, index) => {
-            const focus = Math.min(degree[node.id] || 0, 10) / 10;
-            const layer = index / Math.max(1, groupNodes.length - 1);
-            const angle = groupKeys.length > 1
-              ? baseAngle + (index - (groupNodes.length - 1) / 2) * 0.13 + (stableRandom(node.id, "theta") - 0.5) * 0.44
-              : (Math.PI * 2 * index) / Math.max(1, groupNodes.length) + (stableRandom(node.id, "theta") - 0.5) * 0.28;
-            const radius = cloudRadius(node, focus, layer);
-            homes[node.id] = radialPosition(angle, radius);
-            positions[node.id] = {
-              x: homes[node.id].x + (stableRandom(node.id, "home-x") - 0.5) * 28,
-              y: homes[node.id].y + (stableRandom(node.id, "home-y") - 0.5) * 28,
-            };
-            clampRadial(positions[node.id]);
-            velocity[node.id] = { x: 0, y: 0 };
-          });
-        });
-
-        tags.forEach((node) => {
-          const linkedConcepts = (neighbours[node.id] || [])
-            .map((id) => homes[id] || positions[id])
-            .filter(Boolean);
-          const anchor = linkedConcepts.length
-            ? linkedConcepts.reduce((acc, pos) => ({ x: acc.x + pos.x, y: acc.y + pos.y }), { x: 0, y: 0 })
-            : { x: centerX, y: centerY };
-          if (linkedConcepts.length) {
-            anchor.x /= linkedConcepts.length;
-            anchor.y /= linkedConcepts.length;
-          }
-          const anchorAngle = Math.atan2(anchor.y - centerY, (anchor.x - centerX) / xScale);
-          const anchorRadius = Math.sqrt(Math.pow((anchor.x - centerX) / xScale, 2) + Math.pow(anchor.y - centerY, 2));
-          const angle = anchorAngle + (stableRandom(node.id, "tag-angle") - 0.5) * 0.42;
-          const radius = Math.min(tagRadius, anchorRadius + 20 + stableRandom(node.id, "tag-radius") * 54);
-          homes[node.id] = radialPosition(angle, radius);
-          positions[node.id] = {
-            x: homes[node.id].x + (stableRandom(node.id, "tag-x") - 0.5) * 12,
-            y: homes[node.id].y + (stableRandom(node.id, "tag-y") - 0.5) * 12,
-          };
-          clampRadial(positions[node.id]);
-          velocity[node.id] = { x: 0, y: 0 };
-        });
-
-        nodes.forEach((node) => {
-          if (!positions[node.id]) {
-            const angle = stableRandom(node.id, "fallback-angle") * Math.PI * 2;
-            const radius = 54 + stableRandom(node.id, "fallback-radius") * (contentRadius - 54);
-            homes[node.id] = radialPosition(angle, radius);
-            positions[node.id] = { ...homes[node.id] };
-            velocity[node.id] = { x: 0, y: 0 };
-          }
-        });
-
-        for (let tick = 0; tick < 160; tick += 1) {
-          const alpha = 1 - tick / 160;
-          const force = {};
-          nodes.forEach((node) => {
-            const pos = positions[node.id];
-            const home = homes[node.id] || { x: centerX, y: centerY };
-            const homePull = node.kind === "concept" ? 0.018 : 0.026;
-            force[node.id] = {
-              x: (home.x - pos.x) * homePull,
-              y: (home.y - pos.y) * homePull,
-            };
-          });
-          for (let i = 0; i < nodes.length; i += 1) {
-            for (let j = i + 1; j < nodes.length; j += 1) {
-              const a = nodes[i];
-              const b = nodes[j];
-              const pa = positions[a.id];
-              const pb = positions[b.id];
-              const dx = pa.x - pb.x;
-              const dy = pa.y - pb.y;
-              const dist2 = Math.max(dx * dx + dy * dy, 120);
-              const strength = (a.kind === "tag" || b.kind === "tag") ? 650 : 1150;
-              const push = (strength / dist2) * (0.45 + alpha * 0.55);
-              force[a.id].x += dx * push;
-              force[a.id].y += dy * push;
-              force[b.id].x -= dx * push;
-              force[b.id].y -= dy * push;
-            }
-          }
-          for (const edge of edges) {
-            const source = positions[edge.source];
-            const target = positions[edge.target];
-            if (!source || !target) continue;
-            const dx = target.x - source.x;
-            const dy = target.y - source.y;
-            const desired = edge.relation === "links_to" ? 118 : 76;
-            const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-            const pull = (dist - desired) * (edge.relation === "links_to" ? 0.0032 : 0.0028);
-            const fx = (dx / dist) * pull;
-            const fy = (dy / dist) * pull;
-            force[edge.source].x += fx;
-            force[edge.source].y += fy;
-            force[edge.target].x -= fx;
-            force[edge.target].y -= fy;
-          }
-          nodes.forEach((node) => {
-            const pos = positions[node.id];
-            velocity[node.id].x = (velocity[node.id].x + force[node.id].x) * 0.68;
-            velocity[node.id].y = (velocity[node.id].y + force[node.id].y) * 0.68;
-            pos.x += velocity[node.id].x;
-            pos.y += velocity[node.id].y;
-            clampRadial(pos);
-          });
-        }
-        this.knowledge.graphPositions = positions;
-        if (!this.knowledge.graphSelectedId && concepts.length) this.knowledge.graphSelectedId = concepts[0].id;
-      },
-      selectGraphNode(node) {
-        this.knowledge.graphSelectedId = node.id;
-      },
-      startNodeDrag(node, event) {
-        this.knowledge.graphSelectedId = node.id;
-        this.knowledge.graphDrag = {
-          id: node.id,
-          startX: event.clientX,
-          startY: event.clientY,
-          origin: { ...(this.knowledge.graphPositions[node.id] || { x: node.x, y: node.y }) },
-        };
-      },
-      panGraphStart(event) {
-        this.knowledge.graphPan = {
-          startX: event.clientX,
-          startY: event.clientY,
-          origin: { ...this.knowledge.graphView },
-        };
-      },
-      moveGraphPointer(event) {
-        if (this.knowledge.graphDrag) {
-          const drag = this.knowledge.graphDrag;
-          const scale = this.knowledge.graphView.scale || 1;
-          this.knowledge.graphPositions[drag.id] = {
-            x: drag.origin.x + (event.clientX - drag.startX) / scale,
-            y: drag.origin.y + (event.clientY - drag.startY) / scale,
-          };
-        } else if (this.knowledge.graphPan) {
-          const pan = this.knowledge.graphPan;
-          this.knowledge.graphView.x = pan.origin.x + event.clientX - pan.startX;
-          this.knowledge.graphView.y = pan.origin.y + event.clientY - pan.startY;
-        }
-      },
-      endGraphPointer() {
-        this.knowledge.graphDrag = null;
-        this.knowledge.graphPan = null;
-      },
-      zoomGraph(event) {
-        const next = this.knowledge.graphView.scale * (event.deltaY > 0 ? 0.9 : 1.1);
-        this.knowledge.graphView.scale = Math.max(0.55, Math.min(2.4, next));
-      },
-      resetGraphView() {
-        this.knowledge.graphView = { x: 0, y: 0, scale: 1 };
-        this.layoutGraph();
       },
       async loadKnowledgeQa() {
         await this.withLoading("加载问答", async () => {
