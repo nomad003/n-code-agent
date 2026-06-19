@@ -149,7 +149,7 @@ GET /knowledge
 | `GET /knowledge/api?repo=<repo>` | 列出知识卡片 |
 | `GET /knowledge/api/{repo}/{file}` | 读取知识卡片，返回 `content`、`body`、`meta` |
 | `POST /knowledge/api` | 保存知识卡片 |
-| `GET /knowledge/api/graph?repo=<repo>` | 返回知识图谱节点、边和 `relations` 元数据，包含概念、标签、内部链接关系 |
+| `GET /knowledge/api/graph?repo=<repo>` | 返回知识图谱节点、边和 `relations` 元数据，包含概念、标签、符号、日志、断言、问题类型和资源路径关系 |
 | `GET /knowledge/api/qa?repo=<repo>` | 列出后台知识飞轮沉淀的历史问答 |
 | `POST /knowledge/api/qa/ask` | 在知识库后台追问模型，返回待人工审核的答案 |
 | `POST /knowledge/api/precipitate` | 将人工认可的问答落地为 `Code Playbook` 知识卡 |
@@ -168,6 +168,11 @@ GET /knowledge
 |----------|------|------|
 | `links_to` | 一个知识卡片正文通过 Markdown 链接引用另一个知识卡片 | Markdown 内部链接 |
 | `tagged_with` | 一个知识卡片在 frontmatter `tags` 中声明了该标签 | 卡片 frontmatter |
+| `owns_symbol` | 一个知识卡片在 frontmatter `symbols` 中声明关键类、函数或类型 | 卡片 frontmatter |
+| `emits_log` | 一个知识卡片在 frontmatter `logs` 中声明常见日志关键字或错误文本 | 卡片 frontmatter |
+| `checks_assert` | 一个知识卡片在 frontmatter `asserts` 中声明常见断言、CHECK 或错误条件 | 卡片 frontmatter |
+| `answers_question_type` | 一个知识卡片在 frontmatter `question_types` 中声明适用问题类型 | 卡片 frontmatter |
+| `documents_resource` | 一个知识卡片在 frontmatter `resource` 中声明描述的模块路径或代码资源 | 卡片 frontmatter |
 
 ### `POST /diagnose`
 

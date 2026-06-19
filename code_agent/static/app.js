@@ -16,6 +16,11 @@
     config: { label: "配置", color: "#fbbf24", glow: "rgba(251,191,36,0.55)" },
     code: { label: "代码", color: "#60a5fa", glow: "rgba(96,165,250,0.55)" },
     tag: { label: "标签", color: "#94a3b8", glow: "rgba(148,163,184,0.35)" },
+    symbol: { label: "符号", color: "#22d3ee", glow: "rgba(34,211,238,0.45)" },
+    log: { label: "日志", color: "#fb7185", glow: "rgba(251,113,133,0.45)" },
+    assert: { label: "断言", color: "#f97316", glow: "rgba(249,115,22,0.42)" },
+    question_type: { label: "类型", color: "#c084fc", glow: "rgba(192,132,252,0.42)" },
+    resource: { label: "路径", color: "#4ade80", glow: "rgba(74,222,128,0.38)" },
     other: { label: "其他", color: "#fb7185", glow: "rgba(251,113,133,0.45)" },
   };
 
@@ -31,6 +36,36 @@
       label: "标签归类",
       short_label: "tag",
       description: "frontmatter tags 声明了该标签。",
+    },
+    {
+      id: "owns_symbol",
+      label: "关键符号",
+      short_label: "symbol",
+      description: "frontmatter symbols 声明了关键类、函数或类型。",
+    },
+    {
+      id: "emits_log",
+      label: "日志线索",
+      short_label: "log",
+      description: "frontmatter logs 声明了常见日志关键字或错误文本。",
+    },
+    {
+      id: "checks_assert",
+      label: "断言线索",
+      short_label: "assert",
+      description: "frontmatter asserts 声明了常见断言、CHECK 或错误条件。",
+    },
+    {
+      id: "answers_question_type",
+      label: "问题类型",
+      short_label: "intent",
+      description: "frontmatter question_types 声明了适用问题类型。",
+    },
+    {
+      id: "documents_resource",
+      label: "代码资源",
+      short_label: "path",
+      description: "frontmatter resource 声明了卡片描述的模块路径或代码资源。",
     },
   ];
 
@@ -504,6 +539,11 @@
       },
       graphGroupForNode(node) {
         if (node.kind === "tag") return "tag";
+        if (node.kind === "symbol") return "symbol";
+        if (node.kind === "log") return "log";
+        if (node.kind === "assert") return "assert";
+        if (node.kind === "question_type") return "question_type";
+        if (node.kind === "resource") return "resource";
         const text = [node.type, node.title, node.description, ...(node.tags || [])].join(" ").toLowerCase();
         if (text.includes("qa") || text.includes("curated") || text.includes("问答")) return "qa";
         if (text.includes("playbook") || text.includes("手册") || text.includes("排查")) return "playbook";

@@ -213,6 +213,16 @@ KNOWLEDGE_DB_PATH = os.environ.get(
 # validated (roadmap 方案 3 MVP); set USE_KNOWLEDGE=1 to enable.
 USE_KNOWLEDGE = os.environ.get("USE_KNOWLEDGE", "0") not in ("0", "false", "False")
 
+# Stable code-knowledge map injection. This is separate from the dynamic Q&A
+# flywheel: markdown cards under docs/code-knowledge/<repo>/ are versioned
+# source files and can safely be used as navigation hints by default.
+CODE_KNOWLEDGE_MAP_ENABLED = os.environ.get("CODE_KNOWLEDGE_MAP_ENABLED", "1") not in (
+    "0",
+    "false",
+    "False",
+)
+CODE_KNOWLEDGE_MAP_MAX_CARDS = int(os.environ.get("CODE_KNOWLEDGE_MAP_MAX_CARDS", "12"))
+
 # --- Service ---------------------------------------------------------------
 SERVICE_PORT = int(os.environ.get("SERVICE_PORT", "8900"))
 SERVICE_HOST = os.environ.get("SERVICE_HOST", "0.0.0.0")

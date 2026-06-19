@@ -69,6 +69,12 @@ custom 的 system prompt 分三层：基础工具策略、`plain/technical/edit`
 宕机/错误日志、功能实现、配置实现或通用问答，并注入对应的检索顺序和答案结构，
 避免所有问题都按同一套提示词泛答。
 
+在模型调工具前，custom 后端还会注入稳定的代码知识库地图：
+`docs/code-knowledge/<repo>/` 下的 OKF-style Markdown 卡片会被解析为概念、标签、
+符号、日志、断言、问题类型和资源路径摘要。它只作为导航，提示模型先定位模块和
+排查手册；最终结论仍必须通过 `grep_code`、`read_file`、`find_assert_context` 等
+工具核实当前代码。
+
 **代理路由要点**：litellm 按模型名前缀选客户端。直接用 `vertex_ai/...` 会触发它的原生 Google Cloud 认证（失败且不走代理）。所以 `_routed_model()` 给模型名加 `openai/` 前缀，强制走 OpenAI 兼容路径；代理收到的仍是真实模型名。
 
 ### sdk 后端

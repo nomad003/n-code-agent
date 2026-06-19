@@ -69,12 +69,18 @@ code-agent 每次回答都从零遍历代码。它服务四类高频问题：
 - 显式关系：Markdown 内部链接，例如 `[单位、属性与技能](unit-skill-attr.md)`。
 - 派生关系：frontmatter 中的 tags、resource、symbols 等字段。
 
-当前图谱落地两类边：
+当前图谱落地七类边：
 
 - `links_to`：概念通过 Markdown 内部链接指向另一个概念。
 - `tagged_with`：概念带有某个 tag。
+- `owns_symbol`：概念声明关键类、函数或类型。
+- `emits_log`：概念声明常见日志关键字或错误文本。
+- `checks_assert`：概念声明常见断言、CHECK 或错误条件。
+- `answers_question_type`：概念声明适用问题类型。
+- `documents_resource`：概念声明主要模块路径或代码资源。
 
-后续可以增加 `depends_on`、`uses_config`、`owns_symbol`、`emits_log`、`checks_assert`。
+后续可以增加 `part_of`、`supplements`、`contradicts`、`supersedes`、`depends_on`，
+用于表达知识卡片之间更强的语义关系。
 
 ### 文件 Header / Frontmatter
 
@@ -200,9 +206,9 @@ updated_at: 2026-06-18
 
 后续增强：
 
-- 递归读取子目录，支持完整 OKF bundle。
+- 递归读取子目录，支持完整 OKF bundle。（已支持）
 - 给 frontmatter 建 SQLite/FTS 索引，提升日志、符号、assert 命中率。
-- UI 增加图谱视图，展示模块链接和 cited-by。
+- UI 图谱展示模块链接、标签、符号、日志、断言、问题类型和资源路径。
 - CI 校验 frontmatter 必填字段、内部链接、重复 tags。
 
 ## 第一阶段落地范围

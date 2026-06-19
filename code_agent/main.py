@@ -22,8 +22,8 @@ from pydantic import BaseModel
 
 from . import agent
 from . import config
+from . import knowledge_graph as kg
 from . import llm_trace
-from . import module_knowledge
 from . import operation_modes
 from . import question_intent
 from . import response_policy
@@ -314,27 +314,19 @@ def knowledge_graph_page() -> HTMLResponse:
 @app.get("/knowledge/api")
 def knowledge_list(repo: str | None = None) -> dict:
     repo_name = _resolve_request_repo(repo)
-    root = _knowledge_repo_dir(repo_name)
     cards = []
-    if os.path.isdir(root):
-        for name in sorted(os.listdir(root)):
-            if not name.endswith(".md"):
-                continue
-            path = os.path.join(root, name)
-            if not os.path.isfile(path):
-                continue
-            content = open(path, "r", encoding="utf-8").read()
-            card = module_knowledge._read_card(path)
-            cards.append(
-                {
-                    "name": name,
-                    "title": card.title if card else name[:-3],
-                    "tags": card.tags if card else [],
-                    "meta": _knowledge_frontmatter(content)[0],
-                    "size": os.path.getsize(path),
-                    "mtime": int(os.path.getmtime(path)),
-                }
-            )
+    for card in kg.load_cards(repo_name, include_common=False):
+        path = os.path.join(config.PROJECT_ROOT, card.path)
+        cards.append(
+            {
+                "name": card.id,
+                "title": card.title,
+                "tags": card.tags,
+                "meta": card.meta,
+                "size": os.path.getsize(path),
+                "mtime": int(os.path.getmtime(path)),
+            }
+        )
     return {"repo": repo_name, "cards": cards}
 
 
@@ -371,7 +363,7 @@ async def knowledge_qa_ask(req: KnowledgeCurateAskRequest) -> dict:
     }
 
 
-@app.get("/knowledge/api/{repo}/{name}")
+@app.get("/knowledge/api/{repo}/{name:path}")
 def knowledge_read(repo: str, name: str) -> dict:
     repo_name = _resolve_request_repo(repo)
     path = _knowledge_card_path(repo_name, name)
@@ -379,11 +371,12 @@ def knowledge_read(repo: str, name: str) -> dict:
         content = open(path, "r", encoding="utf-8").read()
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="knowledge card not found")
-    card = module_knowledge._read_card(path)
-    meta, body = _knowledge_frontmatter(content)
+    rel = os.path.relpath(path, _knowledge_repo_dir(repo_name)).replace(os.sep, "/")
+    card = kg.read_card(path, card_id=rel)
+    meta, body = kg.frontmatter(content)
     return {
         "repo": repo_name,
-        "name": os.path.basename(path),
+        "name": card.id if card else rel,
         "title": card.title if card else os.path.basename(path)[:-3],
         "tags": card.tags if card else [],
         "meta": meta,
@@ -405,62 +398,7 @@ def knowledge_save(req: KnowledgeSaveRequest) -> dict:
 @app.get("/knowledge/api/graph")
 def knowledge_graph(repo: str | None = None) -> dict:
     repo_name = _resolve_request_repo(repo)
-    root = _knowledge_repo_dir(repo_name)
-    nodes: list[dict] = []
-    edges: list[dict] = []
-    concept_ids: set[str] = set()
-    cards: dict[str, dict] = {}
-    if os.path.isdir(root):
-        for name in sorted(os.listdir(root)):
-            if not name.endswith(".md"):
-                continue
-            path = os.path.join(root, name)
-            if not os.path.isfile(path):
-                continue
-            text = open(path, "r", encoding="utf-8").read()
-            meta, body = _knowledge_frontmatter(text)
-            card = module_knowledge._read_card(path)
-            node_id = name
-            concept_ids.add(node_id)
-            cards[node_id] = {"meta": meta, "body": body}
-            nodes.append(
-                {
-                    "id": node_id,
-                    "kind": "concept",
-                    "title": card.title if card else meta.get("title", name[:-3]),
-                    "type": meta.get("type", "Concept"),
-                    "description": meta.get("description", ""),
-                    "resource": meta.get("resource", ""),
-                    "tags": _meta_list(meta.get("tags", "")),
-                }
-            )
-    tag_ids: set[str] = set()
-    for node in list(nodes):
-        if node["kind"] != "concept":
-            continue
-        for tag in node.get("tags", []):
-            tag_id = f"tag:{tag}"
-            if tag_id not in tag_ids:
-                tag_ids.add(tag_id)
-                nodes.append({"id": tag_id, "kind": "tag", "title": tag, "type": "Tag"})
-            edges.append(
-                {
-                    "source": node["id"],
-                    "target": tag_id,
-                    "relation": "tagged_with",
-                }
-            )
-    for source, data in cards.items():
-        for target in _knowledge_links(data["body"]):
-            if target in concept_ids:
-                edges.append(
-                    {
-                        "source": source,
-                        "target": target,
-                        "relation": "links_to",
-                    }
-                )
-    return {"repo": repo_name, "nodes": nodes, "edges": edges, "relations": _KNOWLEDGE_GRAPH_RELATIONS}
+    return kg.build_graph(repo_name)
 
 
 @app.get("/knowledge/api/qa")
@@ -489,76 +427,43 @@ def knowledge_precipitate(req: KnowledgePrecipitateRequest) -> dict:
 
 
 _CARD_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*\.md$")
+_CARD_PATH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*(/[A-Za-z0-9][A-Za-z0-9_.-]*)*\.md$")
 
-_KNOWLEDGE_GRAPH_RELATIONS = [
-    {
-        "id": "links_to",
-        "label": "内部链接",
-        "description": "一个知识卡片正文通过 Markdown 链接引用另一个知识卡片。",
-        "source": "markdown_link",
-    },
-    {
-        "id": "tagged_with",
-        "label": "标签归类",
-        "description": "一个知识卡片在 frontmatter tags 中声明了该标签。",
-        "source": "frontmatter_tags",
-    },
-]
+_KNOWLEDGE_GRAPH_RELATIONS = kg.RELATIONS
 
 
 def _knowledge_repo_dir(repo: str) -> str:
-    root = os.path.join(config.PROJECT_ROOT, "docs", "code-knowledge", repo)
-    return os.path.abspath(root)
+    return kg.repo_dir(repo)
 
 
 def _knowledge_card_path(repo: str, name: str) -> str:
-    base = os.path.basename(name or "")
-    if not base.endswith(".md"):
-        base += ".md"
-    if base != name and name.endswith(".md"):
-        raise HTTPException(status_code=400, detail="invalid card name")
-    if not _CARD_NAME_RE.match(base):
+    requested = (name or "").strip().replace("\\", "/")
+    if not requested.endswith(".md"):
+        requested += ".md"
+    if requested.startswith("/") or ".." in requested.split("/"):
+        raise HTTPException(status_code=400, detail="invalid card path")
+    if "/" in requested:
+        if not _CARD_PATH_RE.match(requested):
+            raise HTTPException(status_code=400, detail="invalid card path")
+    elif not _CARD_NAME_RE.match(requested):
         raise HTTPException(status_code=400, detail="invalid card name")
     root = _knowledge_repo_dir(repo)
-    path = os.path.abspath(os.path.join(root, base))
+    path = os.path.abspath(os.path.join(root, requested))
     if path != root and not path.startswith(root + os.sep):
         raise HTTPException(status_code=400, detail="invalid card path")
     return path
 
 
 def _knowledge_frontmatter(text: str) -> tuple[dict[str, str], str]:
-    if not text.startswith("---\n"):
-        return {}, text
-    end = text.find("\n---", 4)
-    if end == -1:
-        return {}, text
-    raw = text[4:end].strip()
-    body = text[end + 4 :].lstrip()
-    meta: dict[str, str] = {}
-    for line in raw.splitlines():
-        key, sep, val = line.partition(":")
-        if sep and key.strip():
-            meta[key.strip()] = val.strip().strip('"')
-    return meta, body
+    return kg.frontmatter(text)
 
 
 def _meta_list(value: str) -> list[str]:
-    raw = (value or "").strip().strip("[]")
-    return [item.strip().strip("'\"") for item in re.split(r"[,，]", raw) if item.strip()]
+    return kg.meta_list(value)
 
 
 def _knowledge_links(markdown: str) -> list[str]:
-    out: list[str] = []
-    for href in re.findall(r"\[[^\]]+\]\(([^)]+)\)", markdown or ""):
-        if href.startswith(("http://", "https://", "#")):
-            continue
-        target = href.split("#", 1)[0].split("?", 1)[0].strip()
-        if not target:
-            continue
-        base = os.path.basename(target)
-        if base.endswith(".md"):
-            out.append(base)
-    return list(dict.fromkeys(out))
+    return kg.markdown_links(markdown)
 
 
 def _knowledge_card_from_qa(req: KnowledgePrecipitateRequest, repo: str) -> str:

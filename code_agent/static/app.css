@@ -266,8 +266,9 @@ button:disabled {
   border-color: transparent;
   background: transparent;
   color: var(--text-2);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 .nav button:hover {
@@ -281,7 +282,7 @@ button:disabled {
   background: var(--blue-dim);
   border-color: transparent;
   box-shadow: inset 3px 0 0 var(--blue);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .nav-icon {
@@ -396,10 +397,6 @@ small {
   align-items: center;
   margin-bottom: 10px;
   padding-bottom: 10px;
-}
-
-.topbar-graph h1 {
-  font-size: 19px;
 }
 
 .topbar-graph p {

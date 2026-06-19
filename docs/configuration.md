@@ -34,6 +34,8 @@ cp .env.example .env     # 填入 LLM_API_KEY，按需改 TARGET_CODE_PATH / COD
 | `USE_SHORTCUT` | `1` | 精确"X 定义在哪"问题直接查索引返回、不走 LLM，0=关 |
 | `KNOWLEDGE_DB_PATH` | `./index/knowledge.db` | 单仓库模式的知识飞轮 SQLite 路径；多仓库模式下默认使用 `./index/repos/<repo>/knowledge.db` |
 | `USE_KNOWLEDGE` | `0` | 是否启用知识沉淀飞轮（沉淀+召回），默认关 |
+| `CODE_KNOWLEDGE_MAP_ENABLED` | `1` | 是否把 `docs/code-knowledge/<repo>/` 的稳定知识地图注入 agent prompt，默认开 |
+| `CODE_KNOWLEDGE_MAP_MAX_CARDS` | `12` | 知识地图最多注入多少张卡片摘要 |
 | `SERVICE_HOST` | `0.0.0.0` | HTTP 监听地址 |
 | `SERVICE_PORT` | `8900` | HTTP 端口 |
 | `MAX_CONCURRENCY` | `4` | `/ask`+`/diagnose` 最大并发数（线程池 worker 数） |

@@ -63,7 +63,18 @@ def test_knowledge_graph_links_and_tags(knowledge_env):
         main.KnowledgeSaveRequest(
             repo="marvel",
             name="a.md",
-            content="---\ntype: Code Module\ntitle: A\ntags: scene, level\n---\n\n# A\n\nSee [B](b.md).\n",
+            content=(
+                "---\n"
+                "type: Code Module\n"
+                "title: A\n"
+                "tags: scene, level\n"
+                "symbols: SceneMgr, LevelMgr\n"
+                "logs: SceneErr\n"
+                "asserts: CHECK_COND\n"
+                "question_types: outage_log, feature_impl\n"
+                "resource: gameserver/scene\n"
+                "---\n\n# A\n\nSee [B](b.md).\n"
+            ),
         )
     )
     main.knowledge_save(
@@ -76,12 +87,39 @@ def test_knowledge_graph_links_and_tags(knowledge_env):
     graph = main.knowledge_graph("marvel")
     node_ids = {n["id"] for n in graph["nodes"]}
     assert {"a.md", "b.md", "tag:scene", "tag:level"} <= node_ids
+    assert "symbol:SceneMgr" in node_ids
+    assert "log:SceneErr" in node_ids
+    assert "assert:CHECK_COND" in node_ids
+    assert "question_type:outage_log" in node_ids
+    assert "resource:gameserver/scene" in node_ids
     assert any(e["source"] == "a.md" and e["target"] == "b.md" for e in graph["edges"])
     assert any(e["relation"] == "tagged_with" for e in graph["edges"])
+    assert any(e["relation"] == "owns_symbol" for e in graph["edges"])
+    assert any(e["relation"] == "emits_log" for e in graph["edges"])
+    assert any(e["relation"] == "checks_assert" for e in graph["edges"])
+    assert any(e["relation"] == "answers_question_type" for e in graph["edges"])
+    assert any(e["relation"] == "documents_resource" for e in graph["edges"])
     relations = {item["id"]: item for item in graph["relations"]}
     assert relations["links_to"]["label"] == "内部链接"
     assert relations["tagged_with"]["label"] == "标签归类"
+    assert relations["owns_symbol"]["label"] == "关键符号"
+    assert relations["emits_log"]["label"] == "日志线索"
     assert "Markdown" in relations["links_to"]["description"]
+
+
+def test_knowledge_nested_card_path(knowledge_env):
+    main.knowledge_save(
+        main.KnowledgeSaveRequest(
+            repo="marvel",
+            name="gameserver/scene.md",
+            content="---\ntitle: 场景子目录\ntags: scene\n---\n\n# 场景子目录\n",
+        )
+    )
+    listed = main.knowledge_list("marvel")
+    assert listed["cards"][0]["name"] == "gameserver/scene.md"
+    read = main.knowledge_read("marvel", "gameserver/scene.md")
+    assert read["name"] == "gameserver/scene.md"
+    assert read["title"] == "场景子目录"
 
 
 def test_knowledge_precipitate_creates_card(knowledge_env):

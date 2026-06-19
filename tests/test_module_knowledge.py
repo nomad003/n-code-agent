@@ -32,6 +32,23 @@ def test_recall_cjk_compound_terms(monkeypatch, tmp_path):
     assert any("关卡框架" in c.title for c in cards)
 
 
+def test_load_cards_recurses_okf_bundle(monkeypatch, tmp_path):
+    root = tmp_path / "docs" / "code-knowledge" / "marvel" / "gameserver"
+    root.mkdir(parents=True)
+    (root / "nested.md").write_text(
+        "---\ntitle: 嵌套模块\ntags: nested, scene\n---\n\n# 嵌套模块\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(config, "PROJECT_ROOT", str(tmp_path))
+    monkeypatch.setattr(config, "CODE_REPOS", {})
+    monkeypatch.setattr(config, "CODE_REPO_DEFAULT", "marvel")
+    monkeypatch.setattr(config, "TARGET_CODE_PATH", str(tmp_path / "target"))
+
+    cards = module_knowledge.load_cards()
+    assert any(c.path.endswith("gameserver/nested.md") for c in cards)
+    assert any(c.title == "嵌套模块" for c in module_knowledge.recall("nested scene"))
+
+
 def test_build_messages_injects_module_card(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "CODE_REPOS", {})
     monkeypatch.setattr(config, "CODE_REPO_DEFAULT", "marvel")
@@ -40,5 +57,6 @@ def test_build_messages_injects_module_card(monkeypatch, tmp_path):
     a = agent.CodeAgent(mode="plain")
     a.question = "怪物如何配置？怪物技能配置缺失怎么排查？"
     msgs = a._build_messages(with_tools=True)
+    assert "代码知识库地图" in msgs[0]["content"]
     assert "已命中的模块知识卡" in msgs[0]["content"]
     assert "SkillListForEnemy" in msgs[0]["content"]

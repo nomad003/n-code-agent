@@ -7,11 +7,10 @@ instead of rediscovering the same framework every time.
 """
 from __future__ import annotations
 
-import os
-import re
 from dataclasses import dataclass
 
 from . import config
+from . import knowledge_graph
 
 
 _MAX_CARDS = 3
@@ -31,35 +30,24 @@ def recall(query: str, *, limit: int = _MAX_CARDS) -> list[Card]:
     query = (query or "").strip()
     if not query:
         return []
-    cards = load_cards()
-    scored: list[tuple[int, Card]] = []
+    cards = knowledge_graph.load_cards(config.current_repo().name, include_common=True)
+    scored: list[tuple[int, knowledge_graph.KnowledgeCard]] = []
     for card in cards:
-        score = _score(query, card)
+        score = knowledge_graph.score_card(query, card)
         if score > 0:
             scored.append((score, card))
     scored.sort(key=lambda item: (-item[0], item[1].path))
-    return [card for _, card in scored[:limit]]
+    return [_to_card(card) for _, card in scored[:limit]]
 
 
 def load_cards() -> list[Card]:
     """Load cards from common + current repo directories."""
-    repo = config.current_repo().name
-    roots = [
-        os.path.join(config.PROJECT_ROOT, "docs", "code-knowledge", "common"),
-        os.path.join(config.PROJECT_ROOT, "docs", "code-knowledge", repo),
+    return [
+        _to_card(card)
+        for card in knowledge_graph.load_cards(
+            config.current_repo().name, include_common=True
+        )
     ]
-    out: list[Card] = []
-    for root in roots:
-        if not os.path.isdir(root):
-            continue
-        for name in sorted(os.listdir(root)):
-            if not name.endswith(".md"):
-                continue
-            path = os.path.join(root, name)
-            card = _read_card(path)
-            if card:
-                out.append(card)
-    return out
 
 
 def format_for_prompt(query: str) -> str:
@@ -80,35 +68,14 @@ def format_for_prompt(query: str) -> str:
 
 
 def _read_card(path: str) -> Card | None:
-    try:
-        text = open(path, "r", encoding="utf-8").read()
-    except OSError:
+    card = knowledge_graph.read_card(path)
+    if not card:
         return None
-    title = os.path.splitext(os.path.basename(path))[0]
-    tags: list[str] = []
-    body = text
-    if text.startswith("---\n"):
-        end = text.find("\n---", 4)
-        if end != -1:
-            meta = text[4:end].strip()
-            body = text[end + 4 :].lstrip()
-            for line in meta.splitlines():
-                key, _, val = line.partition(":")
-                if key.strip() == "title" and val.strip():
-                    title = val.strip()
-                elif key.strip() == "tags":
-                    raw = val.strip().strip("[]")
-                    tags = [
-                        t.strip().strip("'\"")
-                        for t in re.split(r"[,，]", raw)
-                        if t.strip()
-                    ]
-    if title == os.path.splitext(os.path.basename(path))[0]:
-        m = re.search(r"^#\s+(.+)$", body, re.MULTILINE)
-        if m:
-            title = m.group(1).strip()
-    rel = os.path.relpath(path, config.PROJECT_ROOT).replace(os.sep, "/")
-    return Card(path=rel, title=title, tags=tags, body=body)
+    return _to_card(card)
+
+
+def _to_card(card: knowledge_graph.KnowledgeCard) -> Card:
+    return Card(path=card.path, title=card.title, tags=card.tags, body=card.body)
 
 
 def _score(query: str, card: Card) -> int:
@@ -124,17 +91,7 @@ def _score(query: str, card: Card) -> int:
 
 
 def _terms(text: str) -> list[str]:
-    terms = re.findall(r"[A-Za-z_][A-Za-z0-9_]+|[一-鿿]{2,}", text)
-    expanded: list[str] = []
-    for term in terms:
-        low = term.lower()
-        expanded.append(low)
-        if re.fullmatch(r"[一-鿿]{3,}", term):
-            for size in (2, 3, 4):
-                for i in range(0, len(term) - size + 1):
-                    expanded.append(term[i : i + size])
-        expanded.extend(_SYNONYMS.get(low, ()))
-    return list(dict.fromkeys(t for t in expanded if len(t) >= 2))
+    return knowledge_graph.terms_for_query(text)
 
 
 _SYNONYMS = {

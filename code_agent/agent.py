@@ -236,6 +236,17 @@ class CodeAgent:
             profile_text = ""
         if profile_text:
             system = system + "\n\n" + profile_text
+        if config.CODE_KNOWLEDGE_MAP_ENABLED:
+            try:
+                from . import knowledge_graph
+
+                graph_text = knowledge_graph.format_map_for_prompt(
+                    self.question, limit=config.CODE_KNOWLEDGE_MAP_MAX_CARDS
+                )
+            except Exception:
+                graph_text = ""
+            if graph_text:
+                system = system + "\n\n" + graph_text
         module_text = module_knowledge.format_for_prompt(self.question)
         if module_text:
             system = system + "\n\n" + module_text
