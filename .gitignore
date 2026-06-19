@@ -17,3 +17,6 @@ index/
 .idea/
 .vscode/
 .DS_Store
+
+# Vendored binaries too large for GitHub
+vendor/claude-cli/bin/claude.exe
