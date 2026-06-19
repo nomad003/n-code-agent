@@ -130,10 +130,6 @@
     return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
   }
 
-  function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-  }
-
   function readSidebarCollapsed() {
     try {
       return window.localStorage.getItem("code-agent.sidebarCollapsed") === "1";
@@ -555,20 +551,69 @@
           if (neighbours[edge.target]) neighbours[edge.target].push(edge.source);
         });
 
-        concepts.forEach((node) => {
-          const focus = Math.min(degree[node.id] || 0, 9) / 9;
-          const spreadX = width * (0.78 - focus * 0.24);
-          const spreadY = height * (0.72 - focus * 0.2);
-          positions[node.id] = {
-            x: centerX + (stableRandom(node.id, "x") - 0.5) * spreadX,
-            y: centerY + (stableRandom(node.id, "y") - 0.5) * spreadY,
+        const maxRadius = Math.min(width, height) * 0.45;
+        const xScale = 1.38;
+        const homes = {};
+
+        function radialPosition(angle, radius) {
+          return {
+            x: centerX + Math.cos(angle) * radius * xScale,
+            y: centerY + Math.sin(angle) * radius,
           };
-          velocity[node.id] = { x: 0, y: 0 };
+        }
+
+        function clampRadial(pos) {
+          const dx = (pos.x - centerX) / xScale;
+          const dy = pos.y - centerY;
+          const radius = Math.sqrt(dx * dx + dy * dy);
+          if (radius <= maxRadius) return;
+          const scale = maxRadius / Math.max(radius, 1);
+          pos.x = centerX + dx * scale * xScale;
+          pos.y = centerY + dy * scale;
+        }
+
+        const groupMap = new Map();
+        concepts.forEach((node) => {
+          const tagsForNode = node.tags || [];
+          const group = tagsForNode[0] || "core";
+          if (!groupMap.has(group)) groupMap.set(group, []);
+          groupMap.get(group).push(node);
+        });
+
+        const groupKeys = Array.from(groupMap.keys()).sort((a, b) => {
+          const degA = groupMap.get(a).reduce((sum, node) => sum + (degree[node.id] || 0), 0);
+          const degB = groupMap.get(b).reduce((sum, node) => sum + (degree[node.id] || 0), 0);
+          return degB - degA || a.localeCompare(b);
+        });
+
+        groupKeys.forEach((group, groupIndex) => {
+          const groupNodes = groupMap.get(group).sort((a, b) => (degree[b.id] || 0) - (degree[a.id] || 0) || a.id.localeCompare(b.id));
+          const baseAngle = groupKeys.length > 1
+            ? (Math.PI * 2 * groupIndex) / groupKeys.length + (stableRandom(group, "group-angle") - 0.5) * 0.34
+            : 0;
+          groupNodes.forEach((node, index) => {
+            const focus = Math.min(degree[node.id] || 0, 10) / 10;
+            const layer = index / Math.max(1, groupNodes.length - 1);
+            const angle = groupKeys.length > 1
+              ? baseAngle + (index - (groupNodes.length - 1) / 2) * 0.16 + (stableRandom(node.id, "theta") - 0.5) * 0.34
+              : (Math.PI * 2 * index) / Math.max(1, groupNodes.length) + (stableRandom(node.id, "theta") - 0.5) * 0.28;
+            const radius = Math.min(
+              maxRadius,
+              36 + (1 - focus) * 118 + layer * 140 + stableRandom(node.id, "radius") * 46
+            );
+            homes[node.id] = radialPosition(angle, radius);
+            positions[node.id] = {
+              x: homes[node.id].x + (stableRandom(node.id, "home-x") - 0.5) * 18,
+              y: homes[node.id].y + (stableRandom(node.id, "home-y") - 0.5) * 18,
+            };
+            clampRadial(positions[node.id]);
+            velocity[node.id] = { x: 0, y: 0 };
+          });
         });
 
         tags.forEach((node) => {
           const linkedConcepts = (neighbours[node.id] || [])
-            .map((id) => positions[id])
+            .map((id) => homes[id] || positions[id])
             .filter(Boolean);
           const anchor = linkedConcepts.length
             ? linkedConcepts.reduce((acc, pos) => ({ x: acc.x + pos.x, y: acc.y + pos.y }), { x: 0, y: 0 })
@@ -577,35 +622,39 @@
             anchor.x /= linkedConcepts.length;
             anchor.y /= linkedConcepts.length;
           }
-          const drift = 110 + stableRandom(node.id, "radius") * 120;
-          const angle = stableRandom(node.id, "angle") * Math.PI * 2;
+          const anchorAngle = Math.atan2(anchor.y - centerY, (anchor.x - centerX) / xScale);
+          const anchorRadius = Math.sqrt(Math.pow((anchor.x - centerX) / xScale, 2) + Math.pow(anchor.y - centerY, 2));
+          const angle = anchorAngle + (stableRandom(node.id, "tag-angle") - 0.5) * 0.42;
+          const radius = Math.min(maxRadius, anchorRadius + 46 + stableRandom(node.id, "tag-radius") * 72);
+          homes[node.id] = radialPosition(angle, radius);
           positions[node.id] = {
-            x: anchor.x + Math.cos(angle) * drift,
-            y: anchor.y + Math.sin(angle) * drift,
+            x: homes[node.id].x + (stableRandom(node.id, "tag-x") - 0.5) * 12,
+            y: homes[node.id].y + (stableRandom(node.id, "tag-y") - 0.5) * 12,
           };
+          clampRadial(positions[node.id]);
           velocity[node.id] = { x: 0, y: 0 };
         });
 
         nodes.forEach((node) => {
           if (!positions[node.id]) {
-            positions[node.id] = {
-              x: centerX + (stableRandom(node.id, "fallback-x") - 0.5) * width * 0.7,
-              y: centerY + (stableRandom(node.id, "fallback-y") - 0.5) * height * 0.65,
-            };
+            const angle = stableRandom(node.id, "fallback-angle") * Math.PI * 2;
+            const radius = 70 + stableRandom(node.id, "fallback-radius") * (maxRadius - 70);
+            homes[node.id] = radialPosition(angle, radius);
+            positions[node.id] = { ...homes[node.id] };
             velocity[node.id] = { x: 0, y: 0 };
           }
         });
 
-        for (let tick = 0; tick < 260; tick += 1) {
-          const alpha = 1 - tick / 260;
+        for (let tick = 0; tick < 160; tick += 1) {
+          const alpha = 1 - tick / 160;
           const force = {};
           nodes.forEach((node) => {
             const pos = positions[node.id];
-            const focus = Math.min(degree[node.id] || 0, 10) / 10;
-            const centerPull = node.kind === "concept" ? 0.0016 + focus * 0.0018 : 0.0008;
+            const home = homes[node.id] || { x: centerX, y: centerY };
+            const homePull = node.kind === "concept" ? 0.022 : 0.03;
             force[node.id] = {
-              x: (centerX - pos.x) * centerPull,
-              y: (centerY - pos.y) * centerPull,
+              x: (home.x - pos.x) * homePull,
+              y: (home.y - pos.y) * homePull,
             };
           });
           for (let i = 0; i < nodes.length; i += 1) {
@@ -617,7 +666,7 @@
               const dx = pa.x - pb.x;
               const dy = pa.y - pb.y;
               const dist2 = Math.max(dx * dx + dy * dy, 120);
-              const strength = (a.kind === "tag" || b.kind === "tag") ? 2600 : 4200;
+              const strength = (a.kind === "tag" || b.kind === "tag") ? 850 : 1500;
               const push = (strength / dist2) * (0.45 + alpha * 0.55);
               force[a.id].x += dx * push;
               force[a.id].y += dy * push;
@@ -631,9 +680,9 @@
             if (!source || !target) continue;
             const dx = target.x - source.x;
             const dy = target.y - source.y;
-            const desired = edge.relation === "links_to" ? 205 : 145;
+            const desired = edge.relation === "links_to" ? 118 : 76;
             const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-            const pull = (dist - desired) * (edge.relation === "links_to" ? 0.0048 : 0.0034);
+            const pull = (dist - desired) * (edge.relation === "links_to" ? 0.0032 : 0.0028);
             const fx = (dx / dist) * pull;
             const fy = (dy / dist) * pull;
             force[edge.source].x += fx;
@@ -643,13 +692,11 @@
           }
           nodes.forEach((node) => {
             const pos = positions[node.id];
-            const wobble = node.kind === "concept" ? 0.09 : 0.05;
-            force[node.id].x += (stableRandom(node.id, "wx" + (tick % 19)) - 0.5) * wobble * alpha;
-            force[node.id].y += (stableRandom(node.id, "wy" + (tick % 23)) - 0.5) * wobble * alpha;
-            velocity[node.id].x = (velocity[node.id].x + force[node.id].x) * 0.72;
-            velocity[node.id].y = (velocity[node.id].y + force[node.id].y) * 0.72;
-            pos.x = clamp(pos.x + velocity[node.id].x, 38, width - 38);
-            pos.y = clamp(pos.y + velocity[node.id].y, 38, height - 38);
+            velocity[node.id].x = (velocity[node.id].x + force[node.id].x) * 0.68;
+            velocity[node.id].y = (velocity[node.id].y + force[node.id].y) * 0.68;
+            pos.x += velocity[node.id].x;
+            pos.y += velocity[node.id].y;
+            clampRadial(pos);
           });
         }
         this.knowledge.graphPositions = positions;

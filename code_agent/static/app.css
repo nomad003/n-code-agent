@@ -68,7 +68,7 @@ body {
 }
 
 #app.sidebar-collapsed {
-  grid-template-columns: 68px minmax(0, 1fr);
+  grid-template-columns: 58px minmax(0, 1fr);
 }
 
 .sidebar {
@@ -268,12 +268,18 @@ small {
 }
 
 #app.sidebar-collapsed .sidebar {
-  padding: 18px 9px;
+  padding: 18px 8px;
 }
 
 #app.sidebar-collapsed .brand {
-  grid-template-columns: 42px;
+  grid-template-columns: 34px;
   padding-right: 0;
+}
+
+#app.sidebar-collapsed .brand-mark {
+  width: 34px;
+  height: 34px;
+  font-size: 10px;
 }
 
 #app.sidebar-collapsed .brand-copy,
@@ -290,7 +296,13 @@ small {
 #app.sidebar-collapsed .nav button {
   grid-template-columns: 1fr;
   justify-items: center;
-  padding: 8px;
+  min-height: 36px;
+  padding: 6px;
+}
+
+#app.sidebar-collapsed .nav-icon {
+  width: 26px;
+  height: 26px;
 }
 
 .main {
@@ -834,9 +846,9 @@ summary {
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   background:
-    radial-gradient(circle, rgba(160, 180, 204, 0.16) 1px, transparent 1.3px),
+    radial-gradient(circle at 50% 50%, rgba(79, 142, 247, 0.13), transparent 34%),
+    radial-gradient(circle at 50% 50%, rgba(34, 211, 238, 0.08), transparent 52%),
     linear-gradient(180deg, rgba(12, 16, 32, 0.94), rgba(7, 9, 26, 0.98));
-  background-size: 22px 22px, auto;
 }
 
 .graph-wrap::after {
@@ -933,6 +945,10 @@ summary {
   fill: var(--text);
 }
 
+.graph-node .node.tag ~ text {
+  display: none;
+}
+
 .graph-detail {
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
@@ -1018,7 +1034,7 @@ summary {
   }
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 760px) {
   #app,
   #app.sidebar-collapsed {
     grid-template-columns: 1fr;
@@ -1058,11 +1074,11 @@ summary {
   }
 
   #app.sidebar-collapsed .sidebar {
-    grid-template-columns: 42px minmax(0, 1fr) auto;
+    grid-template-columns: 34px minmax(0, 1fr) auto;
   }
 
   #app.sidebar-collapsed .brand {
-    grid-template-columns: 42px;
+    grid-template-columns: 34px;
   }
 
   #app.sidebar-collapsed .brand-copy,
@@ -1072,7 +1088,7 @@ summary {
   }
 
   #app.sidebar-collapsed .nav {
-    grid-template-columns: repeat(3, 44px);
+    grid-template-columns: repeat(3, 38px);
     justify-content: start;
   }
 
@@ -1095,7 +1111,7 @@ summary {
   }
 }
 
-@media (max-width: 680px) {
+@media (max-width: 560px) {
   .main,
   .sidebar {
     padding: 14px;
@@ -1118,11 +1134,11 @@ summary {
   }
 
   #app.sidebar-collapsed .sidebar {
-    grid-template-columns: 42px minmax(0, 1fr) auto;
+    grid-template-columns: 34px minmax(0, 1fr) auto;
   }
 
   #app.sidebar-collapsed .nav {
-    grid-template-columns: repeat(3, 42px);
+    grid-template-columns: repeat(3, 38px);
   }
 
   h1 {
