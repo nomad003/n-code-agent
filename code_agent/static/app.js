@@ -520,6 +520,7 @@
       destroyKnowledgeGraphVis() {
         const current = this.knowledge.graphVis;
         if (!current) return;
+        if (current.hoverFrame) window.cancelAnimationFrame(current.hoverFrame);
         if (current.tooltipMove) document.removeEventListener("mousemove", current.tooltipMove);
         if (current.network) current.network.destroy();
         this.knowledge.graphVis = null;
@@ -533,9 +534,9 @@
             highlight: { background: meta.color, border: meta.color },
             hover: { background: meta.color, border: meta.color },
           },
-          shadow: { enabled: true, color: meta.glow.replace(/[\d.]+\)$/, "0.2)"), size: 8, x: 0, y: 0 },
-          opacity: 0.35,
-          font: { color: "rgba(230,237,243,0.35)", size: 11 },
+          shadow: { enabled: false },
+          opacity: 0.48,
+          font: { color: "rgba(230,237,243,0.5)", size: 11 },
         };
       },
       nodeDim(node) {
@@ -561,7 +562,7 @@
             highlight: { background: meta.color, border: meta.color },
             hover: { background: meta.color, border: meta.color },
           },
-          shadow: { enabled: true, color: meta.glow.replace(/[\d.]+\)$/, "0.5)"), size: 18, x: 0, y: 0 },
+          shadow: { enabled: false },
           opacity: 0.85,
           font: { color: "rgba(230,237,243,0.8)", size: 11 },
         };
@@ -576,7 +577,7 @@
             hover: { background: meta.color, border: "#ffffff" },
           },
           borderWidth: 2,
-          shadow: { enabled: true, color: meta.glow.replace(/[\d.]+\)$/, "1)"), size: 38, x: 0, y: 0 },
+          shadow: { enabled: true, color: meta.glow.replace(/[\d.]+\)$/, "0.75)"), size: 18, x: 0, y: 0 },
           opacity: 1,
           font: { color: "#ffffff", size: 13 },
         };
@@ -603,54 +604,65 @@
           font: { size: 0 },
         };
       },
-      bringKnowledgeEdgesToFront(edgeIds) {
-        const graph = this.knowledge.graphVis;
-        if (!graph || !edgeIds.length) return;
-        const items = edgeIds.map((id) => graph.edges.get(id)).filter(Boolean);
-        graph.edges.remove(edgeIds);
-        graph.edges.add(items);
-      },
       applyKnowledgeNodeStyles() {
         const graph = this.knowledge.graphVis;
         if (!graph) return;
+        graph.hoveredId = null;
+        const nodeUpdates = [];
+        const edgeUpdates = [];
         graph.nodeData.forEach((node) => {
           const current = graph.nodes.get(node.id);
           if (!current || current.hidden) return;
-          graph.nodes.update(Object.assign({ id: node.id }, this.nodeFullColor(node)));
+          nodeUpdates.push(Object.assign({ id: node.id }, this.nodeFullColor(node)));
         });
         graph.edgeData.forEach((edge) => {
-          graph.edges.update(Object.assign({ id: edge.id }, this.edgeStyle(null)));
+          edgeUpdates.push(Object.assign({ id: edge.id }, this.edgeStyle(null)));
         });
+        if (nodeUpdates.length) graph.nodes.update(nodeUpdates);
+        if (edgeUpdates.length) graph.edges.update(edgeUpdates);
       },
       applyKnowledgeHoverHighlight(hoveredId) {
         const graph = this.knowledge.graphVis;
-        if (!graph) return;
+        if (!graph || graph.isDragging || graph.hoveredId === hoveredId) return;
+        if (graph.hoverFrame) window.cancelAnimationFrame(graph.hoverFrame);
+        graph.hoverFrame = window.requestAnimationFrame(() => {
+          graph.hoverFrame = null;
+          this.applyKnowledgeHoverHighlightNow(hoveredId);
+        });
+      },
+      applyKnowledgeHoverHighlightNow(hoveredId) {
+        const graph = this.knowledge.graphVis;
+        if (!graph || graph.isDragging) return;
+        graph.hoveredId = hoveredId;
         const neighbors = new Set([hoveredId]);
         graph.edgeData.forEach((edge) => {
           if (edge.from === hoveredId) neighbors.add(edge.to);
           if (edge.to === hoveredId) neighbors.add(edge.from);
         });
-        graph.nodes.forEach((node) => {
-          if (node.hidden) return;
+        const nodeUpdates = [];
+        const edgeUpdates = [];
+        graph.nodeData.forEach((node) => {
+          const current = graph.nodes.get(node.id);
+          if (!current || current.hidden) return;
           if (node.id === hoveredId) {
-            graph.nodes.update(Object.assign({ id: node.id }, this.nodeHovered(node)));
+            nodeUpdates.push(Object.assign({ id: node.id }, this.nodeHovered(node)));
           } else if (neighbors.has(node.id)) {
-            graph.nodes.update(Object.assign({ id: node.id }, this.nodeNeighbor(node)));
+            nodeUpdates.push(Object.assign({ id: node.id }, this.nodeNeighbor(node)));
           } else {
-            graph.nodes.update(Object.assign({ id: node.id }, this.nodeDim(node)));
+            nodeUpdates.push(Object.assign({ id: node.id }, this.nodeDim(node)));
           }
         });
-        const activeIds = [];
         graph.edgeData.forEach((edge) => {
           const connected = edge.from === hoveredId || edge.to === hoveredId;
-          graph.edges.update(Object.assign({ id: edge.id }, this.edgeStyle(connected)));
-          if (connected) activeIds.push(edge.id);
+          edgeUpdates.push(Object.assign({ id: edge.id }, this.edgeStyle(connected)));
         });
-        this.bringKnowledgeEdgesToFront(activeIds);
+        if (nodeUpdates.length) graph.nodes.update(nodeUpdates);
+        if (edgeUpdates.length) graph.edges.update(edgeUpdates);
       },
       applyKnowledgePinnedHighlight(idList) {
         const graph = this.knowledge.graphVis;
         if (!graph) return;
+        graph.hoveredId = null;
         graph.pinnedSet = idList && idList.length ? new Set(idList) : null;
         if (!graph.pinnedSet) {
           this.applyKnowledgeNodeStyles();
@@ -661,47 +673,43 @@
           if (graph.pinnedSet.has(edge.from)) neighbors.add(edge.to);
           if (graph.pinnedSet.has(edge.to)) neighbors.add(edge.from);
         });
-        graph.nodes.forEach((node) => {
-          if (node.hidden) return;
+        const nodeUpdates = [];
+        const edgeUpdates = [];
+        graph.nodeData.forEach((node) => {
+          const current = graph.nodes.get(node.id);
+          if (!current || current.hidden) return;
           if (graph.pinnedSet.has(node.id)) {
-            graph.nodes.update(Object.assign({ id: node.id }, this.nodeHovered(node)));
+            nodeUpdates.push(Object.assign({ id: node.id }, this.nodeHovered(node)));
           } else if (neighbors.has(node.id)) {
-            graph.nodes.update(Object.assign({ id: node.id }, this.nodeNeighbor(node)));
+            nodeUpdates.push(Object.assign({ id: node.id }, this.nodeNeighbor(node)));
           } else {
-            graph.nodes.update(Object.assign({ id: node.id }, this.nodeDim(node)));
+            nodeUpdates.push(Object.assign({ id: node.id }, this.nodeDim(node)));
           }
         });
-        const activeIds = [];
         graph.edgeData.forEach((edge) => {
           const connected = graph.pinnedSet.has(edge.from) || graph.pinnedSet.has(edge.to);
-          graph.edges.update(Object.assign({ id: edge.id }, this.edgeStyle(connected)));
-          if (connected) activeIds.push(edge.id);
+          edgeUpdates.push(Object.assign({ id: edge.id }, this.edgeStyle(connected)));
         });
-        this.bringKnowledgeEdgesToFront(activeIds);
+        if (nodeUpdates.length) graph.nodes.update(nodeUpdates);
+        if (edgeUpdates.length) graph.edges.update(edgeUpdates);
       },
       applyKnowledgeGraphFilter() {
         const graph = this.knowledge.graphVis;
         if (!graph) return;
         const active = new Set(this.knowledge.graphActiveGroups);
         const hidden = new Set(graph.nodeData.filter((node) => !active.has(node.group)).map((node) => node.id));
-        graph.nodes.forEach((node) => {
-          graph.nodes.update({ id: node.id, hidden: hidden.has(node.id) });
-        });
-        graph.edges.forEach((edge) => {
-          graph.edges.update({ id: edge.id, hidden: hidden.has(edge.from) || hidden.has(edge.to) });
-        });
+        graph.hiddenNodeIds = hidden;
+        graph.nodes.update(graph.nodeData.map((node) => ({ id: node.id, hidden: hidden.has(node.id) })));
+        graph.edges.update(graph.edgeData.map((edge) => ({ id: edge.id, hidden: hidden.has(edge.from) || hidden.has(edge.to) })));
         this.updateKnowledgeGraphStatus();
       },
       updateKnowledgeGraphStatus() {
         const graph = this.knowledge.graphVis;
         if (!graph) return;
         const active = new Set(this.knowledge.graphActiveGroups);
+        const hidden = graph.hiddenNodeIds || new Set();
         const visibleNodes = graph.nodeData.filter((node) => active.has(node.group)).length;
-        const visibleEdges = graph.edgeData.filter((edge) => {
-          const from = graph.nodes.get(edge.from);
-          const to = graph.nodes.get(edge.to);
-          return from && !from.hidden && to && !to.hidden;
-        }).length;
+        const visibleEdges = graph.edgeData.filter((edge) => !hidden.has(edge.from) && !hidden.has(edge.to)).length;
         this.knowledge.graphStatus = `${visibleNodes} 节点 · ${visibleEdges} 关系`;
       },
       initKnowledgeGraphVis() {
@@ -731,7 +739,7 @@
               strokeWidth: 3,
               strokeColor: this.getGraphBg(),
             },
-            shadow: { enabled: true, size: 18, x: 0, y: 0, color: "rgba(0,0,0,0)" },
+            shadow: { enabled: false },
           },
           edges: {
             arrows: { to: { enabled: true, scaleFactor: 0.4 } },
@@ -744,11 +752,16 @@
           },
           interaction: {
             hover: true,
+            hoverConnectedEdges: false,
             tooltipDelay: 100,
             navigationButtons: false,
             keyboard: { enabled: true, bindToWindow: false },
             multiselect: false,
             selectEdges: false,
+            hideEdgesOnDrag: true,
+            hideEdgesOnZoom: true,
+            dragNodes: true,
+            dragView: true,
             zoomView: true,
           },
           physics: {
@@ -768,7 +781,7 @@
         const network = new window.vis.Network(container, { nodes, edges }, options);
         const tooltipMove = (event) => {
           const tooltip = this.$refs.graphTooltip;
-          if (!tooltip) return;
+          if (!tooltip || tooltip.style.display !== "block") return;
           tooltip.style.left = `${event.clientX + 16}px`;
           tooltip.style.top = `${event.clientY - 10}px`;
         };
@@ -780,12 +793,18 @@
           nodeData: data.nodes,
           edgeData: data.edges,
           pinnedSet: null,
+          hiddenNodeIds: new Set(),
+          hoveredId: null,
+          hoverFrame: null,
+          isDragging: false,
           tooltipMove,
         };
         this.applyKnowledgeNodeStyles();
         this.applyKnowledgeGraphFilter();
 
         network.on("hoverNode", (params) => {
+          const graph = this.knowledge.graphVis;
+          if (graph && graph.isDragging) return;
           this.applyKnowledgeHoverHighlight(params.node);
           const node = nodes.get(params.node);
           const tooltip = this.$refs.graphTooltip;
@@ -798,6 +817,10 @@
           const tooltip = this.$refs.graphTooltip;
           if (tooltip) tooltip.style.display = "none";
           const graph = this.knowledge.graphVis;
+          if (graph && graph.hoverFrame) {
+            window.cancelAnimationFrame(graph.hoverFrame);
+            graph.hoverFrame = null;
+          }
           if (graph && graph.pinnedSet) this.applyKnowledgePinnedHighlight(Array.from(graph.pinnedSet));
           else this.applyKnowledgeNodeStyles();
         });
@@ -811,6 +834,18 @@
         network.on("blurEdge", () => {
           const tooltip = this.$refs.graphTooltip;
           if (tooltip) tooltip.style.display = "none";
+        });
+        network.on("dragStart", () => {
+          const graph = this.knowledge.graphVis;
+          if (!graph) return;
+          graph.isDragging = true;
+          const tooltip = this.$refs.graphTooltip;
+          if (tooltip) tooltip.style.display = "none";
+        });
+        network.on("dragEnd", () => {
+          const graph = this.knowledge.graphVis;
+          if (!graph) return;
+          graph.isDragging = false;
         });
         network.on("doubleClick", (params) => {
           const id = params.nodes && params.nodes[0];

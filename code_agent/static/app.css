@@ -844,9 +844,8 @@ summary {
   position: absolute;
   z-index: 5;
   border: 1px solid rgba(148, 163, 184, 0.18);
-  background: rgba(7, 11, 24, 0.72);
+  background: rgba(7, 11, 24, 0.86);
   box-shadow: 0 14px 42px rgba(0, 0, 0, 0.28);
-  backdrop-filter: blur(16px);
 }
 
 .graph-overlay-main {
@@ -1058,7 +1057,6 @@ summary {
   margin: 0;
   transform: translate(-50%, -50%);
   background: rgba(7, 11, 24, 0.82);
-  backdrop-filter: blur(16px);
 }
 
 .graph-status {
