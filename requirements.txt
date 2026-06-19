@@ -1,6 +1,7 @@
 fastapi>=0.110
 uvicorn[standard]>=0.27
 litellm>=1.40
+tenacity>=8.0
 pydantic>=2.0
 # MCP server (exposes ask_codebase over streamable-http to other MCP clients).
 mcp>=1.20

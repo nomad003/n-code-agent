@@ -141,6 +141,15 @@ curl -X POST http://localhost:8900/ask \
 | `target_code/` | 示例/组合目标代码目录 |
 | `index/` | repo 索引、知识库和 profile 缓存 |
 
+## 评测
+
+```bash
+scripts/knowledge-eval.sh                         # 离线评测代码知识库召回/图谱关系
+scripts/eval.sh eval/dataset.real_user.jsonl       # 需要 LLM key，评测 /ask 回答质量
+```
+
+知识库评测不调用模型；`/ask` 回答质量评测会真实调用 agent。
+
 ## 演进计划
 
 1. **当前（方案 1）**：LLM + 实时代码搜索，每次查询走 tool call

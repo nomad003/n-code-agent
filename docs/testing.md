@@ -49,7 +49,28 @@ scripts/ask.sh "SceneMgr 有什么方法？"          # 经真实代理返回答
 
 若代理预算超限 / token 失效，`/ask` 会返回 **502**（`上游模型调用失败: ...`）而非 500 栈——这是预期的错误处理。
 
-## 质量评测（方向 E，需要可用代理 + key）
+## 代码知识库评测（离线）
+
+知识库评测不调 LLM，直接评估 `docs/code-knowledge/<repo>/`：
+
+```bash
+scripts/knowledge-eval.sh
+scripts/knowledge-eval.sh eval/knowledge.marvel.jsonl --top-k 5
+```
+
+它检查四件事：
+
+- 真实问题/日志是否在 top-K 或一跳知识关系扩展中命中预期知识卡。
+- 关键 frontmatter / 正文字段是否仍包含排查线索。
+- 预期语义关系是否存在，例如 `depends_on` / `part_of` / `supplements`。
+- 图谱是否有断开的 Markdown 链接或 frontmatter 关系。
+
+其中 `expect_top_card` 检查 raw top1 排序；`expect_cards` 检查有效命中集合：
+raw top-K + `links_to` / `part_of` / `depends_on` / `supplements` / `contradicts` / `supersedes` 一跳扩展。
+
+默认集 `eval/knowledge.marvel.jsonl` 覆盖怪物技能宕机日志、怪物配置、关卡刷怪、Buff、Role/CombatRole、XEcs 和语义关系完整性。
+
+## /ask 回答质量评测（方向 E，需要可用代理 + key）
 
 单元测试验证逻辑；**评测**衡量回答质量。评测集是 `{问题 → 期望文件/符号}` 的 JSONL：
 

@@ -1,0 +1,135 @@
+"""Tests for offline code-knowledge evaluation."""
+import json
+
+from code_agent import config
+from code_agent import knowledge_eval
+from code_agent import main
+
+
+def test_ranked_cards_hits_marvel_monster_card(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "CODE_REPOS", {})
+    monkeypatch.setattr(config, "CODE_REPO_DEFAULT", "marvel")
+    monkeypatch.setattr(config, "TARGET_CODE_PATH", str(tmp_path))
+
+    ranked = knowledge_eval.ranked_cards(
+        "怪物如何配置，怪物技能在哪里配？", repo="marvel"
+    )
+
+    assert ranked
+    assert ranked[0]["id"] == "monster-config.md"
+
+
+def test_evaluate_case_checks_fields_and_relations(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "PROJECT_ROOT", str(tmp_path))
+    monkeypatch.setattr(config, "CODE_REPOS", {})
+    monkeypatch.setattr(config, "CODE_REPO_DEFAULT", "marvel")
+    monkeypatch.setattr(config, "TARGET_CODE_PATH", str(tmp_path / "target"))
+
+    main.knowledge_save(
+        main.KnowledgeSaveRequest(
+            repo="marvel",
+            name="a.md",
+            content=(
+                "---\n"
+                "type: Code Module\n"
+                "title: A\n"
+                "description: A card\n"
+                "repo: marvel\n"
+                "tags: scene\n"
+                "symbols: SceneMgr\n"
+                "depends_on: b.md\n"
+                "updated_at: 2026-06-19\n"
+                "---\n\n# A\n\nSceneMgr 入口。\n"
+            ),
+        )
+    )
+    main.knowledge_save(
+        main.KnowledgeSaveRequest(
+            repo="marvel",
+            name="b.md",
+            content=(
+                "---\n"
+                "type: Code Module\n"
+                "title: B\n"
+                "description: B card\n"
+                "repo: marvel\n"
+                "tags: base\n"
+                "updated_at: 2026-06-19\n"
+                "---\n\n# B\n\nBase。\n"
+            ),
+        )
+    )
+
+    result = knowledge_eval.evaluate_case(
+        {
+            "repo": "marvel",
+            "question": "SceneMgr 场景",
+            "expect_top_card": "a.md",
+            "expect_cards": ["a.md"],
+            "expect_fields": [
+                {"card": "a.md", "field": "symbols", "contains": ["SceneMgr"]},
+                {"card": "a.md", "field": "body", "contains": ["SceneMgr"]},
+            ],
+            "expect_relations": [
+                {"source": "a.md", "relation": "depends_on", "target": "b.md"}
+            ],
+        }
+    )
+
+    assert result["passed"] is True
+
+
+def test_validate_repo_reports_broken_semantic_relation(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "PROJECT_ROOT", str(tmp_path))
+    monkeypatch.setattr(config, "CODE_REPOS", {})
+    monkeypatch.setattr(config, "CODE_REPO_DEFAULT", "marvel")
+    monkeypatch.setattr(config, "TARGET_CODE_PATH", str(tmp_path / "target"))
+
+    main.knowledge_save(
+        main.KnowledgeSaveRequest(
+            repo="marvel",
+            name="a.md",
+            content=(
+                "---\n"
+                "type: Code Module\n"
+                "title: A\n"
+                "description: A card\n"
+                "repo: marvel\n"
+                "depends_on: missing.md\n"
+                "updated_at: 2026-06-19\n"
+                "---\n\n# A\n"
+            ),
+        )
+    )
+
+    report = knowledge_eval.validate_repo("marvel")
+
+    assert report["valid"] is False
+    assert report["broken_relations"] == [
+        {"source": "a.md", "relation": "depends_on", "target": "missing.md"}
+    ]
+
+
+def test_evaluate_summary(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "CODE_REPOS", {})
+    monkeypatch.setattr(config, "CODE_REPO_DEFAULT", "marvel")
+    monkeypatch.setattr(config, "TARGET_CODE_PATH", str(tmp_path))
+    dataset = tmp_path / "knowledge.jsonl"
+    dataset.write_text(
+        json.dumps(
+            {
+                "repo": "marvel",
+                "question": "Buff 配置字段在哪里解析？BuffConfig XBuffContainer",
+                "expect_top_card": "buff-framework.md",
+                "expect_cards": ["buff-framework.md"],
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    summary = knowledge_eval.evaluate(str(dataset), validate=False)
+
+    assert summary["total"] == 1
+    assert summary["passed"] == 1

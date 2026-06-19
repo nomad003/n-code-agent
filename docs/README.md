@@ -10,7 +10,7 @@
 | [api.md](api.md) | HTTP 接口（`/ask`、`/health`）、CLI、脚本 |
 | [mcp.md](mcp.md) | MCP server 接入（`ask_codebase`，streamable-http） |
 | [code-knowledge-format.md](code-knowledge-format.md) | OKF-compatible 代码知识库规范、frontmatter 字段、卡片模板和落地计划 |
-| [testing.md](testing.md) | 测试运行方式、覆盖范围、端到端 verify |
+| [testing.md](testing.md) | 测试运行方式、知识库评测、/ask 回答质量评测、端到端 verify |
 | [deployment.md](deployment.md) | 部署、迁移、Git LFS、vendored CLI、常见问题 |
 | [roadmap.md](roadmap.md) | 已落地优化、舍弃的设计、后续可选方向 |
 
