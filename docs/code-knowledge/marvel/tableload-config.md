@@ -10,6 +10,8 @@ symbols: TableInit, SkillConfig, BuffConfig, SceneConfig, LevelConfig
 logs: not find, config, conf
 asserts: CHECK_COND
 question_types: outage_log, config_impl, feature_impl
+part_of: gameserver-overview.md
+supplements: gameserver-overview.md
 updated_at: 2026-06-18
 ---
 

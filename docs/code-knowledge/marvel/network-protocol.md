@@ -10,6 +10,8 @@ symbols: ClientLink, KcpLink, LinkListener
 logs: protocol, client, kcp
 asserts: CHECK_COND
 question_types: crash_stack, outage_log, feature_impl
+part_of: gameserver-overview.md
+supplements: role-framework.md, scene-framework.md
 updated_at: 2026-06-18
 ---
 

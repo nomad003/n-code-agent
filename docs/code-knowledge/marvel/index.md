@@ -20,3 +20,16 @@
 ## ECS
 
 * [XEcs 框架](xecs-framework.md) - component/system/utility 三层和 gameserver 集成点。
+
+## 关系维护规则
+
+知识卡片 frontmatter 支持五类语义关系：
+
+* `part_of`：模块/链路属于更上层框架，例如 `scene-framework.md` 属于 `gameserver-overview.md`。
+* `depends_on`：理解本卡前建议先读的基础卡，例如怪物配置链路依赖 tableload 与单位技能卡。
+* `supplements`：本卡补充另一张卡的细节、示例或排查路径。
+* `contradicts`：两张卡存在结论冲突时再填写，用于人工治理。
+* `supersedes`：本卡取代旧版卡时再填写，用于淘汰过期知识。
+
+当前 marvel 卡片已经使用 `part_of`、`depends_on`、`supplements` 建立模块关系。
+暂未发现真实冲突或旧版替换卡，因此没有写入 `contradicts` / `supersedes` 边。

@@ -10,6 +10,9 @@ symbols: Role, RoleMgr, CombatRole, RoleSkill
 logs: Role
 asserts: CHECK_COND
 question_types: crash_stack, outage_log, feature_impl, config_impl
+part_of: gameserver-overview.md
+depends_on: network-protocol.md, scene-framework.md, unit-skill-attr.md
+supplements: scene-framework.md, unit-skill-attr.md
 updated_at: 2026-06-18
 ---
 

@@ -10,6 +10,9 @@ symbols: CombatEnemy, SkillMgr, SkillCore, SkillConfig::GetEnemySkillConfigX
 logs: enemy conf skill, skill not find in conf, Check cond failed
 asserts: CHECK_COND(false)
 question_types: outage_log, config_impl, feature_impl
+part_of: unit-skill-attr.md
+depends_on: tableload-config.md, unit-skill-attr.md
+supplements: level-framework.md, ai-framework.md
 updated_at: 2026-06-18
 ---
 

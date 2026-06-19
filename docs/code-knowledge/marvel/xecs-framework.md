@@ -10,6 +10,8 @@ symbols: XInstance, XSkillSys, XStateSys, XMovement
 logs: XEcs
 asserts: CHECK_COND
 question_types: crash_stack, outage_log, feature_impl, config_impl
+depends_on: unit-skill-attr.md, combat-framework.md
+supplements: gameserver-overview.md, unit-skill-attr.md
 updated_at: 2026-06-18
 ---
 

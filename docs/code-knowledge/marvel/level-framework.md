@@ -10,6 +10,9 @@ symbols: Level, LevelSpawner, LevelMgr, CLuaLevelState, LevelEventHandler
 logs: LevelLogErr, Load script file failed
 asserts: CHECK_COND
 question_types: crash_stack, outage_log, feature_impl, config_impl
+part_of: gameserver-overview.md
+depends_on: scene-framework.md, tableload-config.md
+supplements: scene-framework.md
 updated_at: 2026-06-18
 ---
 

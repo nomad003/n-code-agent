@@ -10,6 +10,9 @@ symbols: XBuff, XBuffContainer, XBuffEffect, XBuffTrigger, BuffConfig
 logs: Buff
 asserts: CHECK_COND
 question_types: crash_stack, outage_log, feature_impl, config_impl
+part_of: gameserver-overview.md
+depends_on: tableload-config.md, unit-skill-attr.md, combat-framework.md
+supplements: unit-skill-attr.md, combat-framework.md
 updated_at: 2026-06-18
 ---
 

@@ -10,6 +10,9 @@ symbols: XCombat, TargetMgr, AttackerMgr, CombatEffect, BattleGroup
 logs: Combat
 asserts: CHECK_COND
 question_types: crash_stack, outage_log, feature_impl
+part_of: gameserver-overview.md
+depends_on: unit-skill-attr.md
+supplements: unit-skill-attr.md
 updated_at: 2026-06-18
 ---
 

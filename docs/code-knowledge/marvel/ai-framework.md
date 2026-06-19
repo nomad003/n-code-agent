@@ -10,6 +10,9 @@ symbols: AIUnitAgent, AISceneAgent, AISquadAgent, AILaunchCore
 logs: AI
 asserts: CHECK_COND
 question_types: crash_stack, outage_log, feature_impl, config_impl
+part_of: gameserver-overview.md
+depends_on: tableload-config.md, unit-skill-attr.md, combat-framework.md
+supplements: monster-config.md, combat-framework.md
 updated_at: 2026-06-18
 ---
 
