@@ -552,7 +552,9 @@
         });
 
         const maxRadius = Math.min(width, height) * 0.45;
-        const xScale = 1.38;
+        const contentRadius = maxRadius * 0.82;
+        const tagRadius = maxRadius * 0.9;
+        const xScale = 1.32;
         const homes = {};
 
         function radialPosition(angle, radius) {
@@ -570,6 +572,18 @@
           const scale = maxRadius / Math.max(radius, 1);
           pos.x = centerX + dx * scale * xScale;
           pos.y = centerY + dy * scale;
+        }
+
+        function cloudRadius(node, focus, layer) {
+          const depth = Math.pow(stableRandom(node.id, "cloud-depth"), 0.82);
+          const innerBias = stableRandom(node.id, "cloud-inner");
+          const degreeBias = (1 - focus) * 52;
+          const rankBias = Math.pow(layer, 0.7) * 48;
+          const centerPull = innerBias < 0.24 ? -46 : innerBias > 0.88 ? 32 : 0;
+          return Math.max(
+            34,
+            Math.min(contentRadius, 46 + depth * 128 + degreeBias + rankBias + centerPull)
+          );
         }
 
         const groupMap = new Map();
@@ -595,16 +609,13 @@
             const focus = Math.min(degree[node.id] || 0, 10) / 10;
             const layer = index / Math.max(1, groupNodes.length - 1);
             const angle = groupKeys.length > 1
-              ? baseAngle + (index - (groupNodes.length - 1) / 2) * 0.16 + (stableRandom(node.id, "theta") - 0.5) * 0.34
+              ? baseAngle + (index - (groupNodes.length - 1) / 2) * 0.13 + (stableRandom(node.id, "theta") - 0.5) * 0.44
               : (Math.PI * 2 * index) / Math.max(1, groupNodes.length) + (stableRandom(node.id, "theta") - 0.5) * 0.28;
-            const radius = Math.min(
-              maxRadius,
-              36 + (1 - focus) * 118 + layer * 140 + stableRandom(node.id, "radius") * 46
-            );
+            const radius = cloudRadius(node, focus, layer);
             homes[node.id] = radialPosition(angle, radius);
             positions[node.id] = {
-              x: homes[node.id].x + (stableRandom(node.id, "home-x") - 0.5) * 18,
-              y: homes[node.id].y + (stableRandom(node.id, "home-y") - 0.5) * 18,
+              x: homes[node.id].x + (stableRandom(node.id, "home-x") - 0.5) * 28,
+              y: homes[node.id].y + (stableRandom(node.id, "home-y") - 0.5) * 28,
             };
             clampRadial(positions[node.id]);
             velocity[node.id] = { x: 0, y: 0 };
@@ -625,7 +636,7 @@
           const anchorAngle = Math.atan2(anchor.y - centerY, (anchor.x - centerX) / xScale);
           const anchorRadius = Math.sqrt(Math.pow((anchor.x - centerX) / xScale, 2) + Math.pow(anchor.y - centerY, 2));
           const angle = anchorAngle + (stableRandom(node.id, "tag-angle") - 0.5) * 0.42;
-          const radius = Math.min(maxRadius, anchorRadius + 46 + stableRandom(node.id, "tag-radius") * 72);
+          const radius = Math.min(tagRadius, anchorRadius + 20 + stableRandom(node.id, "tag-radius") * 54);
           homes[node.id] = radialPosition(angle, radius);
           positions[node.id] = {
             x: homes[node.id].x + (stableRandom(node.id, "tag-x") - 0.5) * 12,
@@ -638,7 +649,7 @@
         nodes.forEach((node) => {
           if (!positions[node.id]) {
             const angle = stableRandom(node.id, "fallback-angle") * Math.PI * 2;
-            const radius = 70 + stableRandom(node.id, "fallback-radius") * (maxRadius - 70);
+            const radius = 54 + stableRandom(node.id, "fallback-radius") * (contentRadius - 54);
             homes[node.id] = radialPosition(angle, radius);
             positions[node.id] = { ...homes[node.id] };
             velocity[node.id] = { x: 0, y: 0 };
@@ -651,7 +662,7 @@
           nodes.forEach((node) => {
             const pos = positions[node.id];
             const home = homes[node.id] || { x: centerX, y: centerY };
-            const homePull = node.kind === "concept" ? 0.022 : 0.03;
+            const homePull = node.kind === "concept" ? 0.018 : 0.026;
             force[node.id] = {
               x: (home.x - pos.x) * homePull,
               y: (home.y - pos.y) * homePull,
@@ -666,7 +677,7 @@
               const dx = pa.x - pb.x;
               const dy = pa.y - pb.y;
               const dist2 = Math.max(dx * dx + dy * dy, 120);
-              const strength = (a.kind === "tag" || b.kind === "tag") ? 850 : 1500;
+              const strength = (a.kind === "tag" || b.kind === "tag") ? 650 : 1150;
               const push = (strength / dist2) * (0.45 + alpha * 0.55);
               force[a.id].x += dx * push;
               force[a.id].y += dy * push;
