@@ -20,8 +20,17 @@ def test_knowledge_page_smoke():
     html = main.knowledge_page().body.decode("utf-8")
     assert "Code Agent Workbench" in html
     assert "/knowledge/api" in html
-    assert "调查" in html and "复盘" in html and "知识" in html
+    assert "/knowledge/graph" in html
+    assert "调查" in html and "复盘" in html and "知识" in html and "图谱" in html
     assert "markdown-preview" in html
+    assert "brand-mark" not in html
+
+
+def test_knowledge_graph_page_smoke():
+    html = main.knowledge_graph_page().body.decode("utf-8")
+    assert "Code Agent Workbench" in html
+    assert "知识图谱" in html
+    assert "graph-canvas" in html
 
 
 def test_knowledge_save_list_read(knowledge_env):

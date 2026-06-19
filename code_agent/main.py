@@ -306,6 +306,11 @@ def knowledge_page() -> HTMLResponse:
     return _frontend_app()
 
 
+@app.get("/knowledge/graph", response_class=HTMLResponse)
+def knowledge_graph_page() -> HTMLResponse:
+    return _frontend_app()
+
+
 @app.get("/knowledge/api")
 def knowledge_list(repo: str | None = None) -> dict:
     repo_name = _resolve_request_repo(repo)

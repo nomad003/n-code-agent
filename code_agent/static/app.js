@@ -21,6 +21,7 @@
 
   function pathToView(pathname) {
     if (pathname.indexOf("/admin/llm-traces") === 0) return "traces";
+    if (pathname.indexOf("/knowledge/graph") === 0) return "graph";
     if (pathname.indexOf("/knowledge") === 0) return "knowledge";
     return "ask";
   }
@@ -196,11 +197,13 @@
     computed: {
       viewTitle() {
         if (this.view === "traces") return "调用复盘";
+        if (this.view === "graph") return "知识图谱";
         if (this.view === "knowledge") return "知识工作台";
         return "代码调查";
       },
       viewSubtitle() {
         if (this.view === "traces") return "沿着每轮模型输入、工具调用和最终回答复盘证据链。";
+        if (this.view === "graph") return "按模块、标签和沉淀知识关系查看代码知识网络。";
         if (this.view === "knowledge") return "维护模块地图、排查手册和可被问答自动召回的沉淀知识。";
         return "把 crash 堆栈、宕机日志、功能实现和配置实现放进同一个调查台。";
       },
@@ -320,8 +323,13 @@
         this.$nextTick(() => this.syncSidebarClass());
       },
       activateView() {
+        if (this.view !== "graph") this.destroyKnowledgeGraphVis();
         if (this.view === "traces" && !this.traceFiles.length) this.loadTraces();
-        if (this.view === "knowledge" && this.selectedRepo) this.loadKnowledge();
+        if (this.view === "knowledge" && this.selectedRepo) {
+          if (this.knowledge.mode === "graph") this.knowledge.mode = "cards";
+          this.loadKnowledge();
+        }
+        if (this.view === "graph" && this.selectedRepo) this.loadKnowledgeGraph();
       },
       async loadRepos() {
         await this.withLoading("加载仓库", async () => {
@@ -400,7 +408,6 @@
           if (this.knowledge.cards.length && !this.knowledge.name) {
             await this.loadCard(this.knowledge.cards[0].name);
           }
-          if (this.knowledge.mode === "graph") await this.loadKnowledgeGraph();
           if (this.knowledge.mode === "qa") await this.loadKnowledgeQa();
         });
       },
@@ -439,7 +446,6 @@
       },
       async setKnowledgeMode(mode) {
         this.knowledge.mode = mode;
-        if (mode === "graph") await this.loadKnowledgeGraph();
         if (mode === "qa") await this.loadKnowledgeQa();
       },
       graphGroupForNode(node) {
@@ -809,7 +815,10 @@
         network.on("doubleClick", (params) => {
           const id = params.nodes && params.nodes[0];
           const node = id ? nodes.get(id) : null;
-          if (node && node.kind === "concept") this.loadCard(node.id);
+          if (node && node.kind === "concept") {
+            this.go("knowledge", "/knowledge");
+            this.loadCard(node.id);
+          }
         });
         network.on("stabilizationIterationsDone", () => {
           network.fit({ animation: { duration: 600, easingFunction: "easeInOutQuad" } });

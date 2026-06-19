@@ -87,29 +87,10 @@ body {
 }
 
 .brand {
-  position: relative;
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
-  gap: 10px;
-  align-items: center;
+  display: block;
   min-height: 54px;
-  padding: 2px 32px 13px 2px;
+  padding: 2px 2px 13px;
   border-bottom: 1px solid var(--border);
-}
-
-.brand-mark {
-  width: 42px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--border-hi);
-  border-radius: var(--r-sm);
-  background: linear-gradient(180deg, var(--surface-3), var(--surface));
-  color: var(--blue-hi);
-  box-shadow: 0 0 0 3px var(--blue-dim), 0 10px 28px rgba(0, 0, 0, 0.25);
-  font-family: var(--mono);
-  font-weight: 800;
-  font-size: 12px;
 }
 
 .brand-copy {
@@ -132,12 +113,8 @@ body {
 }
 
 .sidebar-toggle {
-  position: absolute;
-  top: 10px;
-  right: 2px;
-  z-index: 30;
-  width: 30px;
-  height: 30px;
+  width: 100%;
+  min-height: 36px;
   padding: 0;
   display: grid;
   place-items: center;
@@ -269,20 +246,16 @@ small {
   overflow-wrap: anywhere;
 }
 
+.side-note + .sidebar-toggle {
+  margin-top: 8px;
+}
+
 #app.sidebar-collapsed .sidebar {
   padding: 18px 8px;
 }
 
 #app.sidebar-collapsed .brand {
-  grid-template-columns: 34px;
-  min-height: 82px;
-  padding-right: 0;
-}
-
-#app.sidebar-collapsed .brand-mark {
-  width: 34px;
-  height: 34px;
-  font-size: 10px;
+  display: none;
 }
 
 #app.sidebar-collapsed .brand-copy,
@@ -292,8 +265,7 @@ small {
 }
 
 #app.sidebar-collapsed .sidebar-toggle {
-  right: 2px;
-  top: 46px;
+  margin-top: auto;
 }
 
 #app.sidebar-collapsed .nav button {
@@ -585,7 +557,7 @@ summary {
 
 .segmented {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 4px;
   padding: 3px;
   border: 1px solid var(--border);
@@ -938,6 +910,25 @@ summary {
   background: var(--graph-bg);
 }
 
+.graph-page {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.graph-panel .graph-wrap {
+  height: min(760px, calc(100vh - 260px));
+}
+
+.graph-head-actions {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.graph-head-actions label {
+  min-width: 150px;
+}
+
 .graph-empty {
   margin: 14px;
 }
@@ -1042,21 +1033,16 @@ summary {
   }
 
   .brand {
-    grid-template-columns: 34px minmax(0, 1fr);
     min-height: 82px;
     border-bottom: 1px solid var(--border);
-    padding: 2px 34px 13px 0;
+    padding: 2px 2px 13px 0;
   }
 
   #app.sidebar-collapsed .brand {
-    grid-template-columns: 34px;
     padding-right: 0;
   }
 
   .sidebar-toggle {
-    position: absolute;
-    top: 46px;
-    right: 2px;
     display: grid;
   }
 
@@ -1080,13 +1066,6 @@ summary {
   #app.sidebar-collapsed .nav-text,
   #app.sidebar-collapsed .side-note {
     display: none;
-  }
-
-  .brand-mark,
-  #app.sidebar-collapsed .brand-mark {
-    width: 34px;
-    height: 34px;
-    font-size: 10px;
   }
 
   .two-col,
@@ -1126,7 +1105,7 @@ summary {
   }
 
   #app.sidebar-collapsed .nav {
-    grid-template-columns: repeat(3, 38px);
+    grid-template-columns: 1fr;
   }
 
   h1 {
