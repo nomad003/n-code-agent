@@ -112,6 +112,44 @@
     return html.join("\n") || '<p class="empty">选择或新建一个知识卡片。</p>';
   }
 
+  function hashString(text) {
+    let hash = 2166136261;
+    for (const char of String(text || "")) {
+      hash ^= char.charCodeAt(0);
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+  }
+
+  function stableRandom(id, salt) {
+    let seed = hashString(String(id) + ":" + String(salt));
+    seed += 0x6d2b79f5;
+    let value = seed;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  }
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function readSidebarCollapsed() {
+    try {
+      return window.localStorage.getItem("code-agent.sidebarCollapsed") === "1";
+    } catch (_err) {
+      return false;
+    }
+  }
+
+  function saveSidebarCollapsed(value) {
+    try {
+      window.localStorage.setItem("code-agent.sidebarCollapsed", value ? "1" : "0");
+    } catch (_err) {
+      // Local storage can be disabled in embedded browsers; the current session still works.
+    }
+  }
+
   const app = Vue.createApp({
     data() {
       return {
@@ -120,7 +158,7 @@
         loading: false,
         statusText: "就绪",
         shell: {
-          sidebarCollapsed: false,
+          sidebarCollapsed: readSidebarCollapsed(),
         },
         defaultRepo: "",
         repos: [],
@@ -250,7 +288,7 @@
             ...node,
             x: Math.round(pos.x),
             y: Math.round(pos.y),
-            radius: node.kind === "concept" ? 18 + Math.min((node.tags || []).length, 8) : 11,
+            radius: node.kind === "concept" ? 10 + Math.min((node.tags || []).length, 6) : 5.5,
             active,
             dim: Boolean(query && !matches && !linked.has(node.id)),
           };
@@ -342,6 +380,10 @@
         history.pushState({}, "", path);
         this.view = view;
         this.activateView();
+      },
+      toggleSidebar() {
+        this.shell.sidebarCollapsed = !this.shell.sidebarCollapsed;
+        saveSidebarCollapsed(this.shell.sidebarCollapsed);
       },
       activateView() {
         if (this.view === "traces" && !this.traceFiles.length) this.loadTraces();
@@ -492,30 +534,79 @@
         const nodes = this.knowledge.graph.nodes || [];
         const edges = this.knowledge.graph.edges || [];
         const positions = {};
-        const width = 960;
-        const height = 560;
+        const velocity = {};
+        const degree = {};
+        const neighbours = {};
+        const width = 1120;
+        const height = 680;
         const centerX = width / 2;
         const centerY = height / 2;
         const concepts = nodes.filter((node) => node.kind === "concept");
         const tags = nodes.filter((node) => node.kind === "tag");
-        concepts.forEach((node, index) => {
-          const angle = (Math.PI * 2 * index) / Math.max(1, concepts.length);
-          positions[node.id] = {
-            x: centerX + Math.cos(angle) * 180,
-            y: centerY + Math.sin(angle) * 150,
-          };
+
+        nodes.forEach((node) => {
+          degree[node.id] = 0;
+          neighbours[node.id] = [];
         });
-        tags.forEach((node, index) => {
-          const angle = (Math.PI * 2 * index) / Math.max(1, tags.length);
-          positions[node.id] = {
-            x: centerX + Math.cos(angle) * 320,
-            y: centerY + Math.sin(angle) * 230,
-          };
+        edges.forEach((edge) => {
+          if (degree[edge.source] !== undefined) degree[edge.source] += 1;
+          if (degree[edge.target] !== undefined) degree[edge.target] += 1;
+          if (neighbours[edge.source]) neighbours[edge.source].push(edge.target);
+          if (neighbours[edge.target]) neighbours[edge.target].push(edge.source);
         });
-        for (let tick = 0; tick < 140; tick += 1) {
+
+        concepts.forEach((node) => {
+          const focus = Math.min(degree[node.id] || 0, 9) / 9;
+          const spreadX = width * (0.78 - focus * 0.24);
+          const spreadY = height * (0.72 - focus * 0.2);
+          positions[node.id] = {
+            x: centerX + (stableRandom(node.id, "x") - 0.5) * spreadX,
+            y: centerY + (stableRandom(node.id, "y") - 0.5) * spreadY,
+          };
+          velocity[node.id] = { x: 0, y: 0 };
+        });
+
+        tags.forEach((node) => {
+          const linkedConcepts = (neighbours[node.id] || [])
+            .map((id) => positions[id])
+            .filter(Boolean);
+          const anchor = linkedConcepts.length
+            ? linkedConcepts.reduce((acc, pos) => ({ x: acc.x + pos.x, y: acc.y + pos.y }), { x: 0, y: 0 })
+            : { x: centerX, y: centerY };
+          if (linkedConcepts.length) {
+            anchor.x /= linkedConcepts.length;
+            anchor.y /= linkedConcepts.length;
+          }
+          const drift = 110 + stableRandom(node.id, "radius") * 120;
+          const angle = stableRandom(node.id, "angle") * Math.PI * 2;
+          positions[node.id] = {
+            x: anchor.x + Math.cos(angle) * drift,
+            y: anchor.y + Math.sin(angle) * drift,
+          };
+          velocity[node.id] = { x: 0, y: 0 };
+        });
+
+        nodes.forEach((node) => {
+          if (!positions[node.id]) {
+            positions[node.id] = {
+              x: centerX + (stableRandom(node.id, "fallback-x") - 0.5) * width * 0.7,
+              y: centerY + (stableRandom(node.id, "fallback-y") - 0.5) * height * 0.65,
+            };
+            velocity[node.id] = { x: 0, y: 0 };
+          }
+        });
+
+        for (let tick = 0; tick < 260; tick += 1) {
+          const alpha = 1 - tick / 260;
           const force = {};
           nodes.forEach((node) => {
-            force[node.id] = { x: (centerX - positions[node.id].x) * 0.002, y: (centerY - positions[node.id].y) * 0.002 };
+            const pos = positions[node.id];
+            const focus = Math.min(degree[node.id] || 0, 10) / 10;
+            const centerPull = node.kind === "concept" ? 0.0016 + focus * 0.0018 : 0.0008;
+            force[node.id] = {
+              x: (centerX - pos.x) * centerPull,
+              y: (centerY - pos.y) * centerPull,
+            };
           });
           for (let i = 0; i < nodes.length; i += 1) {
             for (let j = i + 1; j < nodes.length; j += 1) {
@@ -525,9 +616,9 @@
               const pb = positions[b.id];
               const dx = pa.x - pb.x;
               const dy = pa.y - pb.y;
-              const dist2 = Math.max(dx * dx + dy * dy, 80);
-              const strength = (a.kind === "tag" || b.kind === "tag") ? 900 : 1500;
-              const push = strength / dist2;
+              const dist2 = Math.max(dx * dx + dy * dy, 120);
+              const strength = (a.kind === "tag" || b.kind === "tag") ? 2600 : 4200;
+              const push = (strength / dist2) * (0.45 + alpha * 0.55);
               force[a.id].x += dx * push;
               force[a.id].y += dy * push;
               force[b.id].x -= dx * push;
@@ -540,9 +631,9 @@
             if (!source || !target) continue;
             const dx = target.x - source.x;
             const dy = target.y - source.y;
-            const desired = edge.relation === "links_to" ? 145 : 105;
+            const desired = edge.relation === "links_to" ? 205 : 145;
             const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-            const pull = (dist - desired) * 0.006;
+            const pull = (dist - desired) * (edge.relation === "links_to" ? 0.0048 : 0.0034);
             const fx = (dx / dist) * pull;
             const fy = (dy / dist) * pull;
             force[edge.source].x += fx;
@@ -552,8 +643,13 @@
           }
           nodes.forEach((node) => {
             const pos = positions[node.id];
-            pos.x = Math.max(35, Math.min(width - 35, pos.x + force[node.id].x));
-            pos.y = Math.max(35, Math.min(height - 35, pos.y + force[node.id].y));
+            const wobble = node.kind === "concept" ? 0.09 : 0.05;
+            force[node.id].x += (stableRandom(node.id, "wx" + (tick % 19)) - 0.5) * wobble * alpha;
+            force[node.id].y += (stableRandom(node.id, "wy" + (tick % 23)) - 0.5) * wobble * alpha;
+            velocity[node.id].x = (velocity[node.id].x + force[node.id].x) * 0.72;
+            velocity[node.id].y = (velocity[node.id].y + force[node.id].y) * 0.72;
+            pos.x = clamp(pos.x + velocity[node.id].x, 38, width - 38);
+            pos.y = clamp(pos.y + velocity[node.id].y, 38, height - 38);
           });
         }
         this.knowledge.graphPositions = positions;

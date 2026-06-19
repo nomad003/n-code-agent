@@ -17,7 +17,7 @@
           <div class="brand-title">Code Agent Workbench</div>
           <div class="brand-subtitle">代码调查 / 调用复盘 / 知识沉淀</div>
         </div>
-        <button class="sidebar-toggle" type="button" @click="shell.sidebarCollapsed = !shell.sidebarCollapsed" :aria-label="shell.sidebarCollapsed ? '展开边栏' : '收起边栏'" :title="shell.sidebarCollapsed ? '展开边栏' : '收起边栏'">
+        <button class="sidebar-toggle" type="button" @click="toggleSidebar" :aria-pressed="shell.sidebarCollapsed" :aria-label="shell.sidebarCollapsed ? '展开边栏' : '收起边栏'" :title="shell.sidebarCollapsed ? '展开边栏' : '收起边栏'">
           <span>{{ shell.sidebarCollapsed ? '>' : '<' }}</span>
         </button>
       </div>
@@ -226,7 +226,7 @@
           <div class="graph-stage">
             <div class="graph-wrap">
               <div class="notice" v-if="!graphNodes.length">当前仓库没有可展示的知识图谱节点。请切换到 {{ defaultRepo || '默认聚合仓库' }}，或先新增知识卡片。</div>
-              <svg viewBox="0 0 960 560" role="img" aria-label="知识图谱" @wheel.prevent="zoomGraph" @pointerdown.self="panGraphStart" @pointermove="moveGraphPointer" @pointerup="endGraphPointer" @pointerleave="endGraphPointer">
+              <svg viewBox="0 0 1120 680" role="img" aria-label="知识图谱" @wheel.prevent="zoomGraph" @pointerdown.self="panGraphStart" @pointermove="moveGraphPointer" @pointerup="endGraphPointer" @pointerleave="endGraphPointer">
                 <g :transform="'translate(' + knowledge.graphView.x + ',' + knowledge.graphView.y + ') scale(' + knowledge.graphView.scale + ')'">
                   <line v-for="edge in graphEdges" :key="edge.id" :x1="edge.x1" :y1="edge.y1" :x2="edge.x2" :y2="edge.y2" :class="'edge ' + edge.relation + (edge.dim ? ' dim' : '')"></line>
                   <g v-for="node in graphNodes" :key="node.id" :transform="'translate(' + node.x + ',' + node.y + ')'" :class="'graph-node ' + (node.active ? 'active' : '') + (node.dim ? ' dim' : '')" @pointerdown.stop="startNodeDrag(node, $event)" @click.stop="selectGraphNode(node)">
@@ -252,7 +252,7 @@
               <small>{{ node.id }} · {{ node.type }}</small>
             </button>
           </div>
-          <div class="hint">圆点是知识概念，浅色小点是标签；实线表示 Markdown 内部链接，虚线表示标签关系。</div>
+          <div class="hint">拖拽空白处移动画布，滚轮缩放；节点采用松散力导向布局，实线表示 Markdown 内部链接，虚线表示标签关系。</div>
         </div>
 
         <div v-if="knowledge.mode === 'qa'" class="panel qa-panel">
