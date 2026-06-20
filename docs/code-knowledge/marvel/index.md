@@ -25,12 +25,13 @@ updated_at: 2026-06-20
 
 - [gameserver 核心战斗总体框架](gameserver-combat-core-overview.md)
 - [Unit 通用层](unit-framework.md)
+- [Enemy 层](enemy-framework.md)
 
 ## 后续拆分
 
 - 场景与 SceneBattle
 - 关卡 Level / LevelSpawner / 刷怪
-- CombatEnemy / CombatRole 派生层
+- CombatRole 派生层
 - SkillMgr / SkillCore / SkillConfig
 - XBuffContainer / BuffConfig / Buff effect
 - AIAgent / AIUnitAgent / AI 节点

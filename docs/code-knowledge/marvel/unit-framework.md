@@ -225,3 +225,4 @@ updated_at: 2026-06-20
 ## 相关卡片
 
 - [gameserver 核心战斗总体框架](gameserver-combat-core-overview.md)
+- [Enemy 层](enemy-framework.md)
