@@ -110,6 +110,96 @@
     return row.answer || row.content || row.text || row.output || row.error || "";
   }
 
+  function compactText(value, limit = 260) {
+    const text = String(value || "").replace(/\s+/g, " ").trim();
+    if (!text) return "";
+    return text.length > limit ? text.slice(0, limit - 1) + "..." : text;
+  }
+
+  function clipText(value, limit = 3600) {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    return text.length > limit ? text.slice(0, limit - 1) + "..." : text;
+  }
+
+  function asPrettyJson(value, limit = 3600) {
+    if (value === undefined || value === null || value === "") return "";
+    let text = "";
+    if (typeof value === "string") {
+      try {
+        text = JSON.stringify(JSON.parse(value), null, 2);
+      } catch (_err) {
+        text = value;
+      }
+    } else {
+      text = JSON.stringify(value, null, 2);
+    }
+    return text.length > limit ? text.slice(0, limit - 1) + "..." : text;
+  }
+
+  function messageContent(message) {
+    const content = message && message.content;
+    if (typeof content === "string") return content;
+    if (Array.isArray(content)) {
+      return content
+        .map((part) => (typeof part === "string" ? part : part.text || ""))
+        .filter(Boolean)
+        .join("\n");
+    }
+    return "";
+  }
+
+  function rowText(row) {
+    if (!row) return "";
+    if (row.message) return messageContent(row.message);
+    if (row.result && typeof row.result === "string") return row.result;
+    return eventText(row);
+  }
+
+  function rowToolName(row) {
+    if (!row) return "";
+    if (row.name || row.tool || row.function) return row.name || row.tool || row.function;
+    const calls = row.message && row.message.tool_calls;
+    if (Array.isArray(calls) && calls.length) {
+      return calls
+        .map((call) => (call.function && call.function.name) || call.name || "")
+        .filter(Boolean)
+        .join(", ");
+    }
+    return "";
+  }
+
+  function rowToolCalls(row) {
+    const calls = row && row.message && row.message.tool_calls;
+    if (!Array.isArray(calls)) return [];
+    return calls.map((call, index) => ({
+      key: `${row.round || "r"}-call-${index}`,
+      event: "tool_call",
+      name: (call.function && call.function.name) || call.name || "tool",
+      arguments: asPrettyJson((call.function && call.function.arguments) || call.input || call.arguments),
+      result: "",
+      is_error: false,
+    }));
+  }
+
+  function traceDuration(rows) {
+    if (!rows.length) return "";
+    const first = Date.parse(rows[0].ts || "");
+    const last = Date.parse(rows[rows.length - 1].ts || "");
+    if (!Number.isFinite(first) || !Number.isFinite(last) || last < first) return "";
+    const ms = last - first;
+    if (ms < 1000) return `${ms}ms`;
+    return `${(ms / 1000).toFixed(ms < 10000 ? 1 : 0)}s`;
+  }
+
+  function formatBytesValue(size) {
+    const value = Number(size || 0);
+    if (!value) return "0 B";
+    if (value < 1024) return `${value} B`;
+    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+    return `${(value / 1024 / 1024).toFixed(1)} MB`;
+  }
+
   function escapeHtml(text) {
     return String(text || "")
       .replace(/&/g, "&amp;")
@@ -273,6 +363,7 @@
         traceFiles: [],
         selectedTrace: "",
         traceRows: [],
+        traceOpenRounds: {},
         knowledge: {
           mode: "cards",
           cards: [],
@@ -319,34 +410,98 @@
       tracePretty() {
         return this.traceRows.map((row) => JSON.stringify(row, null, 2)).join("\n");
       },
+      selectedTraceFile() {
+        return this.traceFiles.find((file) => file.file === this.selectedTrace) || {};
+      },
+      traceHeader() {
+        const rows = this.traceRows || [];
+        const first = rows[0] || {};
+        const file = this.selectedTraceFile;
+        return {
+          file: file.file || this.selectedTrace || first.request_id || "",
+          question: file.question || first.question || "",
+          mode: file.mode || first.mode || "",
+          backend: file.backend || first.backend || "",
+          model: file.model || first.model || "",
+          size: file.size || 0,
+          eventCount: rows.length,
+        };
+      },
       traceSummary() {
         const rows = this.traceRows || [];
+        const isRoundStart = (row) => row.event === "llm_request" || row.event === "sdk_request";
+        const isToolEvent = (row) => (
+          row.event === "tool_result"
+          || row.event === "sdk_tool_use"
+          || row.event === "tool_call"
+          || Boolean(row.tool || row.name)
+        );
         const llmRequests = rows.filter((row) => row.event === "llm_request");
         const llmResponses = rows.filter((row) => row.event === "llm_response");
-        const toolRows = rows.filter((row) => row.event === "tool_call" || row.tool || row.name);
-        const rounds = Math.max(llmRequests.length, llmResponses.length);
-        const roundDetails = [];
+        const toolRows = rows.filter(isToolEvent);
+        const anchors = rows
+          .map((row, index) => ({ row, index }))
+          .filter((item) => isRoundStart(item.row));
+        const hasModelRequest = Boolean(anchors.length);
+        if (!anchors.length && rows.length) anchors.push({ row: rows[0], index: 0 });
 
-        for (let i = 0; i < Math.max(1, rounds); i += 1) {
-          const start = llmRequests[i] ? rows.indexOf(llmRequests[i]) : 0;
-          const end = llmRequests[i + 1] ? rows.indexOf(llmRequests[i + 1]) : rows.length;
-          const slice = rows.slice(start, end);
-          const tools = slice
-            .map((row) => row.tool || row.name || row.function || "")
-            .filter(Boolean);
-          const response = llmResponses[i] || slice.find((row) => row.event === "final_answer") || {};
-          roundDetails.push({
-            id: i + 1,
-            tools: Array.from(new Set(tools)),
-            answer: eventText(response),
+        const roundDetails = anchors.map((anchor, i) => {
+          const end = anchors[i + 1] ? anchors[i + 1].index : rows.length;
+          const slice = rows.slice(anchor.index, end);
+          const request = slice.find(isRoundStart) || {};
+          const messages = Array.isArray(request.messages) ? request.messages : [];
+          const userMessage = [...messages].reverse().find((message) => message.role === "user");
+          const toolRequests = slice.flatMap(rowToolCalls);
+          const toolResults = slice
+            .filter((row) => row.event === "tool_result" || row.event === "sdk_tool_use" || row.event === "tool_call")
+            .map((row, index) => ({
+              key: `${anchor.index}-${index}-${row.name || row.event}`,
+              event: row.event || "tool_result",
+              name: rowToolName(row) || "tool",
+              arguments: asPrettyJson(row.arguments || row.input || row.raw_arguments, 1400),
+              result: clipText(row.result || row.content || row.output || row.error || "", 2600),
+              is_error: Boolean(row.is_error || row.error),
+            }));
+          const responseRows = slice.filter((row) => (
+            row.event === "llm_response"
+            || row.event === "llm_error"
+            || row.event === "sdk_text"
+            || row.event === "sdk_result"
+            || row.event === "final_answer"
+            || row.event === "request_end"
+            || row.event === "shortcut"
+            || row.event === "cache_hit"
+          ));
+          const answerParts = [];
+          responseRows.forEach((row) => {
+            const text = clipText(rowText(row), 3600);
+            if (text && !answerParts.includes(text)) answerParts.push(text);
           });
-        }
+          const tools = Array.from(new Set(
+            [...toolRequests, ...toolResults]
+              .map((item) => item.name)
+              .filter(Boolean)
+          ));
+          return {
+            id: request.round || anchor.row.round || i + 1,
+            events: slice.length,
+            duration: traceDuration(slice),
+            model: request.model || anchor.row.model || this.traceHeader.model,
+            messageCount: messages.length || (request.prompt ? 1 : 0),
+            withTools: request.with_tools === true ? "开启" : request.with_tools === false ? "关闭" : "-",
+            userPrompt: clipText(messageContent(userMessage) || request.prompt || this.traceHeader.question, 1800),
+            tools,
+            toolResults: [...toolRequests, ...toolResults],
+            answer: answerParts.join("\n\n"),
+            raw: slice.map((row) => JSON.stringify(row, null, 2)).join("\n"),
+          };
+        });
 
         const findings = [];
         if (!rows.length) {
           findings.push("请选择一个 trace 文件。");
         } else {
-          if (!llmRequests.length) findings.push("没有记录 llm_request，无法复盘提示词输入。");
+          if (!hasModelRequest) findings.push("没有记录模型请求事件，无法复盘提示词输入。");
           if (!toolRows.length) findings.push("没有工具调用记录，复杂代码问题可能缺少代码检索证据。");
           if (!rows.some((row) => row.event === "request_end" || row.event === "final_answer")) {
             findings.push("没有看到 request_end/final_answer，确认请求是否中途失败。");
@@ -355,7 +510,7 @@
         }
 
         return {
-          rounds,
+          rounds: roundDetails.length,
           tools: toolRows.length,
           findings,
           roundDetails,
@@ -441,6 +596,26 @@
         this.syncThemeClass();
         this.$nextTick(() => this.refreshGraphTheme());
       },
+      shortQuestion(question) {
+        return compactText(question || "无问题文本", 96);
+      },
+      traceFileMeta(file) {
+        return [
+          file.mode || "mode -",
+          file.backend || "backend -",
+          file.last_event || "event -",
+          file.last_ts || file.mtime || "",
+        ].filter(Boolean).join(" · ");
+      },
+      formatBytes(size) {
+        return formatBytesValue(size);
+      },
+      isTraceRoundOpen(id) {
+        return this.traceOpenRounds[id] === true;
+      },
+      setTraceRoundOpen(id, open) {
+        this.traceOpenRounds = { ...this.traceOpenRounds, [id]: open };
+      },
       activateView() {
         if (this.view !== "graph") this.destroyKnowledgeGraphVis();
         if (this.view === "traces" && !this.traceFiles.length) this.loadTraces();
@@ -517,6 +692,13 @@
           const data = await this.apiJson("/admin/llm-traces/api/" + encodeURIComponent(file));
           this.selectedTrace = file;
           this.traceRows = data.rows || [];
+          const roundIds = this.traceRows
+            .filter((row) => row.event === "llm_request" || row.event === "sdk_request")
+            .map((row, index) => row.round || index + 1);
+          if (!roundIds.length && this.traceRows.length) roundIds.push(1);
+          this.traceOpenRounds = Object.fromEntries(
+            roundIds.map((id, index) => [id, index === 0])
+          );
         });
       },
       async loadKnowledge() {

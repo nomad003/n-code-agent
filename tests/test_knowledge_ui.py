@@ -35,6 +35,14 @@ def test_knowledge_graph_page_smoke():
     assert "关系说明" in html
 
 
+def test_trace_page_smoke():
+    html = main.llm_traces_page().body.decode("utf-8")
+    assert "调用复盘" in html
+    assert "trace-question-card" in html
+    assert "Round 明细" in html
+    assert "本轮原始事件" in html
+
+
 def test_knowledge_save_list_read(knowledge_env):
     req = main.KnowledgeSaveRequest(
         repo="marvel",

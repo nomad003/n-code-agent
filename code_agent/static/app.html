@@ -123,26 +123,38 @@
       </section>
 
       <section v-if="view === 'traces'" class="workspace trace-layout">
-        <div class="panel list-panel">
+        <div class="panel list-panel trace-list-panel">
           <div class="panel-head">
-            <h2>请求记录</h2>
+            <h2>会话</h2>
             <button class="ghost" @click="loadTraces">刷新</button>
           </div>
-          <div class="trace-dir">{{ traceDir || 'logs/llm' }}</div>
-          <button v-for="file in traceFiles" :key="file.file" class="list-item" :class="{ active: selectedTrace === file.file }" @click="loadTrace(file.file)">
-            <span>{{ file.file }}</span>
-            <small>{{ file.last_event || '-' }} · {{ file.question || '无问题文本' }}</small>
+          <div class="trace-dir">
+            <span>目录</span>
+            <strong>{{ traceDir || 'logs/llm' }}</strong>
+          </div>
+          <div v-if="!traceFiles.length" class="trace-empty">暂无 trace 文件。</div>
+          <button v-for="file in traceFiles" :key="file.file" class="list-item trace-session" :class="{ active: selectedTrace === file.file }" @click="loadTrace(file.file)">
+            <span class="trace-session-question">{{ shortQuestion(file.question) }}</span>
+            <small class="trace-session-meta">{{ traceFileMeta(file) }}</small>
+            <small class="trace-session-file">{{ file.file }}</small>
           </button>
         </div>
 
-        <div class="panel">
-          <div class="panel-head">
-            <h2>证据链</h2>
-            <span class="pill">{{ traceRows.length }} events</span>
+        <div class="panel trace-detail-panel">
+          <div class="trace-question-card">
+            <div class="trace-question-label">问题</div>
+            <h2>{{ traceHeader.question || '请选择一个会话' }}</h2>
+            <div class="trace-meta">
+              <span>{{ traceHeader.file || '-' }}</span>
+              <span>{{ traceHeader.mode || 'mode -' }}</span>
+              <span>{{ traceHeader.backend || 'backend -' }}</span>
+              <span>{{ traceHeader.model || 'model -' }}</span>
+              <span>{{ formatBytes(traceHeader.size) }}</span>
+            </div>
           </div>
           <div class="metrics">
-            <div><strong>{{ traceSummary.rounds }}</strong><span>模型轮次</span></div>
-            <div><strong>{{ traceSummary.tools }}</strong><span>工具调用</span></div>
+            <div><strong>{{ traceSummary.rounds }}</strong><span>Round</span></div>
+            <div><strong>{{ traceSummary.tools }}</strong><span>工具事件</span></div>
             <div><strong>{{ traceSummary.findings.length }}</strong><span>检查项</span></div>
           </div>
           <div class="notice" v-if="traceSummary.findings.length">
@@ -151,15 +163,56 @@
               <li v-for="item in traceSummary.findings" :key="item">{{ item }}</li>
             </ul>
           </div>
-          <div class="round" v-for="round in traceSummary.roundDetails" :key="round.id">
-            <div class="round-title">Round {{ round.id }}</div>
-            <div class="tool-chain">
-              <span v-for="tool in round.tools" :key="tool">{{ tool }}</span>
-              <em v-if="!round.tools.length">未调用工具</em>
-            </div>
-            <pre v-if="round.answer">{{ round.answer }}</pre>
+          <div class="trace-section-head">
+            <h3>Round 明细</h3>
+            <span>{{ traceRows.length }} events</span>
           </div>
-          <details>
+          <details class="round-card" v-for="round in traceSummary.roundDetails" :key="round.id" :open="isTraceRoundOpen(round.id)" @toggle="setTraceRoundOpen(round.id, $event.currentTarget.open)">
+            <summary>
+              <span class="round-title">Round {{ round.id }}</span>
+              <span class="round-summary">{{ round.events }} events · {{ round.tools.length }} tools · {{ round.duration || '-' }}</span>
+            </summary>
+            <div class="round-body">
+              <div class="round-grid">
+                <div class="round-panel">
+                  <h4>模型输入</h4>
+                  <dl class="trace-kv">
+                    <div><dt>模型</dt><dd>{{ round.model || '-' }}</dd></div>
+                    <div><dt>消息</dt><dd>{{ round.messageCount }} 条</dd></div>
+                    <div><dt>工具开关</dt><dd>{{ round.withTools }}</dd></div>
+                  </dl>
+                  <pre v-if="round.userPrompt">{{ round.userPrompt }}</pre>
+                </div>
+                <div class="round-panel">
+                  <h4>模型输出</h4>
+                  <pre v-if="round.answer">{{ round.answer }}</pre>
+                  <div v-else class="trace-muted">本轮没有文本输出。</div>
+                </div>
+              </div>
+              <div class="round-panel">
+                <h4>工具链</h4>
+                <div class="tool-chain">
+                  <span v-for="tool in round.tools" :key="tool">{{ tool }}</span>
+                  <em v-if="!round.tools.length">未调用工具</em>
+                </div>
+                <div class="tool-results" v-if="round.toolResults.length">
+                  <div class="tool-result" v-for="tool in round.toolResults" :key="tool.key" :class="{ danger: tool.is_error }">
+                    <div class="tool-result-head">
+                      <strong>{{ tool.name }}</strong>
+                      <span>{{ tool.event }}</span>
+                    </div>
+                    <pre v-if="tool.arguments">{{ tool.arguments }}</pre>
+                    <pre v-if="tool.result">{{ tool.result }}</pre>
+                  </div>
+                </div>
+              </div>
+              <details class="raw-round">
+                <summary>本轮原始事件</summary>
+                <pre>{{ round.raw }}</pre>
+              </details>
+            </div>
+          </details>
+          <details class="raw-all">
             <summary>原始事件</summary>
             <pre>{{ tracePretty }}</pre>
           </details>
