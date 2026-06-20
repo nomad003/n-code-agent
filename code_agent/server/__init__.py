@@ -1,1 +1,1 @@
-"""HTTP service package."""
+"""Compatibility package for the top-level :mod:`server` package."""

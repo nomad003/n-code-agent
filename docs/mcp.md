@@ -31,7 +31,7 @@ MCP_PORT=8901 AGENT_BACKEND=sdk scripts/mcp.sh start
 外加通用的 `AGENT_BACKEND` / `CODE_REPOS` / `CODE_REPO_DEFAULT` / `TARGET_CODE_PATH` / `LLM_API_KEY` 等（见 [configuration.md](configuration.md)）。
 `ask_codebase` 的 `mode` 支持 `plain`（非程序员）、`technical`（程序员解读）、`edit`（直接改码入口）；接口可请求，但 agent 必须先通过 `AGENT_ALLOWED_MODES` 开启。`repo` 来自 `CODE_REPOS`，不配置多仓库时只使用 `TARGET_CODE_PATH` 单仓库模式。
 
-> 设计为**独立进程**（独立端口），不与 `code_agent.main` 的 REST 服务混挂——MCP 的 ASGI app 需要自己的 lifespan/session 管理，独立运行更稳。两者可同时起：REST 在 8900，MCP 在 8901。
+> 设计为**独立进程**（独立端口），不与 `server.app` 的 REST 服务混挂——MCP 的 ASGI app 需要自己的 lifespan/session 管理，独立运行更稳。两者可同时起：REST 在 8900，MCP 在 8901。
 
 ## 客户端连接
 
@@ -73,7 +73,7 @@ asyncio.run(main())
 
 | 入口 | 用途 |
 |------|------|
-| `code_agent.main`（REST，8900） | 给普通 HTTP 客户端 |
+| `server.app` / `code_agent.main` 兼容入口（REST，8900） | 给普通 HTTP 客户端 |
 | `code_agent.mcp_server`（MCP，8901） | 给 MCP 客户端/agent |
 | `code_agent.cli` | 本地命令行调试 |
 

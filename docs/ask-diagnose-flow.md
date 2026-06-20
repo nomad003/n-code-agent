@@ -22,8 +22,8 @@
 
 ## `/ask` 入口
 
-入口实现：`code_agent/server/app.py` 的 `ask()`。
-`code_agent/main.py` 和 `code_agent/interfaces/main.py` 仍保留为兼容 shim。
+入口实现：`server/app.py` 的 `ask()`。
+`code_agent/main.py`、`code_agent/interfaces/main.py` 和 `code_agent/server/app.py` 仍保留为兼容 shim。
 
 请求字段：
 
@@ -190,8 +190,8 @@ flowchart TD
 
 ## `/diagnose` 入口
 
-入口实现：`code_agent/server/app.py` 的 `diagnose_endpoint()`。
-`code_agent/main.py` 和 `code_agent/interfaces/main.py` 仍保留为兼容 shim。
+入口实现：`server/app.py` 的 `diagnose_endpoint()`。
+`code_agent/main.py`、`code_agent/interfaces/main.py` 和 `code_agent/server/app.py` 仍保留为兼容 shim。
 
 请求字段：
 
@@ -273,7 +273,7 @@ flowchart TD
 
 | 文件 | 作用 |
 |------|------|
-| `code_agent/server/app.py` | HTTP 入口、缓存、并发闸门、repo/mode 解析。 |
+| `server/app.py` | HTTP 入口、缓存、并发闸门、repo/mode 解析。 |
 | `code_agent/core/agent.py` | `agent.answer()`、custom Agent loop、知识注入、工具调用、trace。 |
 | `code_agent/core/question_intent.py` | 问题类型识别和各类型最佳实践 prompt。 |
 | `code_agent/diagnostics/diagnose.py` | backtrace/log/assert 预解析和诊断 prompt。 |

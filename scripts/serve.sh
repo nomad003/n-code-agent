@@ -20,4 +20,4 @@ if [[ -z "${1:-}" ]]; then
   echo "[serve] default repo: ${CODE_REPO_DEFAULT:-<default>}"
   echo "[serve] port        : ${SERVICE_PORT:-8900}"
 fi
-daemon_dispatch serve "${1:-}" -m code_agent.main
+daemon_dispatch serve "${1:-}" -m server.app

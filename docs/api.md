@@ -111,7 +111,7 @@ python -m code_agent.repo_profile --repo ecs
 
 ### 缓存说明
 
-缓存是 `code_agent.main` 里的**有界 LRU**（问题 → 答案，上限 `CACHE_MAX_ENTRIES`，超出淘汰最久未用）：
+缓存是 `server.app` 里的**有界 LRU**（`code_agent.main` 只是兼容 shim；问题 → 答案，上限 `CACHE_MAX_ENTRIES`，超出淘汰最久未用）：
 
 - `use_cache=true` 且问题问过 → 直接返回缓存，`cached:true`，**不调 LLM**（省时省 token），且不占并发槽。
 - 缓存 key 包含 `repo + mode + question`，不同仓库不会串答案。

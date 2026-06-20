@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Implemented and verified end-to-end: 方案 1 (litellm/SDK tool-calling loop) + 方案 2 first step (offline tree-sitter C++ symbol index). Entrypoints: `code_agent.main` (REST), `code_agent.mcp_server` (MCP), `code_agent.cli`. Offline pytest suite under `tests/`.
+Implemented and verified end-to-end: 方案 1 (litellm/SDK tool-calling loop) + 方案 2 first step (offline tree-sitter C++ symbol index). Entrypoints: `server.app` (REST, with `code_agent.main` compatibility), `code_agent.mcp_server` (MCP), `code_agent.cli`. Offline pytest suite under `tests/`.
 
 Detailed docs live in `docs/` ([architecture](docs/architecture.md), [configuration](docs/configuration.md), [api](docs/api.md), [deployment](docs/deployment.md)) — keep them in sync when changing behavior.
 
@@ -17,7 +17,7 @@ A "游戏服务器/战斗/客户端/引擎 代码理解服务" (code-comprehensi
 Request flow:
 
 ```
-HTTP POST /ask  →  FastAPI (code_agent.server.app)  →  LLM agent loop (code_agent.core.agent)
+HTTP POST /ask  →  FastAPI (server.app)  →  LLM agent loop (code_agent.core.agent)
                                               │  litellm
                                               ▼
                                    mushigen proxy → gemini-3.5-flash
@@ -53,15 +53,15 @@ Intended module responsibilities:
 | `code_agent/retrieval/` | Search tools, offline index build/query, shortcut, per-repo navigation/profile |
 | `code_agent/kb/` | Knowledge flywheel, OKF graph, module cards, Assert catalog, knowledge evaluation |
 | `code_agent/diagnostics/` | Runtime diagnosis (方向 F): parse backtrace, map frames to code via index, run agent |
-| `code_agent/server/` | FastAPI service, HTTP API routes, cache and concurrency gate |
-| `code_agent/frontend/` | Bundled Vue frontend assets and page shell helpers |
+| `server/` | FastAPI service, HTTP API routes, cache and concurrency gate |
+| `frontend/` | Bundled Vue frontend assets and page shell helpers |
 | `code_agent/interfaces/` | CLI and MCP entrypoints, plus the legacy HTTP import shim |
 | `code_agent/observability/` | Per-request JSONL trace and `/admin/llm-traces` helpers |
 | `code_agent/evals/` | Eval harness (方向 E): score {question → expected files/symbols}; `--twice` measures flywheel recall |
 | `code_agent/*.py` | Compatibility shims for old imports and `python -m code_agent.<module>` commands |
 | `vendor/claude-cli/` | Vendored Claude Code CLI (linux-x64) for the SDK backend; native binary stored via **Git LFS** |
 
-`code_agent.main`, `code_agent.mcp_server`, and `code_agent.cli` are three entrypoints over the same `agent.answer(..., repo=...)`. The MCP server (`code_agent.mcp_server`) is a thin FastMCP adapter — high-level tools `ask_codebase(question, mode="", repo="")` and `diagnose_crash(..., repo="")` — run as its own process/port; start with `scripts/mcp.sh`. See [docs/mcp.md](docs/mcp.md).
+`server.app`, `code_agent.mcp_server`, and `code_agent.cli` are three entrypoints over the same `agent.answer(..., repo=...)`. `code_agent.main` remains a REST compatibility shim. The MCP server (`code_agent.mcp_server`) is a thin FastMCP adapter — high-level tools `ask_codebase(question, mode="", repo="")` and `diagnose_crash(..., repo="")` — run as its own process/port; start with `scripts/mcp.sh`. See [docs/mcp.md](docs/mcp.md).
 
 ### Operation modes & output policy
 
@@ -95,7 +95,7 @@ scripts/ask.sh [--no-cache] "question"    # curl a RUNNING service's POST /ask
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m code_agent.main
+.venv/bin/python -m server.app
 .venv/bin/python -m code_agent.cli ["question"]
 ```
 
@@ -138,7 +138,7 @@ LLM access goes through **litellm** to the mushigen proxy — do not call the mo
 
 `/ask` and `/diagnose` are async and run the blocking agent loop through a concurrency gate (`main._run_governed`): a bounded `ThreadPoolExecutor` (`MAX_CONCURRENCY` workers) is the real gate — a 504-timed-out request can't kill its thread, but the thread keeps occupying a worker so the cap holds (slot freed only when the thread actually finishes, decrement marshalled to the loop). `_inflight` (running+queued) admits up to `MAX_CONCURRENCY + MAX_QUEUE`, else 503. The `/ask` answer cache is a bounded LRU (`CACHE_MAX_ENTRIES`); cache hits bypass the gate.
 
-`use_cache`/`cached` imply a caching layer for repeated questions — implement this in or behind `code_agent.main`.
+`use_cache`/`cached` imply a caching layer for repeated questions — implement this in or behind `server.app`.
 
 ## Roadmap (informs design decisions)
 

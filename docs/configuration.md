@@ -10,7 +10,7 @@
 cp .env.example .env     # 填入 LLM_API_KEY，按需改 TARGET_CODE_PATH / CODE_REPOS / AGENT_BACKEND
 ```
 
-> 裸跑 `python -m code_agent.main`（不经脚本）不会自动加载 `.env`，需自己 `export`，或先 `set -a; source .env; set +a`。
+> 裸跑 `python -m server.app`（不经脚本）不会自动加载 `.env`，需自己 `export`，或先 `set -a; source .env; set +a`。旧入口 `python -m code_agent.main` 仍兼容。
 
 ## 通用配置
 

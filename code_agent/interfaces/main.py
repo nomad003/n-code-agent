@@ -1,6 +1,6 @@
-"""Compatibility shim for :mod:`code_agent.server.app`."""
+"""Compatibility shim for :mod:`server.app`."""
 import sys as _sys
-from ..server import app as _impl
+from server import app as _impl
 
 if __name__ == "__main__":
     import uvicorn

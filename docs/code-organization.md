@@ -17,13 +17,13 @@ from code_agent import agent, tools, diagnose
 | `code_agent/retrieval/` | 代码检索与索引 | `tools.py`、`indexer.py`、`index_query.py`、`repo_profile.py`、`shortcut.py` |
 | `code_agent/kb/` | 知识库与知识评测 | `knowledge.py`、`knowledge_graph.py`、`module_knowledge.py`、`assert_knowledge.py`、`knowledge_eval.py` |
 | `code_agent/diagnostics/` | 运行时诊断 | `diagnose.py` |
-| `code_agent/server/` | HTTP 服务 | `app.py` |
-| `code_agent/frontend/` | 前端资产与 shell | `assets.py`、`static/` |
+| `server/` | HTTP 服务 | `app.py` |
+| `frontend/` | 前端资产与 shell | `assets.py`、`static/` |
 | `code_agent/interfaces/` | 非 HTTP 入口和兼容入口 | `mcp_server.py`、`cli.py`、`main.py` |
 | `code_agent/observability/` | 调用观测 | `llm_trace.py`、`trace_viewer.py` |
 | `code_agent/evals/` | 回答质量评测 | `evaluate.py` |
-| `code_agent/frontend/static/` | Vue 前端静态资源 | `app.html`、`app.css`、`app.js` |
-| `code_agent/static` | 兼容路径 | 指向 `frontend/static` |
+| `frontend/static/` | Vue 前端静态资源 | `app.html`、`app.css`、`app.js` |
+| `code_agent/static`、`code_agent/frontend/static` | 兼容路径 | 指向 `frontend/static` |
 
 ## 兼容入口
 
@@ -37,8 +37,10 @@ from code_agent import agent, tools, diagnose
 | `code_agent/knowledge_graph.py` | `code_agent/kb/knowledge_graph.py` |
 | `code_agent/assert_knowledge.py` | `code_agent/kb/assert_knowledge.py` |
 | `code_agent/diagnose.py` | `code_agent/diagnostics/diagnose.py` |
-| `code_agent/main.py` | `code_agent/server/app.py` |
-| `code_agent/interfaces/main.py` | `code_agent/server/app.py` |
+| `code_agent/main.py` | `server/app.py` |
+| `code_agent/interfaces/main.py` | `server/app.py` |
+| `code_agent/server/app.py` | `server/app.py` |
+| `code_agent/frontend/assets.py` | `frontend/assets.py` |
 | `code_agent/evaluate.py` | `code_agent/evals/evaluate.py` |
 
 命令也保持不变：
@@ -47,21 +49,23 @@ from code_agent import agent, tools, diagnose
 python -m code_agent.indexer --repo marvel
 python -m code_agent.knowledge_eval eval/knowledge.marvel.jsonl
 python -m code_agent.evaluate eval/dataset.sample.jsonl
-python -m code_agent.main
+python -m server.app
 python -m code_agent.mcp_server
 ```
+
+`python -m code_agent.main` 仍是 REST 兼容入口。
 
 ## 依赖方向
 
 推荐依赖方向：
 
 ```text
-server -> core -> retrieval
+server -> code_agent.core -> code_agent.retrieval
                  \-> kb
                  \-> diagnostics
-interfaces -> core
-observability <- core/server
-evals -> core
+code_agent.interfaces -> code_agent.core
+code_agent.observability <- code_agent.core/server
+code_agent.evals -> code_agent.core
 ```
 
 约束：
@@ -70,7 +74,7 @@ evals -> core
 - 文件系统访问集中在 `retrieval/tools.py` 和索引相关模块。
 - LLM loop 只放在 `core/agent.py` 或 `core/agent_sdk.py`。
 - 知识卡、图谱、Assert catalog 的解析放在 `kb/`。
-- HTTP 服务只放在 `server/`；MCP/CLI 放在 `interfaces/`。
+- HTTP 服务只放在顶层 `server/`；MCP/CLI 放在 `code_agent/interfaces/`。
 - 前端页面资产只放在 `frontend/static/`，服务端只通过 `frontend.assets` 读取页面 shell。
 - 根目录兼容 shim 不放业务逻辑。
 
@@ -81,8 +85,8 @@ evals -> core
 | 新工具、新索引、新代码搜索策略 | `code_agent/retrieval/` |
 | 新问题类型、新回答模式、Agent loop 改造 | `code_agent/core/` |
 | 新知识卡格式、知识召回、图谱关系、Assert catalog | `code_agent/kb/` |
-| 新 HTTP API、服务缓存、并发治理 | `code_agent/server/` |
-| 新前端页面、样式、交互脚本 | `code_agent/frontend/static/` |
+| 新 HTTP API、服务缓存、并发治理 | `server/` |
+| 新前端页面、样式、交互脚本 | `frontend/static/` |
 | 新 MCP tool、CLI 参数 | `code_agent/interfaces/` |
 | 新 trace 解析、可视化后端 | `code_agent/observability/` |
 | 新评测集执行器 | `code_agent/evals/` |

@@ -1,12 +1,5 @@
-"""Filesystem helpers for the bundled Vue frontend."""
+"""Compatibility shim for :mod:`frontend.assets`."""
+import sys as _sys
+from frontend import assets as _impl
 
-from functools import lru_cache
-from pathlib import Path
-
-STATIC_DIR = Path(__file__).resolve().parent / "static"
-
-
-@lru_cache(maxsize=1)
-def app_html() -> str:
-    """Return the single-page app shell."""
-    return (STATIC_DIR / "app.html").read_text(encoding="utf-8")
+_sys.modules[__name__] = _impl

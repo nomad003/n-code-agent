@@ -17,7 +17,7 @@
 
 ### 服务化与运维
 
-- 三个对等入口（REST `code_agent.main` / MCP `code_agent.mcp_server` / CLI `code_agent.cli`），都走同一个 `agent.answer(..., repo=...)`。
+- 三个对等入口（REST `server.app`，兼容 `code_agent.main` / MCP `code_agent.mcp_server` / CLI `code_agent.cli`），都走同一个 `agent.answer(..., repo=...)`。
 - `/ask` 失败返回干净 502（非 500 栈），失败不入缓存。
 - MCP 调用日志 → `logs/mcp.log`（轮转）；`serve.sh`/`mcp.sh` 支持 `start/stop/restart/status`。
 - 全量环境变量配置（`.env` / `.env.example`）、离线单元测试套件（见 [testing.md](testing.md)）。
