@@ -318,6 +318,11 @@ updated_at: 2026-06-20
 - `level-spawner-framework.md`：LevelSpawner、Level、刷怪和 Lua 关卡。
 - [Unit 通用层](unit-framework.md)：CombatUnit、组件 typelist、通用 Unit 配置映射。已建立。
 - [Enemy 层](enemy-framework.md)：CombatEnemy、怪物、召唤物、可破坏物。已建立。
+- [Unit 运行骨架与组件系统](unit-runtime-components.md)：Unit 字段、组件、生命周期。已建立。
+- [Unit 配置、属性、移动](unit-config-attr-move.md)：Unit 配置、属性、移动、导航、物理。已建立。
+- [Unit 状态、技能、AI、同步](unit-state-skill-ai-sync.md)：Unit 状态、技能、AI、同步。已建立。
+- [Enemy 创建与生命周期](enemy-runtime-lifecycle.md)：Enemy 创建、LevelInit、死亡清理。已建立。
+- [Enemy 配置、AI、技能、召唤](enemy-config-ai-skill-spawn.md)：Enemy 配置、AI、技能、召唤、可破坏物。已建立。
 - `role-framework.md`：CombatRole、玩家、伙伴、机器人、切人。
 - `skill-framework.md`：SkillMgr、SkillCore、SkillConfig、技能配置链路。
 - `buff-framework.md`：XBuffContainer、BuffConfig、Buff effect/trigger。
@@ -329,3 +334,8 @@ updated_at: 2026-06-20
 - [marvel 代码知识库索引](index.md)
 - [Unit 通用层](unit-framework.md)
 - [Enemy 层](enemy-framework.md)
+- [Unit 运行骨架与组件系统](unit-runtime-components.md)
+- [Unit 配置、属性、移动](unit-config-attr-move.md)
+- [Unit 状态、技能、AI、同步](unit-state-skill-ai-sync.md)
+- [Enemy 创建与生命周期](enemy-runtime-lifecycle.md)
+- [Enemy 配置、AI、技能、召唤](enemy-config-ai-skill-spawn.md)

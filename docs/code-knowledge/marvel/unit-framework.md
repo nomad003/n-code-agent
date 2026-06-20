@@ -71,6 +71,14 @@ updated_at: 2026-06-20
 - 进入场景、离开场景、每帧更新、每秒更新。
 - 对接 ECS、场景、关卡、伤害、Buff、AI。
 
+## 细分卡片
+
+| 子卡 | 重点 | 适用问题 |
+| --- | --- | --- |
+| [Unit 运行骨架与组件系统](unit-runtime-components.md) | `CombatUnit` 字段、组件 typelist、生命周期、事件入口。 | crash 栈、离场后引用、组件为空。 |
+| [Unit 配置、属性、移动](unit-config-attr-move.md) | `UnitConf`、属性、移动、导航、PhysX 控制器。 | 配置实现、碰撞/移动异常、属性异常。 |
+| [Unit 状态、技能、AI、同步](unit-state-skill-ai-sync.md) | `StateManager`、`SkillMgr`、Buff/AI 接入、同步、Effect、Doodad、Bind。 | 技能、状态、AI、同步和 Buff 问题。 |
+
 | 生命周期 | 入口 | 主要动作 |
 | --- | --- | --- |
 | 构造 | `CombatUnit::CombatUnit` | 初始化导航、AI、Buff、战斗组、移动、绑定、物理控制器。 |
@@ -226,3 +234,6 @@ updated_at: 2026-06-20
 
 - [gameserver 核心战斗总体框架](gameserver-combat-core-overview.md)
 - [Enemy 层](enemy-framework.md)
+- [Unit 运行骨架与组件系统](unit-runtime-components.md)
+- [Unit 配置、属性、移动](unit-config-attr-move.md)
+- [Unit 状态、技能、AI、同步](unit-state-skill-ai-sync.md)

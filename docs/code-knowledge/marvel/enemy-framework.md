@@ -55,6 +55,13 @@ updated_at: 2026-06-20
 
 `CombatEnemy` 继承 `CombatUnit`。
 
+## 细分卡片
+
+| 子卡 | 重点 | 适用问题 |
+| --- | --- | --- |
+| [Enemy 创建与生命周期](enemy-runtime-lifecycle.md) | `CombatEnemy` 字段、创建入口、初始化、`LevelInit`、死亡清理。 | 刷怪失败、进离场、死亡不清理、wave/group。 |
+| [Enemy 配置、AI、技能、召唤](enemy-config-ai-skill-spawn.md) | 模板/表现配置、AI、技能查表、属性、召唤、可破坏物。 | 怪物怎么配、技能缺失、AI 不动、召唤物异常。 |
+
 类型来自 `XEntityStatistics.Type`：
 
 | 类型判断 | 含义 | 主要影响 |
@@ -353,3 +360,5 @@ AI 技能：
 
 - [Unit 通用层](unit-framework.md)
 - [gameserver 核心战斗总体框架](gameserver-combat-core-overview.md)
+- [Enemy 创建与生命周期](enemy-runtime-lifecycle.md)
+- [Enemy 配置、AI、技能、召唤](enemy-config-ai-skill-spawn.md)
