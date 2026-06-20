@@ -1,7 +1,7 @@
 ---
 type: Code Module
 title: gameserver 核心战斗总体框架
-description: 聚焦场景、关卡、Unit、CombatEnemy、CombatRole、Buff、AI、Skill、XEcs 的战斗域模块地图。
+description: 战斗域模块地图。覆盖 Scene/Level/Unit/Skill/Buff/AI/XEcs。
 repo: marvel
 module: gameserver/combat-core
 resource: gameserver
@@ -16,7 +16,15 @@ updated_at: 2026-06-20
 
 # gameserver 核心战斗总体框架
 
-这张卡用于回答“gameserver 战斗核心由哪些模块组成”“场景、关卡、Unit、AI、Skill、Buff、XEcs 如何协作”“战斗 crash/log 应该从哪里开始查”。本卡只覆盖核心战斗域，不覆盖网络连接、登录、协议分发、进程部署等服务器外围模块。具体行号和结论仍需用工具读取当前代码核实。
+## 卡片说明
+
+| 项 | 内容 |
+| --- | --- |
+| 用途 | 说明 gameserver 核心战斗模块地图。 |
+| 适用问题 | 架构、crash、宕机日志、功能实现、配置实现。 |
+| 覆盖范围 | Scene、Level、Unit、Skill、Buff、AI、Combat、XEcs。 |
+| 不覆盖 | 网络连接、登录、协议分发、进程部署。 |
+| 使用要求 | 具体行号和结论需读取当前代码核实。 |
 
 ## 范围
 
@@ -38,12 +46,14 @@ updated_at: 2026-06-20
 
 ## 总体结构
 
-核心运行时可以按四层理解：
+核心运行时分四层：
 
-1. **SceneBattle 是战斗场景容器**：`gameserver/scene/scenebattle.h` 继承 `Scene`，维护场景状态、暂停/恢复、胜负、死亡队列、场景 Buff，以及 `SceneHandler` 集合。
-2. **LevelSpawner/Level 是关卡与刷怪执行层**：`gameserver/level/levelspawner.h` 作为 `ISceneHandler` 挂在 SceneBattle 上，驱动 Lua 关卡、触发器、地图切换、时间限制、刷怪和结算；`gameserver/level/level.h` 提供 `SpawnEnemy`、事件绑定、胜负、任务、地图、剧情等关卡脚本接口。
-3. **CombatUnit 是战斗对象中心**：`gameserver/unit/unit.h` 定义 Unit 生命周期、进出场、Update、位置/朝向、技能事件、死亡事件，并组合 Skill、Buff、AI、属性、移动、导航、物理控制等组件。
-4. **XEcs 执行动作/技能/命中状态机**：`ecs/XEcs/XSirius.h` / `.cpp` 注册和更新动作、技能、命中、状态、Buff node、QTE、脚本消息等 ECS 系统；`gameserver/xecs/XFacility.h` 把 ECS 查询和事件回调接回 gameserver 的 Unit/Skill/Buff/Attr/Combat。
+| 层 | 角色 | 关键入口 |
+| --- | --- | --- |
+| SceneBattle | 战斗场景容器。维护状态、胜负、暂停、死亡队列。 | `gameserver/scene/scenebattle.h` |
+| LevelSpawner / Level | 关卡与刷怪执行层。驱动 Lua、触发器、地图、结算。 | `gameserver/level/levelspawner.h`, `gameserver/level/level.h` |
+| CombatUnit | 战斗对象中心。组合 Skill、Buff、AI、属性、移动、导航。 | `gameserver/unit/unit.h` |
+| XEcs | 动作、技能、命中、状态机执行层。 | `ecs/XEcs/XSirius.h`, `gameserver/xecs/XFacility.h` |
 
 ## 场景层
 

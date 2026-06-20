@@ -92,7 +92,7 @@ code-agent 每次回答都从零遍历代码。它服务四类高频问题：
 ---
 type: Code Module
 title: 战斗框架
-description: 战斗管理、目标选择、伤害效果和战斗单位的模块地图
+description: 战斗模块地图。覆盖目标、伤害、战斗单位。
 repo: marvel
 module: gameserver/combat
 resource: gameserver/combat
@@ -165,7 +165,7 @@ updated_at: 2026-06-18
 |------|------|
 | `type` | 卡片类型，如 `Code Module`、`Code Playbook`、`Config Chain` |
 | `title` | UI 展示名和 prompt 注入标题 |
-| `description` | 一句话摘要，用于索引、列表和召回片段 |
+| `description` | 短摘要，用于索引、列表和召回片段；优先用 1-2 个短句，避免长句 |
 | `repo` | 对应 `CODE_REPOS` 里的 repo 名 |
 | `module` | 模块路径或逻辑模块名 |
 | `resource` | 主要代码路径 |
@@ -186,7 +186,14 @@ updated_at: 2026-06-18
 ```md
 # 模块名
 
-这张卡用于回答哪些问题。说明本卡是稳定框架，具体行号和结论仍需工具核实。
+## 卡片说明
+
+| 项 | 内容 |
+| --- | --- |
+| 用途 | 回答哪些问题。 |
+| 覆盖范围 | 只写本卡覆盖的模块。 |
+| 不覆盖 | 明确排除项。 |
+| 使用要求 | 具体结论需工具核实。 |
 
 ## 入口文件
 
@@ -204,6 +211,14 @@ updated_at: 2026-06-18
 
 ## 相关卡片
 ```
+
+## 描述写法
+
+- `description` 只写短摘要。
+- 不把范围、限制和使用要求塞进一个长句。
+- 正文开头固定使用 `卡片说明` 表格。
+- 模块职责优先用列表或表格。
+- 每条描述只表达一个事实。
 
 ## 召回策略
 

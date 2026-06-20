@@ -1,7 +1,7 @@
 ---
 type: Reference
 title: marvel 代码知识库索引
-description: 重新整理后的 marvel 代码知识入口，优先沉淀核心战斗域。
+description: marvel 知识入口。核心战斗域优先。
 repo: marvel
 module: index
 resource: .
@@ -12,7 +12,14 @@ updated_at: 2026-06-20
 
 # marvel 代码知识库索引
 
-这是一份重新整理后的知识入口。当前优先覆盖 `gameserver` 核心战斗域，暂不整理网络、登录、协议连接、服务部署等服务器外围模块。具体结论仍需用工具读取当前代码核实。
+## 卡片说明
+
+| 项 | 内容 |
+| --- | --- |
+| 用途 | 作为 marvel 知识库入口。 |
+| 当前重点 | `gameserver` 核心战斗域。 |
+| 暂不覆盖 | 网络、登录、协议连接、服务部署。 |
+| 使用要求 | 具体结论需读取当前代码核实。 |
 
 ## 已整理
 
