@@ -141,7 +141,7 @@ curl -X POST http://localhost:8900/ask \
 | `server/` | FastAPI 服务、HTTP API、缓存和并发闸门 |
 | `frontend/` | Vue 前端资产和页面 shell |
 | `code_agent/interfaces/` | CLI、MCP 入口，以及旧 HTTP shim |
-| `code_agent/server/`、`code_agent/frontend/`、`code_agent/*.py` | 旧路径兼容 shim，例如 `python -m code_agent.main` 仍可用 |
+| `code_agent/*.py` | 旧路径兼容 shim，例如 `python -m code_agent.main` 仍可用 |
 | `docs/` | 项目文档 |
 | `scripts/` | 启动、测试、索引、评测脚本 |
 | `tests/` | 离线测试 |

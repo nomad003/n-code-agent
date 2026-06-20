@@ -23,7 +23,7 @@
 ## `/ask` 入口
 
 入口实现：`server/app.py` 的 `ask()`。
-`code_agent/main.py`、`code_agent/interfaces/main.py` 和 `code_agent/server/app.py` 仍保留为兼容 shim。
+`code_agent/main.py` 和 `code_agent/interfaces/main.py` 仍保留为兼容 shim。
 
 请求字段：
 
@@ -191,7 +191,7 @@ flowchart TD
 ## `/diagnose` 入口
 
 入口实现：`server/app.py` 的 `diagnose_endpoint()`。
-`code_agent/main.py`、`code_agent/interfaces/main.py` 和 `code_agent/server/app.py` 仍保留为兼容 shim。
+`code_agent/main.py` 和 `code_agent/interfaces/main.py` 仍保留为兼容 shim。
 
 请求字段：
 

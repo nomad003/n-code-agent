@@ -126,7 +126,6 @@ custom 的 system prompt 分三层：基础工具策略、`plain/technical/edit`
 | `code_agent/interfaces/` | MCP server、CLI，以及旧 HTTP shim |
 | `code_agent/observability/` | LLM trace 写入和 trace viewer API |
 | `code_agent/evals/` | `/ask` 回答质量评测 |
-| `code_agent/static` | 指向 `frontend/static` 的兼容路径 |
 | `code_agent/*.py` | 旧路径兼容 shim，不放业务逻辑 |
 | `vendor/claude-cli/` | 内置 Claude Code CLI（linux-x64，二进制经 Git LFS） |
 

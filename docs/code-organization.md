@@ -23,7 +23,6 @@ from code_agent import agent, tools, diagnose
 | `code_agent/observability/` | 调用观测 | `llm_trace.py`、`trace_viewer.py` |
 | `code_agent/evals/` | 回答质量评测 | `evaluate.py` |
 | `frontend/static/` | Vue 前端静态资源 | `app.html`、`app.css`、`app.js` |
-| `code_agent/static`、`code_agent/frontend/static` | 兼容路径 | 指向 `frontend/static` |
 
 ## 兼容入口
 
@@ -39,8 +38,6 @@ from code_agent import agent, tools, diagnose
 | `code_agent/diagnose.py` | `code_agent/diagnostics/diagnose.py` |
 | `code_agent/main.py` | `server/app.py` |
 | `code_agent/interfaces/main.py` | `server/app.py` |
-| `code_agent/server/app.py` | `server/app.py` |
-| `code_agent/frontend/assets.py` | `frontend/assets.py` |
 | `code_agent/evaluate.py` | `code_agent/evals/evaluate.py` |
 
 命令也保持不变：
