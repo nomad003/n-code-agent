@@ -36,7 +36,7 @@
 | LLM 式压缩（`LLMSummarizingCondenser`） | 用额外 LLM 调用压历史 | 短问答收益不抵成本；已用确定性遮蔽替代 |
 | 12 态状态机 + 确认模式 | 危险写/执行的人类把关 | 只读无副作用，三态足够 |
 
-> 原则：保持工具层（`code_agent.tools`）是唯一接触文件系统的层，复杂度只在真正需要时引入。
+> 原则：保持工具层（`code_agent.retrieval.tools`）是唯一接触文件系统的层，复杂度只在真正需要时引入。
 
 ## 三、后续可选方向
 
@@ -47,14 +47,14 @@
 当前每次查询都走 LLM tool-call。离线索引让符号/全文检索从"全库扫描"变成"一次 SQLite 查询"。
 
 **已落地（第一步：符号索引 + 工具加速）**
-- `code_agent.indexer`：tree-sitter 解析 C++ → 抽取 class/struct/enum/union/function/method → SQLite `symbols` 表 + FTS5 全文索引（`files_fts`）。每条符号记 `file + line + 文件哈希`（为方案 3 的失效检查预留）。
-- `index_query.py`：只读查询层，无索引时返回 `None` 让调用方回退。
-- `code_agent.tools`：`find_symbol` 优先查索引（精确、一步命中）；`grep_code` 对「整库 + 纯文本」走 FTS 快路，正则/限定路径回退 live scan。
+- `code_agent.retrieval.indexer`：tree-sitter 解析 C++ → 抽取 class/struct/enum/union/function/method → SQLite `symbols` 表 + FTS5 全文索引（`files_fts`）。每条符号记 `file + line + 文件哈希`（为方案 3 的失效检查预留）。
+- `code_agent.retrieval.index_query`：只读查询层，无索引时返回 `None` 让调用方回退。
+- `code_agent.retrieval.tools`：`find_symbol` 优先查索引（精确、一步命中）；`grep_code` 对「整库 + 纯文本」走 FTS 快路，正则/限定路径回退 live scan。
 - 构建：`scripts/index.sh --repo <name>`（多仓库模式）或 `scripts/index.sh`（单仓库兼容模式）。`USE_INDEX=0` 可强制回退。
 
 **已落地（第二步：增量更新 + 入口短路）**
 - **增量更新**：`indexer.update()`（`scripts/index.sh --update`）按文件内容哈希只重建变更/新增文件、删除消失文件的行，无变化则空跑。比全量 `build()` 快得多，跟得上代码改动。
-- **入口短路**：`code_agent.shortcut` 识别「X 定义在哪 / where is X defined」这类纯查定义问题，直接查索引返回、**完全不走 LLM**（秒回、零成本）。接在 `agent.answer()` 层，三个入口都受益；保守匹配（"X 是做什么的"这类需解释的不短路）；`USE_SHORTCUT=0` 可关。
+- **入口短路**：`code_agent.retrieval.shortcut` 识别「X 定义在哪 / where is X defined」这类纯查定义问题，直接查索引返回、**完全不走 LLM**（秒回、零成本）。接在 `agent.answer()` 层，三个入口都受益；保守匹配（"X 是做什么的"这类需解释的不短路）；`USE_SHORTCUT=0` 可关。
 
 **未做（后续）**
 - 向量库 / 语义检索（刻意推迟到方案 3，符号索引不需要它）。
@@ -95,12 +95,12 @@
 - **V3（部分）**：✅ FTS 召回加了**同义词扩展**（"作用/功能/干嘛"等词组，不同措辞也能召回，零依赖的轻量语义近似）。未做：真正的向量/语义召回（代理暂无 embedding 接口，留待有接口或命中率验证后引入本地模型）；与方案 2 符号表合并成统一检索；知识去重/合并、可信度打分。
 
 **已落地（MVP + 失效）**
-- `knowledge.py`：SQLite + FTS5 知识库。`store(q, a, refs)` 记录问题/答案/引用文件+内容哈希；`recall(query)` 按关键词 OR 匹配召回，并对每条重算引用文件哈希、变了标 `stale`。独立 DB；多仓库模式下按 repo 写到 `index/repos/<repo>/knowledge.db`，与只读 code_index 分开。
-- `agent.CodeAgent`：问答后**自动沉淀**（`_precipitate`，从 `read_file` 的 Action 提取引用文件）；起手**自动召回**注入 system 提示（`_recalled_context`，stale 条目降级为"需重新核实"）。`recall_knowledge` 作为第 7 个工具，仅在飞轮开启时 advertise。
+- `code_agent.kb.knowledge`：SQLite + FTS5 知识库。`store(q, a, refs)` 记录问题/答案/引用文件+内容哈希；`recall(query)` 按关键词 OR 匹配召回，并对每条重算引用文件哈希、变了标 `stale`。独立 DB；多仓库模式下按 repo 写到 `index/repos/<repo>/knowledge.db`，与只读 code_index 分开。
+- `code_agent.core.agent.CodeAgent`：问答后**自动沉淀**（`_precipitate`，从 `read_file` 的 Action 提取引用文件）；起手**自动召回**注入 system 提示（`_recalled_context`，stale 条目降级为"需重新核实"）。`recall_knowledge` 作为第 7 个工具，仅在飞轮开启时 advertise。
 - 开关 `USE_KNOWLEDGE`（默认 **关**，验证命中率后再开）。失效是核心：实测改源文件 → stale=True、还原 → False。
 - 实测飞轮：同一问题问两次，第二次成功召回第一次结论作为线索（带来源文件 + 核实提示）。
 
-**现有项目的有利条件：** `code_agent.events` 的 Action/Observation 历史是 Extractor 的现成输入；`code_agent.tools` 是唯一文件入口，检索层可作为"第 5 个工具"接入，`code_agent.agent` 几乎不动。
+**现有项目的有利条件：** `code_agent.core.events` 的 Action/Observation 历史是 Extractor 的现成输入；`code_agent.retrieval.tools` 是唯一文件入口，检索层可作为"第 5 个工具"接入，`code_agent.core.agent` 几乎不动。
 
 **风险：**
 - 正反馈不一定成立 —— 若用户问题分散、命中率低，沉淀收益跟不上维护成本。MVP 阶段先测命中率再投入。

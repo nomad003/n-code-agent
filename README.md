@@ -10,10 +10,10 @@
 客户端 (HTTP POST /ask)
     │
     ▼
-FastAPI 服务 (code_agent.main)
+FastAPI 服务 (code_agent.interfaces.main)
     │
     ▼
-LLM Agent (code_agent.agent) ── litellm ──► mushigen proxy ──► gemini-3.5-flash
+LLM Agent (code_agent.core.agent) ── litellm ──► mushigen proxy ──► gemini-3.5-flash
     │
     ├── grep_code(pattern, path)      搜索代码符号/关键字
     ├── read_file(path, start, end)   读取文件内容
@@ -133,13 +133,19 @@ curl -X POST http://localhost:8900/ask \
 
 | 路径 | 职责 |
 |------|------|
-| `code_agent/` | 主要实现包：agent、工具、服务入口、索引、诊断、知识库等 |
-| `code_agent/main.py` / `code_agent/cli.py` / `code_agent/mcp_server.py` | HTTP、CLI、MCP 入口 |
+| `code_agent/core/` | Agent loop、SDK 后端、问题类型、回答模式、输出策略 |
+| `code_agent/retrieval/` | 沙箱工具、离线索引、索引查询、repo profile |
+| `code_agent/kb/` | 知识库、知识图谱、模块卡、Assert 知识 |
+| `code_agent/diagnostics/` | backtrace/log 诊断 |
+| `code_agent/interfaces/` | HTTP、CLI、MCP 入口 |
+| `code_agent/*.py` | 旧路径兼容 shim，例如 `python -m code_agent.main` 仍可用 |
 | `docs/` | 项目文档 |
 | `scripts/` | 启动、测试、索引、评测脚本 |
 | `tests/` | 离线测试 |
 | `target_code/` | 示例/组合目标代码目录 |
 | `index/` | repo 索引、知识库和 profile 缓存 |
+
+更细的后端目录说明见 [docs/code-organization.md](docs/code-organization.md)。
 
 ## 评测
 

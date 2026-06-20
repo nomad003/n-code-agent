@@ -1,8 +1,9 @@
 # custom 后端工作原理
 
-`custom` 是默认后端：它不用 Claude Agent SDK，而是在 `code_agent.agent` 里直接实现一个
+`custom` 是默认后端：它不用 Claude Agent SDK，而是在 `code_agent.core.agent` 里直接实现一个
 litellm tool-calling 循环。它的目标很明确：只读地理解代码库，所有文件访问都必须
-经过 `code_agent.tools` 的沙箱工具。
+经过 `code_agent.retrieval.tools` 的沙箱工具。旧路径 `code_agent.agent` /
+`code_agent.tools` 仍是兼容 shim。
 
 ## 总览
 
@@ -22,7 +23,7 @@ HTTP /ask、MCP ask_codebase、CLI
 `custom` 后端由 `AGENT_BACKEND=custom` 选择，也是默认值。它和 `sdk` 后端共用：
 
 - `config.system_prompt_for_mode(mode)`
-- `code_agent.tools` 的沙箱工具
+- `code_agent.retrieval.tools` 的沙箱工具
 - `response_policy.enforce(...)`
 - repo 上下文、索引、知识库、trace 机制
 
@@ -38,7 +39,7 @@ agent.answer(question, mode=mode, repo=repo)
 
 这一层先做三件事：
 
-1. `config.use_repo(repo)`：把当前请求绑定到指定 repo。后续 `code_agent.tools`、`code_agent.index_query`、`code_agent.knowledge` 都通过 `config.current_*()` 读取当前 repo 的路径和 DB。
+1. `config.use_repo(repo)`：把当前请求绑定到指定 repo。后续 `code_agent.retrieval.tools`、`code_agent.retrieval.index_query`、`code_agent.kb.knowledge` 都通过 `config.current_*()` 读取当前 repo 的路径和 DB。
 2. 解析 `mode`：`plain` / `technical` / `edit` 必须在 `AGENT_ALLOWED_MODES` 中。
 3. 创建 `LLMTrace`：记录请求、每轮 LLM 输入输出、工具结果、最终答案或错误。
 
@@ -391,7 +392,7 @@ target_code/marvel/
   ecs        -> /home/dev/marvel/XEcsLib
 ```
 
-因此默认提问时，`code_agent.tools` 的沙箱根目录就是 `target_code/marvel`，模型能同时搜索：
+因此默认提问时，`code_agent.retrieval.tools` 的沙箱根目录就是 `target_code/marvel`，模型能同时搜索：
 
 - `gameserver/...`
 - `ecs/...`
@@ -412,7 +413,7 @@ target_code/marvel/
 
 ## 沙箱工具边界
 
-LLM 不能直接读文件系统，只能调用 `code_agent.tools` 的工具。关键工具包括：
+LLM 不能直接读文件系统，只能调用 `code_agent.retrieval.tools` 的工具。关键工具包括：
 
 - `grep_code(...)`
 - `read_file(...)`

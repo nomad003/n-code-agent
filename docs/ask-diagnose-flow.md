@@ -22,7 +22,8 @@
 
 ## `/ask` 入口
 
-入口实现：`code_agent/main.py` 的 `ask()`。
+入口实现：`code_agent/interfaces/main.py` 的 `ask()`。
+`code_agent/main.py` 仍保留为兼容 shim。
 
 请求字段：
 
@@ -141,7 +142,8 @@ flowchart TD
 
 ### Agent loop
 
-默认 custom backend 的核心实现是 `code_agent/agent.py` 的 `CodeAgent`。
+默认 custom backend 的核心实现是 `code_agent/core/agent.py` 的 `CodeAgent`。
+`code_agent/agent.py` 仍保留为兼容 shim。
 
 每轮逻辑：
 
@@ -188,7 +190,8 @@ flowchart TD
 
 ## `/diagnose` 入口
 
-入口实现：`code_agent/main.py` 的 `diagnose_endpoint()`。
+入口实现：`code_agent/interfaces/main.py` 的 `diagnose_endpoint()`。
+`code_agent/main.py` 仍保留为兼容 shim。
 
 请求字段：
 
@@ -270,10 +273,10 @@ flowchart TD
 
 | 文件 | 作用 |
 |------|------|
-| `code_agent/main.py` | HTTP 入口、缓存、并发闸门、repo/mode 解析。 |
-| `code_agent/agent.py` | `agent.answer()`、custom Agent loop、知识注入、工具调用、trace。 |
-| `code_agent/question_intent.py` | 问题类型识别和各类型最佳实践 prompt。 |
-| `code_agent/diagnose.py` | backtrace/log/assert 预解析和诊断 prompt。 |
-| `code_agent/knowledge_graph.py` | OKF-style 知识卡读取、图谱构建、卡片打分、prompt 摘要。 |
-| `code_agent/module_knowledge.py` | 模块知识卡正文召回和 system prompt 注入。 |
+| `code_agent/interfaces/main.py` | HTTP 入口、缓存、并发闸门、repo/mode 解析。 |
+| `code_agent/core/agent.py` | `agent.answer()`、custom Agent loop、知识注入、工具调用、trace。 |
+| `code_agent/core/question_intent.py` | 问题类型识别和各类型最佳实践 prompt。 |
+| `code_agent/diagnostics/diagnose.py` | backtrace/log/assert 预解析和诊断 prompt。 |
+| `code_agent/kb/knowledge_graph.py` | OKF-style 知识卡读取、图谱构建、卡片打分、prompt 摘要。 |
+| `code_agent/kb/module_knowledge.py` | 模块知识卡正文召回和 system prompt 注入。 |
 | `docs/code-knowledge/` | 版本化代码知识库。 |

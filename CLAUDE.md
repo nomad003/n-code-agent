@@ -17,7 +17,7 @@ A "游戏服务器/战斗/客户端/引擎 代码理解服务" (code-comprehensi
 Request flow:
 
 ```
-HTTP POST /ask  →  FastAPI (code_agent.main)  →  LLM agent loop (code_agent.agent)
+HTTP POST /ask  →  FastAPI (code_agent.interfaces.main)  →  LLM agent loop (code_agent.core.agent)
                                               │  litellm
                                               ▼
                                    mushigen proxy → gemini-3.5-flash
@@ -27,12 +27,12 @@ HTTP POST /ask  →  FastAPI (code_agent.main)  →  LLM agent loop (code_agent.
 
 `agent.answer()` dispatches on the `AGENT_BACKEND` env var:
 
-- **`custom`** (default) — the litellm tool-calling loop in `code_agent.agent` (`CodeAgent`). Provider-agnostic; routes through the `/v1` proxy with the `openai/` prefix. Model = `LLM_MODEL`. Keeps an `Action`/`Observation` event history (`code_agent.events`), builds messages in one place (`_build_messages`), retries transient LLM errors (`LLM_NUM_RETRIES`), stops early on repeated identical tool calls (`STUCK_REPEAT_THRESHOLD`), and masks all but the most recent `OBS_KEEP_FULL` tool outputs to bound context.
-- **`sdk`** — the Claude Agent SDK loop in `agent_sdk.py` (imported lazily). Uses `claude-agent-sdk` + the Claude Code CLI, routed to **Bedrock** via env vars (`CLAUDE_CODE_USE_BEDROCK`, `ANTHROPIC_BEDROCK_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, …). Model = `SDK_MODEL` (falls back to `ANTHROPIC_MODEL`).
+- **`custom`** (default) — the litellm tool-calling loop in `code_agent.core.agent` (`CodeAgent`). Provider-agnostic; routes through the `/v1` proxy with the `openai/` prefix. Model = `LLM_MODEL`. Keeps an `Action`/`Observation` event history (`code_agent.core.events`), builds messages in one place (`_build_messages`), retries transient LLM errors (`LLM_NUM_RETRIES`), stops early on repeated identical tool calls (`STUCK_REPEAT_THRESHOLD`), and masks all but the most recent `OBS_KEEP_FULL` tool outputs to bound context.
+- **`sdk`** — the Claude Agent SDK loop in `code_agent.core.agent_sdk` (imported lazily). Uses `claude-agent-sdk` + the Claude Code CLI, routed to **Bedrock** via env vars (`CLAUDE_CODE_USE_BEDROCK`, `ANTHROPIC_BEDROCK_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, …). Model = `SDK_MODEL` (falls back to `ANTHROPIC_MODEL`).
 
-**Both backends share the same `code_agent.tools` and `config.system_prompt_for_mode()`.** The SDK backend wraps the existing sandboxed tools as `@tool`/SDK-MCP tools that delegate to `tools.dispatch()` — so the path sandbox and output caps are identical — and disables the SDK's built-in Read/Grep/Glob/Bash/Write/Edit so the model is confined to our tools. `max_turns = MAX_ITERATIONS`.
+**Both backends share the same `code_agent.retrieval.tools` and `config.system_prompt_for_mode()`.** Public imports such as `code_agent.tools` remain compatibility shims. The SDK backend wraps the existing sandboxed tools as `@tool`/SDK-MCP tools that delegate to `tools.dispatch()` — so the path sandbox and output caps are identical — and disables the SDK's built-in Read/Grep/Glob/Bash/Write/Edit so the model is confined to our tools. `max_turns = MAX_ITERATIONS`.
 
-The agent is a **tool-calling loop**: the LLM is given sandboxed repo tools and iterates (call tool → feed result back → repeat) until it can answer. Tools in `code_agent.tools`:
+The agent is a **tool-calling loop**: the LLM is given sandboxed repo tools and iterates (call tool → feed result back → repeat) until it can answer. Tools in `code_agent.retrieval.tools`:
 
 - `grep_code(pattern, path, output_mode, context, head_limit)` — search code for symbols/keywords
 - `read_file(path, start, end)` — read a file slice
@@ -49,24 +49,14 @@ Intended module responsibilities:
 | File | Responsibility |
 |------|----------------|
 | `code_agent/config.py` | Model id, API base/key, repo config, system prompt |
-| `code_agent/tools.py` | Search-tool implementations + schemas (index-backed, fall back to live scan) |
-| `code_agent/indexer.py` | Build/`update()` the offline index (tree-sitter C++ → SQLite symbols + FTS5; incremental by file hash) |
-| `code_agent/index_query.py` | Read-only index queries (returns None when no index → tools fall back) |
-| `code_agent/shortcut.py` | Entry short-circuit: answer "where is X defined" from the index, skipping the LLM (方案 2) |
-| `code_agent/diagnose.py` | Runtime diagnosis (方向 F): parse backtrace, map frames to code via index, run agent |
-| `code_agent/knowledge.py` | Knowledge flywheel (方案 3): precipitate Q&A → SQLite/FTS, recall with staleness check |
-| `code_agent/evaluate.py` | Eval harness (方向 E): score {question → expected files/symbols} dataset; `--twice` measures flywheel recall |
-| `code_agent/agent.py` | Backend dispatch + custom loop (`CodeAgent`: event history, stuck detection, retries) |
-| `code_agent/events.py` | `Action`/`Observation` event model for the custom loop |
-| `code_agent/agent_sdk.py` | Claude Agent SDK backend (used when `AGENT_BACKEND=sdk`) |
-| `code_agent/operation_modes.py` | Mode policy: plain/technical/edit, alias normalization, per-mode prompt rules |
-| `code_agent/response_policy.py` | Output guardrail: strips code/config/command samples from plain-mode answers (idempotent, CJK lines preserved as prose) |
-| `code_agent/llm_trace.py` | Per-request JSONL trace under `logs/llm/` (best-effort; never breaks the request) |
-| `code_agent/trace_viewer.py` | Read-only helpers behind `/admin/llm-traces` (list + parse trace files with path-escape guard) |
-| `code_agent/main.py` | FastAPI service (`POST /ask`, `POST /diagnose`, `GET /repos`, `GET /health`, `/admin/llm-traces`), runs on port **8900** |
-| `code_agent/mcp_server.py` | MCP server exposing `ask_codebase` / `diagnose_crash` over streamable-http, port **8901** |
-| `code_agent/cli.py` | Interactive command-line testing mode |
-| `code_agent/repo_profile.py` | Per-repo navigation/profile cache builder and formatter |
+| `code_agent/core/` | Backend dispatch, custom loop, SDK backend, event model, operation modes, question intent, response policy |
+| `code_agent/retrieval/` | Search tools, offline index build/query, shortcut, per-repo navigation/profile |
+| `code_agent/kb/` | Knowledge flywheel, OKF graph, module cards, Assert catalog, knowledge evaluation |
+| `code_agent/diagnostics/` | Runtime diagnosis (方向 F): parse backtrace, map frames to code via index, run agent |
+| `code_agent/interfaces/` | FastAPI service, MCP server and CLI entrypoints |
+| `code_agent/observability/` | Per-request JSONL trace and `/admin/llm-traces` helpers |
+| `code_agent/evals/` | Eval harness (方向 E): score {question → expected files/symbols}; `--twice` measures flywheel recall |
+| `code_agent/*.py` | Compatibility shims for old imports and `python -m code_agent.<module>` commands |
 | `vendor/claude-cli/` | Vendored Claude Code CLI (linux-x64) for the SDK backend; native binary stored via **Git LFS** |
 
 `code_agent.main`, `code_agent.mcp_server`, and `code_agent.cli` are three entrypoints over the same `agent.answer(..., repo=...)`. The MCP server (`code_agent.mcp_server`) is a thin FastMCP adapter — high-level tools `ask_codebase(question, mode="", repo="")` and `diagnose_crash(..., repo="")` — run as its own process/port; start with `scripts/mcp.sh`. See [docs/mcp.md](docs/mcp.md).
@@ -135,7 +125,7 @@ Set via env vars (or edit `config.py`):
 
 LLM access goes through **litellm** to the mushigen proxy — do not call the model provider SDK directly.
 
-**Proxy routing gotcha:** the proxy is an OpenAI-compatible gateway at `/v1` (custom backend) and Bedrock at `/bedrock` (sdk backend); both default to `http://10.253.17.63:8090`. litellm picks its client from the model's leading provider segment, so a bare `vertex_ai/…` model triggers litellm's *native* Google Cloud auth (fails with `ModuleNotFoundError: google` / "Google Cloud SDK not found") and never reaches the proxy. `code_agent.agent` therefore prepends `openai/` to `LLM_MODEL` (`_routed_model()`), forcing the OpenAI-compatible path; the proxy still receives the real model name after the prefix. Keep this prefixing if you touch the LLM call.
+**Proxy routing gotcha:** the proxy is an OpenAI-compatible gateway at `/v1` (custom backend) and Bedrock at `/bedrock` (sdk backend); both default to `http://10.253.17.63:8090`. litellm picks its client from the model's leading provider segment, so a bare `vertex_ai/…` model triggers litellm's *native* Google Cloud auth (fails with `ModuleNotFoundError: google` / "Google Cloud SDK not found") and never reaches the proxy. `code_agent.core.agent` therefore prepends `openai/` to `LLM_MODEL` (`_routed_model()`), forcing the OpenAI-compatible path; the proxy still receives the real model name after the prefix. Keep this prefixing if you touch the LLM call.
 
 ## API
 
@@ -151,7 +141,7 @@ LLM access goes through **litellm** to the mushigen proxy — do not call the mo
 ## Roadmap (informs design decisions)
 
 1. **方案 1 (done):** LLM + live code search, every query goes through tool calls.
-2. **方案 2 (symbol index landed):** `code_agent.indexer` builds (and incrementally `update()`s) a tree-sitter C++ → SQLite symbol table + FTS5 index; `find_symbol`/`grep_code` use it and fall back to live scan. Precise "where is X defined" questions short-circuit the LLM entirely (`code_agent.shortcut`, `USE_SHORTCUT`).
+2. **方案 2 (symbol index landed):** `code_agent.retrieval.indexer` builds (and incrementally `update()`s) a tree-sitter C++ → SQLite symbol table + FTS5 index; `find_symbol`/`grep_code` use it and fall back to live scan. Precise "where is X defined" questions short-circuit the LLM entirely (`code_agent.retrieval.shortcut`, `USE_SHORTCUT`).
 3. **方案 3 (knowledge flywheel landed, off by default):** `knowledge.py` precipitates each Q&A and recalls related leads (with staleness check) on later questions. Toggle `USE_KNOWLEDGE=1`. Semantic recall deferred to V3. See [docs/roadmap.md](docs/roadmap.md).
 
 Keep the tool layer separable so the future index can back the same tools.

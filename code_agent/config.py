@@ -8,7 +8,7 @@ import contextvars
 import os
 from dataclasses import dataclass
 
-from . import operation_modes
+from .core import operation_modes
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 

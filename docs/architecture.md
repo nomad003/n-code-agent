@@ -12,17 +12,17 @@
 客户端
   │  HTTP POST /ask   或   CLI
   ▼
-code_agent.main / code_agent.cli
+code_agent.interfaces.main / code_agent.interfaces.cli
                             入口（HTTP 服务 / 命令行），HTTP 入口带问答缓存
   ▼
 agent.answer(question, repo=...)  按 repo 选择目标仓库，按 AGENT_BACKEND 分发
   │
-  ├─ custom（默认）──► code_agent.agent 内 litellm 循环 ──► mushigen /v1 ──► LLM_MODEL
+  ├─ custom（默认）──► code_agent.core.agent 内 litellm 循环 ──► mushigen /v1 ──► LLM_MODEL
   │                                                （openai/ 前缀路由）
-  └─ sdk ────────────► agent_sdk.py（Claude Agent SDK + CLI）──► Bedrock ──► SDK_MODEL
+  └─ sdk ────────────► core/agent_sdk.py（Claude Agent SDK + CLI）──► Bedrock ──► SDK_MODEL
         │
         ▼
-   code_agent.tools（沙箱工具）   在当前 repo 根目录内 grep / read / list / 查索引
+   code_agent.retrieval.tools（沙箱工具）   在当前 repo 根目录内 grep / read / list / 查索引
         ▲
         └── 工具结果回喂给 LLM，进入下一轮
 ```
@@ -33,11 +33,11 @@ agent.answer(question, repo=...)  按 repo 选择目标仓库，按 AGENT_BACKEN
 
 ## 双后端
 
-`agent.answer()` 根据 `AGENT_BACKEND` 环境变量选择后端，**两者共用同一套 `code_agent.tools` 工具和 `config.system_prompt_for_mode()`**，对外接口完全一致。
+`agent.answer()` 根据 `AGENT_BACKEND` 环境变量选择后端，**两者共用同一套 `code_agent.retrieval.tools` 工具和 `config.system_prompt_for_mode()`**，对外接口完全一致。`code_agent.tools` 保留为旧路径兼容 shim。
 
 | | `custom`（默认） | `sdk` |
 |---|---|---|
-| 实现 | `code_agent.agent` 的 `_answer_custom()` | `code_agent.agent_sdk`（延迟导入） |
+| 实现 | `code_agent.core.agent` 的 `_answer_custom()` | `code_agent.core.agent_sdk`（延迟导入） |
 | LLM 客户端 | litellm | claude-agent-sdk + Claude Code CLI |
 | 路由 | mushigen 代理 `/v1`（OpenAI 兼容） | Bedrock（env vars） |
 | 模型 | `LLM_MODEL` | `SDK_MODEL`（默认取 `ANTHROPIC_MODEL`） |
@@ -79,13 +79,13 @@ custom 的 system prompt 分三层：基础工具策略、`plain/technical/edit`
 
 ### sdk 后端
 
-用 Claude Agent SDK 跑 agent 循环，但**把 `code_agent.tools` 的沙箱工具包装成 SDK 工具**（`@tool` + `create_sdk_mcp_server`），内部仍调 `tools.dispatch()`——所以路径沙箱、输出限长与 custom 完全相同。同时通过 `disallowed_tools` 禁用 SDK 自带的 Read/Grep/Glob/Bash/Write/Edit，**让模型只能用我们的沙箱工具**。
+用 Claude Agent SDK 跑 agent 循环，但**把 `code_agent.retrieval.tools` 的沙箱工具包装成 SDK 工具**（`@tool` + `create_sdk_mcp_server`），内部仍调 `tools.dispatch()`——所以路径沙箱、输出限长与 custom 完全相同。同时通过 `disallowed_tools` 禁用 SDK 自带的 Read/Grep/Glob/Bash/Write/Edit，**让模型只能用我们的沙箱工具**。
 
 - 工具在 SDK 内命名为 `mcp__code__<tool>`，由 `allowed_tools` 白名单放行。
 - CLI 经 Bedrock 路由（`_bedrock_env()` 把相关 env vars 显式传入 `options.env`）。
 - CLI 二进制优先用项目内置的 `vendor/claude-cli/`（见 [deployment.md](deployment.md)），找不到回退系统 PATH。
 
-## 工具层（`code_agent.tools`）
+## 工具层（`code_agent.retrieval.tools`）
 
 模型唯一能接触文件系统的途径，是设计的安全边界，也是将来换索引（方案 2）的接缝。
 
@@ -114,28 +114,26 @@ custom 的 system prompt 分三层：基础工具策略、`plain/technical/edit`
 
 ## 模块职责
 
-| 文件 | 职责 |
+| 目录/文件 | 职责 |
 |------|------|
 | `code_agent/config.py` | 全局配置、repo 解析/上下文、system prompt、`require_api_key()` |
-| `code_agent/tools.py` | 沙箱工具 + 工具 schema + `dispatch()` 注册表（索引优先，回退 live scan） |
-| `code_agent/indexer.py` | 按 repo 离线建索引：tree-sitter 解析 C++ → SQLite 符号表 + FTS5 |
-| `code_agent/index_query.py` | 当前 repo 的索引只读查询层（无索引返回 None 让工具回退） |
-| `code_agent/shortcut.py` | 入口短路：精确"X 定义在哪"直接查索引返回、跳过 LLM（方案 2） |
-| `code_agent/diagnose.py` | 运行时诊断：backtrace 解析 + 帧→符号映射 + 日志反查打印点 + 跑 agent（方向 F） |
-| `code_agent/knowledge.py` | 当前 repo 的知识飞轮：问答沉淀 SQLite/FTS + 召回（含失效检查） |
-| `code_agent/repo_profile.py` | 当前 repo 的项目概览 / 导航缓存生成与读取 |
-| `code_agent/agent.py` | 后端分发 + custom 循环（`CodeAgent`：事件历史/stuck/重试） |
-| `code_agent/events.py` | custom 循环的 `Action`/`Observation` 事件模型 |
-| `code_agent/agent_sdk.py` | sdk（Claude Agent SDK）后端 |
-| `code_agent/main.py` | FastAPI 服务（`/ask`、`/diagnose`、`/repos`、`/health`）+ 按 repo 隔离的问答缓存（端口 8900） |
-| `code_agent/mcp_server.py` | MCP server，暴露 `ask_codebase`（streamable-http，端口 8901，见 [mcp.md](mcp.md)） |
-| `code_agent/cli.py` | 命令行交互 / 单次提问 |
+| `code_agent/core/` | Agent loop、SDK 后端、事件模型、回答模式、问题类型和输出策略 |
+| `code_agent/retrieval/` | 沙箱工具、离线索引、索引查询、shortcut、repo profile |
+| `code_agent/kb/` | 知识飞轮、知识图谱、模块知识卡、Assert catalog、知识评测 |
+| `code_agent/diagnostics/` | backtrace/log 诊断与预解析 |
+| `code_agent/interfaces/` | FastAPI、MCP server、CLI |
+| `code_agent/observability/` | LLM trace 写入和 trace viewer API |
+| `code_agent/evals/` | `/ask` 回答质量评测 |
+| `code_agent/static/` | Vue 前端静态资源 |
+| `code_agent/*.py` | 旧路径兼容 shim，不放业务逻辑 |
 | `vendor/claude-cli/` | 内置 Claude Code CLI（linux-x64，二进制经 Git LFS） |
+
+更细的放置规则见 [code-organization.md](code-organization.md)。
 
 ## 演进计划
 
 1. **当前（方案 1）**：LLM + 实时代码搜索，每次查询走 tool call。
-2. **方案 2（符号索引已落地）**：`code_agent.indexer` 用 tree-sitter 解析 C++ → SQLite 符号表 + FTS5 全文索引；`tools.find_symbol`/`grep_code` 优先走索引（快、精确），无索引则回退 live scan。支持**增量更新**（`indexer.update()` / `scripts/index.sh --update`，按文件哈希只重建变更项）和**入口短路**（`code_agent.shortcut`：精确"X 定义在哪"直接查索引、跳过 LLM）。`code_agent.tools` 作为唯一接触文件的层，索引顶替其实现而 `code_agent.agent` 不动。向量库/语义检索推迟到方案 3。
+2. **方案 2（符号索引已落地）**：`code_agent.retrieval.indexer` 用 tree-sitter 解析 C++ → SQLite 符号表 + FTS5 全文索引；`tools.find_symbol`/`grep_code` 优先走索引（快、精确），无索引则回退 live scan。支持**增量更新**（`indexer.update()` / `scripts/index.sh --update`，按文件哈希只重建变更项）和**入口短路**（`code_agent.retrieval.shortcut`：精确"X 定义在哪"直接查索引、跳过 LLM）。`code_agent.retrieval.tools` 作为唯一接触文件的层，索引顶替其实现而 `code_agent.core.agent` 不动。向量库/语义检索推迟到方案 3。
 3. **方案 3（知识飞轮已落地，默认关）**：`knowledge.py` 把每次问答沉淀进 SQLite/FTS，下次相似问题召回作线索注入（`USE_KNOWLEDGE=1` 开启）。**失效机制**是核心：召回时重算引用文件哈希，变了标 stale 并降级为"需重新核实"，agent 用工具二次核实而非直接采信。语义召回留待 V3。
 
 > 已落地优化、明确舍弃的设计、以及更细的后续方向（服务治理、缓存、评测等）见 [roadmap.md](roadmap.md)。
