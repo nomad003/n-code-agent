@@ -317,12 +317,18 @@ def knowledge_list(repo: str | None = None) -> dict:
     cards = []
     for card in kg.load_cards(repo_name, include_common=False):
         path = os.path.join(config.PROJECT_ROOT, card.path)
+        segments = card.id.split("/")
+        group = segments[0] if len(segments) > 1 else ""
         cards.append(
             {
                 "name": card.id,
                 "title": card.title,
                 "tags": card.tags,
                 "meta": card.meta,
+                "path": card.id,
+                "segments": segments,
+                "group": group,
+                "depth": max(0, len(segments) - 1),
                 "size": os.path.getsize(path),
                 "mtime": int(os.path.getmtime(path)),
             }

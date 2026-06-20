@@ -25,19 +25,40 @@ updated_at: 2026-06-20
 
 - [gameserver 核心战斗总体框架](gameserver-combat-core-overview.md)
 - [Unit 通用层](unit-framework.md)
-- [Unit 运行骨架与组件系统](unit-runtime-components.md)
-- [Unit 配置、属性、移动](unit-config-attr-move.md)
-- [Unit 状态、技能、AI、同步](unit-state-skill-ai-sync.md)
+- [CombatUnit 运行骨架](unit/combatunit.md)
+- [Unit 组件系统](unit/unit-components.md)
+- [UnitConf 配置封装](unit/unit-conf.md)
+- [UnitCombatAttribute 属性容器](unit/unit-combat-attribute.md)
+- [CombatAttrCalc 属性初始化](unit/combat-attr-calc.md)
+- [UnitMove 移动与碰撞修正](unit/unit-move.md)
+- [XNavigation 导航模块](unit/xnavigation.md)
+- [UnitController 物理控制器](unit/unit-controller.md)
+- [StateManager 状态管理](unit/state-manager.md)
+- [SkillMgr 技能管理](unit/skill-mgr.md)
+- [XBuffContainer Buff 容器接入](unit/xbuff-container.md)
+- [AIEntity AI 容器](unit/ai-entity.md)
+- [UnitEffect Affix Effect](unit/unit-effect.md)
+- [DoodadInfo 掉落物信息](unit/doodad-info.md)
+- [BindInfo 平台绑定](unit/bind-info.md)
+- [Unit 同步模块](unit/unit-sync.md)
 - [Enemy 层](enemy-framework.md)
-- [Enemy 创建与生命周期](enemy-runtime-lifecycle.md)
-- [Enemy 配置、AI、技能、召唤](enemy-config-ai-skill-spawn.md)
+- [CombatEnemy 生命周期](enemy/combat-enemy.md)
+- [SceneUnitHandler 创建入口](enemy/scene-unit-handler.md)
+- [Level::SpawnEnemy 刷怪入口](enemy/level-spawn-enemy.md)
+- [XEntityStatistics 怪物模板配置](enemy/enemy-template-config.md)
+- [XEntityPresentation 表现配置](enemy/enemy-presentation-config.md)
+- [AIEnemyAgent 怪物 AI](enemy/enemy-ai-agent.md)
+- [Enemy 技能配置查表](enemy/enemy-skill-config.md)
+- [Enemy 属性初始化](enemy/enemy-attr-init.md)
+- [SpawnControl 召唤控制](enemy/spawn-control.md)
+- [DestructibleUnit 可破坏物](enemy/destructible-unit.md)
 
 ## 后续拆分
 
 - 场景与 SceneBattle
 - 关卡 Level / LevelSpawner / 刷怪
 - CombatRole 派生层
-- SkillMgr / SkillCore / SkillConfig
-- XBuffContainer / BuffConfig / Buff effect
-- AIAgent / AIUnitAgent / AI 节点
+- SkillConfig 细节
+- BuffConfig / Buff effect 内部
+- AIAgent / AIUnitAgent / AI 节点内部
 - XEcs / XFacility / XSirius

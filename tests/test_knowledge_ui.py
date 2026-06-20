@@ -25,6 +25,7 @@ def test_knowledge_page_smoke():
     assert "调查" in html and "复盘" in html and "知识" in html and "图谱" in html
     assert "theme-toggle" in html
     assert "markdown-preview" in html
+    assert "knowledge-tree" in html
     assert "showCardPreview" in html
     assert "brand-mark" not in html
     app_js = Path("code_agent/static/app.js").read_text(encoding="utf-8")
@@ -66,6 +67,9 @@ def test_knowledge_save_list_read(knowledge_env):
     assert listed["cards"][0]["name"] == "monster-config.md"
     assert listed["cards"][0]["title"] == "怪物配置"
     assert "怪物" in listed["cards"][0]["tags"]
+    assert listed["cards"][0]["segments"] == ["monster-config.md"]
+    assert listed["cards"][0]["group"] == ""
+    assert listed["cards"][0]["depth"] == 0
 
     read = main.knowledge_read("marvel", "monster-config.md")
     assert "# 怪物配置" in read["content"]
@@ -154,6 +158,9 @@ def test_knowledge_nested_card_path(knowledge_env):
     )
     listed = main.knowledge_list("marvel")
     assert listed["cards"][0]["name"] == "gameserver/scene.md"
+    assert listed["cards"][0]["segments"] == ["gameserver", "scene.md"]
+    assert listed["cards"][0]["group"] == "gameserver"
+    assert listed["cards"][0]["depth"] == 1
     read = main.knowledge_read("marvel", "gameserver/scene.md")
     assert read["name"] == "gameserver/scene.md"
     assert read["title"] == "场景子目录"

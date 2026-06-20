@@ -234,10 +234,18 @@
             <button :class="{ active: knowledge.mode === 'cards' }" @click="setKnowledgeMode('cards')">卡片</button>
             <button :class="{ active: knowledge.mode === 'qa' }" @click="setKnowledgeMode('qa')">问答沉淀</button>
           </div>
-          <button v-for="card in knowledge.cards" :key="card.name" class="list-item" :class="{ active: knowledge.name === card.name }" @click="loadCard(card.name)">
-            <span>{{ card.title }}</span>
-            <small>{{ card.name }} · {{ (card.tags || []).join(', ') || 'no tags' }}</small>
-          </button>
+          <div class="knowledge-tree">
+            <details v-for="group in knowledgeCardGroups" :key="group.id" class="tree-group" open>
+              <summary>
+                <span>{{ group.label }}</span>
+                <small>{{ group.cards.length }}</small>
+              </summary>
+              <button v-for="card in group.cards" :key="card.name" class="list-item tree-card" :class="{ active: knowledge.name === card.name }" :style="{ '--tree-depth': card.treeDepth }" @click="loadCard(card.name)">
+                <span>{{ card.title }}</span>
+                <small>{{ card.name }} · {{ (card.tags || []).join(', ') || 'no tags' }}</small>
+              </button>
+            </details>
+          </div>
         </div>
 
         <div v-if="knowledge.mode === 'cards'" class="panel editor">

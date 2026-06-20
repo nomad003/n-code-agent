@@ -1062,6 +1062,37 @@
       renderedKnowledge() {
         return renderMarkdown(this.knowledge.content);
       },
+      knowledgeCardGroups() {
+        const order = ["_root", "unit", "enemy", "gameserver", "ecs", "common"];
+        const groups = new Map();
+        (this.knowledge.cards || []).forEach((card) => {
+          const segments = Array.isArray(card.segments) && card.segments.length
+            ? card.segments
+            : String(card.name || "").split("/");
+          const groupId = segments.length > 1 ? segments[0] : "_root";
+          if (!groups.has(groupId)) {
+            groups.set(groupId, {
+              id: groupId,
+              label: groupId === "_root" ? "根目录" : groupId,
+              cards: [],
+            });
+          }
+          groups.get(groupId).cards.push(Object.assign({}, card, {
+            treeDepth: Math.max(0, segments.length - 1),
+          }));
+        });
+        return Array.from(groups.values())
+          .sort((a, b) => {
+            const ai = order.indexOf(a.id);
+            const bi = order.indexOf(b.id);
+            if (ai !== -1 || bi !== -1) return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+            return a.label.localeCompare(b.label);
+          })
+          .map((group) => {
+            group.cards.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+            return group;
+          });
+      },
       knowledgeMetaRows() {
         return Object.entries(this.knowledge.meta || {}).map(([key, value]) => ({
           key,

@@ -59,8 +59,16 @@ updated_at: 2026-06-20
 
 | 子卡 | 重点 | 适用问题 |
 | --- | --- | --- |
-| [Enemy 创建与生命周期](enemy-runtime-lifecycle.md) | `CombatEnemy` 字段、创建入口、初始化、`LevelInit`、死亡清理。 | 刷怪失败、进离场、死亡不清理、wave/group。 |
-| [Enemy 配置、AI、技能、召唤](enemy-config-ai-skill-spawn.md) | 模板/表现配置、AI、技能查表、属性、召唤、可破坏物。 | 怪物怎么配、技能缺失、AI 不动、召唤物异常。 |
+| [CombatEnemy 生命周期](enemy/combat-enemy.md) | 字段、初始化、进离场、`LevelInit`、死亡清理。 | 进离场、死亡不清理、wave/group。 |
+| [SceneUnitHandler 创建入口](enemy/scene-unit-handler.md) | 查模板、选择派生类、创建 Enemy/召唤物/可破坏物。 | 创建失败、模板缺失。 |
+| [Level::SpawnEnemy 刷怪入口](enemy/level-spawn-enemy.md) | Lua/关卡参数、坐标修正、进场。 | 刷怪失败、group/wave。 |
+| [XEntityStatistics 怪物模板配置](enemy/enemy-template-config.md) | 怪物主模板字段。 | 怪物怎么配、模板字段。 |
+| [XEntityPresentation 表现配置](enemy/enemy-presentation-config.md) | 资源、缩放、碰撞体、Buff tag。 | 体型/碰撞配置。 |
+| [AIEnemyAgent 怪物 AI](enemy/enemy-ai-agent.md) | AI 表选择、行为树、视野、巡逻。 | AI 不动、不索敌。 |
+| [Enemy 技能配置查表](enemy/enemy-skill-config.md) | `SkillListForEnemy` / Spawn 技能查表。 | 技能缺失日志。 |
+| [Enemy 属性初始化](enemy/enemy-attr-init.md) | 属性表、复制、缩放、召唤继承。 | 属性异常。 |
+| [SpawnControl 召唤控制](enemy/spawn-control.md) | 召唤数量、跟随、超限技能。 | 召唤物异常。 |
+| [DestructibleUnit 可破坏物](enemy/destructible-unit.md) | 可破坏物配置覆盖、阶段、掉落。 | 可破坏物打不掉。 |
 
 类型来自 `XEntityStatistics.Type`：
 
@@ -360,5 +368,5 @@ AI 技能：
 
 - [Unit 通用层](unit-framework.md)
 - [gameserver 核心战斗总体框架](gameserver-combat-core-overview.md)
-- [Enemy 创建与生命周期](enemy-runtime-lifecycle.md)
-- [Enemy 配置、AI、技能、召唤](enemy-config-ai-skill-spawn.md)
+- [CombatEnemy 生命周期](enemy/combat-enemy.md)
+- [Enemy 技能配置查表](enemy/enemy-skill-config.md)

@@ -112,31 +112,29 @@ updated_at: 2026-06-18
 
 ## 文件布局
 
-当前落地使用平铺目录：
+当前落地使用层次目录。根目录只放索引和上层导航卡；具体实现模块放到领域子目录。
+原则是 **一个稳定模块一张知识卡**，不要把多个类/配置/流程合并到同一张细节卡。
 
 ```text
 docs/code-knowledge/
   common/
   marvel/
     index.md
-    gameserver-overview.md
-    combat-framework.md
-    ...
+    gameserver-combat-core-overview.md
+    unit-framework.md
+    enemy-framework.md
+    unit/
+      combatunit.md
+      unit-conf.md
+      skill-mgr.md
+    enemy/
+      combat-enemy.md
+      enemy-skill-config.md
+      spawn-control.md
 ```
 
-后续如果需要更强 OKF 兼容，可演进为分层目录：
-
-```text
-docs/code-knowledge/marvel/
-  index.md
-  gameserver/
-    index.md
-    combat.md
-    scene.md
-  ecs/
-    index.md
-    xecs-runtime.md
-```
+前端左侧卡片栏按 bundle 内相对路径自动分组展示，例如 `unit/skill-mgr.md`
+会出现在 `unit` 分组下。新增卡片时优先放入对应子目录，避免根目录继续膨胀。
 
 ## Frontmatter
 
@@ -245,6 +243,7 @@ sequenceDiagram
 - 不把范围、限制和使用要求塞进一个长句。
 - 正文开头固定使用 `卡片说明` 表格。
 - 模块职责优先用列表或表格。
+- 细节卡只描述一个模块；如果同时出现多个模块，应拆成多张卡并用 `depends_on` / `supplements` 连接。
 - 每条描述只表达一个事实。
 
 ## 召回策略
