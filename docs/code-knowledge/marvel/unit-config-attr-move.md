@@ -37,6 +37,36 @@ updated_at: 2026-06-20
 | `XNavigation` | 场景 WaypointGraph、`UnitMove`、Unit 半径 | AI 导航和目的点移动。 |
 | `UnitController` | PhysX、`UnitConf`, `PhysicsScene` | CCT 创建、碰撞过滤、控制器移动。 |
 
+### 模块依赖图
+
+```mermaid
+flowchart LR
+    Template["XEntityStatistics"]
+    Present["XEntityPresentation"]
+    AttrDefine["AttrDefine / RoleAttrConfig"]
+    SceneConf["Scene / Map / DynamicWall"]
+    UnitConf["UnitConf"]
+    Attr["UnitCombatAttribute"]
+    AttrCalc["CombatAttrCalc"]
+    Move["UnitMove"]
+    Navi["XNavigation"]
+    Controller["UnitController"]
+    PhysX["PhysicsScene / PhysX"]
+
+    Template --> UnitConf
+    Present --> UnitConf
+    Template --> AttrCalc
+    AttrDefine --> Attr
+    AttrCalc --> Attr
+    UnitConf --> Move
+    UnitConf --> Controller
+    SceneConf --> Move
+    SceneConf --> Navi
+    Move --> Navi
+    Controller --> Move
+    PhysX --> Controller
+```
+
 ## UnitConf
 
 代码：
@@ -79,6 +109,26 @@ updated_at: 2026-06-20
 | `InitBodySize(scale, data)` | 计算半径/高度/AABB；Huge 时解析多碰撞体。 |
 | `ModifyScale` / `ResetScale` | 重新计算体型。 |
 
+### UnitConf 配置加载流程图
+
+```mermaid
+flowchart TD
+    A["CombatEnemy::InitConf / Role 初始化"] --> B["UnitConf::InitFromPresent(present_id)"]
+    B --> C{"XEntityPresentation 存在"}
+    C -->|否| X["CHECK_COND_NORETURN(false)"]
+    C -->|是| D["读取 Scale / BoundRadius / BoundHeight / Huge"]
+    D --> E["InitBodySize 计算半径、高度、AABB"]
+    E --> F{"是否 Huge"}
+    F -->|是| G["解析 HugeMonsterColliders"]
+    F -->|否| H["使用普通碰撞体"]
+    G --> I["UnitConf::InitFromTemplate(template_id)"]
+    H --> I
+    I --> J{"XEntityStatistics 存在"}
+    J -->|否| K["日志: can't find monster template id"]
+    K --> X
+    J -->|是| L["读取 Block / BlockFlag / CastRangeY / MinimalMoveGap"]
+```
+
 ## UnitCombatAttribute
 
 代码：
@@ -114,6 +164,23 @@ updated_at: 2026-06-20
 | `AttrDefine.txt` | 属性 ID、类型、同步标记。 |
 | `RoleAttrConfig::GetAttrDefineNeedSysClient` | 决定哪些属性填给客户端。 |
 
+### 属性读写流程图
+
+```mermaid
+flowchart TD
+    A["业务模块请求属性变更"] --> B{"CanSetAttr 是否允许"}
+    B -->|否| C["忽略或返回失败"]
+    B -->|是| D{"写入方式"}
+    D -->|SetAttr| E["直接写 mAttrData"]
+    D -->|AddAttr| F["读取旧值后累加"]
+    D -->|SetCurrentAttr| G["按最大值约束当前值"]
+    D -->|AddCurrentAttr| G
+    E --> H["OnAttrChanged / watcher"]
+    F --> H
+    G --> H
+    H --> I["Buff / State / Skill / Sync 响应"]
+```
+
 ## CombatAttrCalc
 
 代码：
@@ -141,6 +208,31 @@ updated_at: 2026-06-20
 - 召唤物先读自己的表，再从 caller 复制未初始化属性。
 - `CallerAttrList` 可按比例复制 caller 指定属性。
 - `InitAttr_AtLast` 必须在基础属性、缩放、Buff 初始化之后。
+
+### 属性初始化时序图
+
+```mermaid
+sequenceDiagram
+    participant Enemy as CombatEnemy
+    participant Calc as CombatAttrCalc
+    participant Conf as XEntityStatistics
+    participant Attr as UnitCombatAttribute
+    participant Scene as Scene
+
+    Enemy->>Attr: Init(templateID, uid)
+    Enemy->>Calc: InitEnemyAttr(enemy, conf, scene)
+    Calc->>Conf: 读取基础攻防血和 BaseAttr
+    alt AttrCopy 非 0
+        Calc->>Conf: 切换到复制模板读取基础属性
+    end
+    Calc->>Attr: 写入基础属性
+    alt ApplyScale 非 0
+        Calc->>Scene: 读取场景缩放
+        Calc->>Attr: SceneScaleAttr
+    end
+    Calc->>Attr: InitAttr_AtLast
+    Attr-->>Enemy: 当前 HP / 体力 / 能量就绪
+```
 
 ## UnitMove
 
@@ -187,6 +279,23 @@ updated_at: 2026-06-20
 | `SceneList` / `MapList` | 地图、阻挡、导航数据。 |
 | `DynamicWall.txt` | 动态墙和触发墙。 |
 
+### 移动与碰撞流程图
+
+```mermaid
+flowchart TD
+    A["TryMove / TransferLocation"] --> B["读取 UnitConf 半径、高度、Block"]
+    B --> C["ForceGround 修正地面高度"]
+    C --> D{"CheckBlock / CheckCollision"}
+    D -->|阻挡| E["CheckDynamicBlockWithCorrectPos"]
+    E --> F{"可修正位置"}
+    F -->|有| G["BroadcastCorrectLocation"]
+    F -->|无| H["拒绝移动或回滚"]
+    D -->|不阻挡| I["写入 ECS / 位置"]
+    G --> I
+    I --> J["TestTrigger / DynamicWall 触发"]
+    J --> K["SetLastWalkablePos / CheckNoFreeFlyZone"]
+```
+
 ## XNavigation
 
 代码：
@@ -225,6 +334,24 @@ updated_at: 2026-06-20
 - 日志前缀是 `[Navi]`。
 - `NaviEnableResult` 可区分目标为 0、路径失败、跨图、直线不可达、调用过频等。
 
+### 导航流程图
+
+```mermaid
+flowchart TD
+    A["XNavigation::Enable(dest, radius)"] --> B["记录 originDestPos / destRadius"]
+    B --> C["AdjustNaviDestPos"]
+    C --> D{"_CheckCanStraightReach"}
+    D -->|可直达| E["设置直线移动目标"]
+    D -->|不可直达| F{"_CheckCanFindPathByWayPoint"}
+    F -->|成功| G["写入 path / curPathIdx"]
+    F -->|失败| H["NaviEnableResult 标记失败"]
+    E --> I["Update 推进移动"]
+    G --> I
+    I --> J{"_IsNeedTeleport"}
+    J -->|是| K["传送或强制修正"]
+    J -->|否| L["UnitMove 尝试移动到下一点"]
+```
+
 ## UnitController
 
 代码：
@@ -258,6 +385,27 @@ updated_at: 2026-06-20
 - 移动问题先判断是 `UnitMove` 逻辑修正还是 `UnitController` 物理碰撞。
 - 碰撞过滤依赖 fight group、always collider、skill collider。
 - 位置纠正后要看 `OnCorrectPosition` 是否同步到 controller。
+
+### 物理控制器时序图
+
+```mermaid
+sequenceDiagram
+    participant Unit as CombatUnit
+    participant Controller as UnitController
+    participant Conf as UnitConf
+    participant PhysX as PhysicsScene
+    participant Move as UnitMove
+
+    Unit->>Controller: OnPostEnterScene()
+    Controller->>Conf: GetFilterDataByUnitConf()
+    Controller->>PhysX: 创建 CCT / 写 filterData
+    Move->>Controller: Move(delta)
+    Controller->>PhysX: CCT move
+    PhysX-->>Controller: 碰撞结果 / ground flags
+    Controller-->>Move: 返回位置和碰撞状态
+    Unit->>Controller: OnLeaveScene()
+    Controller->>PhysX: 释放 CCT
+```
 
 ## 常见问题入口
 

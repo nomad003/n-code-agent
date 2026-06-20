@@ -39,6 +39,38 @@ updated_at: 2026-06-20
 | `BindInfo` | 平台、ECS bind、Unit 自动绑定标记 | 每帧检查平台绑定。 |
 | `EcsSnapshot` / `XActionSender` / `XActionReceiver` | XEcs、协议、AOI | 状态同步和客户端输入。 |
 
+### 模块关系图
+
+```mermaid
+flowchart TD
+    Unit["CombatUnit"]
+    State["StateManager"]
+    Skill["SkillMgr / SkillCore"]
+    Buff["XBuffContainer"]
+    AI["AIEntity / AIEnemyAgent"]
+    Effect["UnitEffect / AttrEffect"]
+    Doodad["DoodadInfo"]
+    Bind["BindInfo"]
+    Sync["EcsSnapshot / XActionSender / XActionReceiver"]
+    XEcs["XEcs"]
+
+    Unit --> State
+    Unit --> Skill
+    Unit --> Buff
+    Unit --> AI
+    Unit --> Effect
+    Unit --> Doodad
+    Unit --> Bind
+    Unit --> Sync
+    Skill --> State
+    Skill --> Buff
+    Skill --> XEcs
+    Buff --> Effect
+    State --> Skill
+    Bind --> XEcs
+    Sync --> XEcs
+```
+
 ## StateManager
 
 代码：
@@ -91,6 +123,22 @@ updated_at: 2026-06-20
 - 阶段不切换：看 `BossStage`、当前 HP、`EnemyStage.StaticsID`。
 - 状态技能不放：看 `mAllSkillType`、`SkillListForEnemy.ModeUse`。
 - 受击/放技能时延迟切状态：看 `HandleDelay`。
+
+### 状态事件流程图
+
+```mermaid
+flowchart TD
+    A["OnPreEnterScene"] --> B["读取 Boss/Player 状态配置"]
+    B --> C["InitSkill 建立状态技能映射"]
+    D["ProjectDamage"] --> E["HP / 韧性 / 机制条变化"]
+    F["OnAttrChange"] --> E
+    E --> G{"是否达到阶段或 Mode 条件"}
+    G -->|否| H["保留当前状态"]
+    G -->|是| I["BossStage / BossModeState 切换"]
+    I --> J["触发阶段 Buff / 技能 / cutscene"]
+    K["OnStartSkill / OnStartHit"] --> L["标记 casting / hitting"]
+    M["OnEndSkill / OnEndHit"] --> N["清理窗口状态"]
+```
 
 ## SkillMgr
 
@@ -148,6 +196,29 @@ updated_at: 2026-06-20
 - AI 不会用技能：查 `RegisterAIMgr` 是否注册到对应 `AISkillType`。
 - HP 阈值技能不触发：查 `m_HpMaxSkills` 和 `HpMaxLimit`。
 
+### 技能初始化时序图
+
+```mermaid
+sequenceDiagram
+    participant Enemy as CombatEnemy
+    participant SkillMgr as SkillMgr
+    participant AIConf as UnitAITable
+    participant Stats as XEntityStatistics
+    participant Config as SkillConfig
+    participant XEcs as XEcs
+
+    Enemy->>SkillMgr: Init(scene, unit)
+    SkillMgr->>SkillMgr: 判断 SKILL_ENEMY / SKILL_SPAWN
+    SkillMgr->>AIConf: 读取 AI 技能名
+    SkillMgr->>Config: GetEnemySkillConfigX(statisticsID, skillHash)
+    Config-->>SkillMgr: SkillListForEnemy 行或失败
+    SkillMgr->>Stats: 读取 AppearSkill / OtherSkills
+    SkillMgr->>Config: 创建模板额外技能
+    SkillMgr->>SkillMgr: RegisterAIMgr / InitConditionSkills
+    Enemy->>SkillMgr: PostInit BindEcs
+    SkillMgr->>XEcs: drive2skill 绑定技能系统
+```
+
 ## Buff 和 AI 接入
 
 `XBuffContainer`：
@@ -169,6 +240,30 @@ updated_at: 2026-06-20
 | 场景就绪 | agent `EnterScene`。 |
 | 每帧 | `AIEntity::Update`。 |
 | 离场 | agent `LeaveScene`。 |
+
+### Buff 与 AI 每帧时序图
+
+```mermaid
+sequenceDiagram
+    participant Scene as SceneBattle
+    participant Unit as CombatUnit
+    participant State as StateManager
+    participant Buff as XBuffContainer
+    participant AI as AIEntity
+    participant Navi as XNavigation
+    participant Move as UnitMove
+
+    loop 每帧
+        Scene->>Unit: Update(delta)
+        Unit->>State: Update(delta)
+        Unit->>Buff: Update(delta)
+        Buff-->>Unit: 触发属性/状态/技能事件
+        Unit->>AI: Update(delta)
+        AI->>Navi: 下发导航或技能意图
+        Unit->>Navi: Update(delta)
+        Unit->>Move: Update(delta)
+    end
+```
 
 ## UnitEffect 和 AttrEffect
 
@@ -204,6 +299,25 @@ updated_at: 2026-06-20
 
 - `AffixEffect.txt`
 - 运行时通过 `AffixEffectConfig` 查询。
+
+### Affix Effect 流程图
+
+```mermaid
+flowchart TD
+    A["技能 / Buff / 伤害事件"] --> B["UnitEffect 查询 effect type"]
+    B --> C{"Effect 类型"}
+    C -->|技能加 Buff| D["SKILL_ADDBUFF_TYPE"]
+    C -->|攻击加属性| E["ATTACK_ADDATTR_TYPE"]
+    C -->|技能加伤害| F["SKILL_ADD_DAMAGE_TYPE"]
+    C -->|Boss 状态| G["BOSS_ENTER_STATE_TYPE"]
+    D --> H["XBuffContainer 添加 Buff"]
+    E --> I["UnitCombatAttribute 临时属性"]
+    F --> J["伤害计算修正"]
+    G --> H
+    H --> K["事件结束时清理或保留"]
+    I --> K
+    J --> K
+```
 
 ## DoodadInfo
 
@@ -247,6 +361,23 @@ updated_at: 2026-06-20
 - 脚本绑定的 Unit 应由脚本解绑。
 - Enemy 默认不是自动绑定，通常通过技能或关卡脚本绑定。
 
+### Doodad 和 Bind 流程图
+
+```mermaid
+flowchart TD
+    A["Unit typelist 判断"] --> B{"是否 Doodad"}
+    B -->|是| C["绑定 DoodadInfo"]
+    C --> D["读取 DropObject / DoodadConfig"]
+    D --> E["Update 扣生命周期 / 检查拾取"]
+    B -->|否| F["跳过 DoodadInfo"]
+    G["BindInfo::Update"] --> H{"is_dirty_ 或 auto-bind"}
+    H -->|否| I["不处理绑定"]
+    H -->|是| J["检查平台关系"]
+    J --> K{"是否需要 bind/unbind"}
+    K -->|bind| L["xecs::bindTo"]
+    K -->|unbind| M["脚本或平台解绑"]
+```
+
 ## 同步
 
 `EcsSnapshot` 字段：
@@ -282,6 +413,29 @@ updated_at: 2026-06-20
 | `OnCastSync` | 处理技能释放同步。 |
 | `OnPositionCheck` | 位置校验。 |
 | `IsValid` | 输入对象有效性校验。 |
+
+### 同步发送与接收时序图
+
+```mermaid
+sequenceDiagram
+    participant Client as Client
+    participant Receiver as XActionReceiver
+    participant Unit as CombatUnit
+    participant XEcs as XEcs
+    participant Sender as XActionSender
+    participant AOI as AOI/协议广播
+
+    Client->>Receiver: Move / Face / Cast / Slot
+    Receiver->>Unit: IsValid 校验 UID、场景、状态
+    Receiver->>XEcs: 写入移动、朝向、技能输入
+    XEcs-->>Unit: 运行后状态和位置
+    Unit->>Sender: Package()
+    Sender->>Unit: NeedBroadCast()
+    Sender->>XEcs: 读取 pos / face / move / skill
+    Sender->>Sender: PackageSyncData(EcsSnapshot)
+    Sender->>AOI: Broadcast StepSyncData
+    AOI-->>Client: 同步结果
+```
 
 ## 常见问题入口
 

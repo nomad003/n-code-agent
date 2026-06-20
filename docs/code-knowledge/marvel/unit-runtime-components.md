@@ -52,6 +52,36 @@ updated_at: 2026-06-20
 | `CombatRole` | 继承 Unit 生命周期，补玩家/伙伴、网络会话、切人。 |
 | `DestructibleUnit` | 继承 Enemy/Unit，但裁剪组件和覆盖配置。 |
 
+### 模块依赖图
+
+```mermaid
+flowchart TD
+    CU["CombatUnit"]
+    Scene["Scene / SceneBattle"]
+    Level["LevelEnemyEventHandler"]
+    XEcs["XEcs"]
+    Tableload["Tableload"]
+    Combat["Combat 工具层"]
+    Buff["XBuffContainer"]
+    AI["AIEntity"]
+    PhysX["UnitController / PhysX"]
+    Enemy["CombatEnemy"]
+    Role["CombatRole"]
+    Destructible["DestructibleUnit"]
+
+    CU --> Scene
+    CU --> Level
+    CU --> XEcs
+    CU --> Tableload
+    CU --> Combat
+    CU --> Buff
+    CU --> AI
+    CU --> PhysX
+    Enemy --> CU
+    Role --> CU
+    Destructible --> Enemy
+```
+
 ## 核心字段
 
 身份和配置字段：
@@ -146,6 +176,24 @@ updated_at: 2026-06-20
 - Doodad/Destructible 不是完整 Enemy 组件集，不能假设有所有组件。
 - `PartialCall` 不会调用不在当前 typelist 中的组件。
 
+### 组件选择流程图
+
+```mermaid
+flowchart TD
+    A["读取 m_uEntitySpecies"] --> B{"选择 typelist"}
+    B -->|Enemy| C["TEnemyComponents"]
+    B -->|Role| D["TRoleComponents"]
+    B -->|Doodad| E["TDoodadComponents"]
+    B -->|Destructible| F["TDestructibleComponents"]
+    C --> G["InitComponents resize"]
+    D --> G
+    E --> G
+    F --> G
+    G --> H["Set / SetBind 写 m_oComponents"]
+    H --> I["PartialCall 计算当前 typelist 与调用集合交集"]
+    I --> J["只调用当前 Unit 实际拥有的组件"]
+```
+
 ## 生命周期实现
 
 构造：
@@ -199,6 +247,51 @@ updated_at: 2026-06-20
 | 5 | `Scene::DelUnit(this)` | 从场景容器删除。 |
 | 6 | `m_currScene = NULL` | 标记离场完成。 |
 
+### 生命周期时序图
+
+```mermaid
+sequenceDiagram
+    participant Caller as 创建方
+    participant Unit as CombatUnit
+    participant Scene as Scene
+    participant Components as Unit 组件
+
+    Caller->>Unit: InitComponents / InitTimers
+    Caller->>Unit: EnterScene(scene)
+    Unit->>Unit: OnPreEnterScene()
+    Unit->>Scene: AddUnit(this)
+    Unit->>Unit: OnPostEnterScene()
+    Unit->>Components: PartialCall(OnPostEnterScene)
+    loop 每帧
+        Scene->>Unit: Update(delta)
+        Unit->>Components: PartialCall(Update)
+        Unit->>Unit: UpdateDeath()
+    end
+    Caller->>Unit: LeaveScene()
+    Unit->>Components: PartialCall(OnLeaveScene)
+    Unit->>Scene: DelUnit(this)
+    Unit->>Unit: m_currScene = NULL
+```
+
+### 每帧更新流程图
+
+```mermaid
+flowchart TD
+    A["CombatUnit::Update(delta)"] --> B{"m_currScene 是否有效"}
+    B -->|否| Z["返回"]
+    B -->|是| C{"SceneBattle::IsStop"}
+    C -->|是| Z
+    C -->|否| D{"Unit 是否 puppet"}
+    D -->|是| E["delta = 0"]
+    D -->|否| F["保留原 delta"]
+    E --> G["StateManager::Update"]
+    F --> G
+    G --> H["CombatAttrCalc::RecoverVigorPerSec"]
+    H --> I["PartialCall: Buff / AI / Navi / Doodad / Bind / Move"]
+    I --> J["UpdatePerSceneSecond"]
+    J --> K["UpdateDeath"]
+```
+
 ## 事件入口
 
 | 事件 | 函数 | 默认行为 |
@@ -210,6 +303,21 @@ updated_at: 2026-06-20
 | 受伤 | `OnTakeDamage` | 基类空实现，Enemy/Role 可覆盖。 |
 | 创建召唤物 | `OnCreateEnemyByCaller` | 基类空实现。 |
 | 最后一击 | `OnHitByLastHit` | 基类空实现，Enemy Boss 集火会覆盖。 |
+
+### 事件与死亡流程图
+
+```mermaid
+flowchart TD
+    SkillStart["OnStartSkill"] --> Buff["Buff / State / 统计响应"]
+    SkillEnd["OnEndSkill"] --> Buff
+    HitStart["OnStartHit"] --> State["StateManager hit 窗口"]
+    HitEnd["OnEndHit"] --> State
+    Damage["OnTakeDamage"] --> HP["属性变化 / CurrentHp"]
+    HP --> DeathCheck["UpdateDeath / CheckDeath"]
+    DeathCheck -->|死亡| OnDied["OnDied"]
+    OnDied --> SceneDeath["Scene death queue / Level event"]
+    OnDied --> UnitLeave["LeaveScene 或延迟清理"]
+```
 
 ## 排查清单
 

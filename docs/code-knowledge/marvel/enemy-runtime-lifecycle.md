@@ -39,6 +39,31 @@ updated_at: 2026-06-20
 | `CombatAttrCalc` | Enemy/Spawn 属性初始化。 |
 | `SpawnConfig` | 召唤跟随和数量限制。 |
 
+### 生命周期模块图
+
+```mermaid
+flowchart TD
+    Level["Level::SpawnEnemy"]
+    Handler["SceneUnitHandler"]
+    Enemy["CombatEnemy"]
+    Unit["CombatUnit"]
+    Scene["SceneBattle"]
+    AI["AIEnemyAgent"]
+    Skill["SkillMgr"]
+    Attr["CombatAttrCalc"]
+    Spawn["SpawnControl"]
+
+    Level --> Handler
+    Handler --> Enemy
+    Enemy --> Unit
+    Enemy --> Scene
+    Enemy --> AI
+    Enemy --> Skill
+    Enemy --> Attr
+    Enemy --> Spawn
+    Unit --> Scene
+```
+
 ## CombatEnemy 字段
 
 关卡字段：
@@ -130,6 +155,47 @@ updated_at: 2026-06-20
 | 12 | caller `OnCreateEnemyByCaller`。 |
 | 13 | final host `SpawnControl::OnAdd`。 |
 
+### 创建入口流程图
+
+```mermaid
+flowchart TD
+    A{"创建来源"}
+    A -->|关卡刷怪| B["Level::SpawnEnemy"]
+    A -->|技能召唤| C["CreateUnitByCaller"]
+    A -->|可破坏物| D["CreateDestructible / CreateTemplateUnit"]
+    B --> E["SceneUnitHandler::CreateUnit"]
+    C --> E
+    D --> E
+    E --> F["查 XEntityStatistics"]
+    F -->|缺失| X["日志 + CHECK_COND_NORETURN(false)"]
+    F -->|存在| G["CreateTemplateUnit 按 Type 选派生"]
+    G --> H["CombatEnemy::Init"]
+    H --> I["写入 m_CreatedUnitList"]
+    I --> J["LevelInit 或召唤关系初始化"]
+    J --> K["EnterScene"]
+```
+
+### 关卡刷怪时序图
+
+```mermaid
+sequenceDiagram
+    participant Lua as Lua/Level 脚本
+    participant Level as Level
+    participant Handler as SceneUnitHandler
+    participant Enemy as CombatEnemy
+    participant Scene as SceneBattle
+
+    Lua->>Level: SpawnEnemy(monsterID, pos, wave, group)
+    Level->>Level: 平台坐标转换 / 地面高度修正
+    Level->>Handler: CreateUnit(monsterID, pos, Category_Enemy)
+    Handler->>Handler: 查模板并选择派生类
+    Handler->>Enemy: Init(conf, scene)
+    Handler-->>Level: enemy*
+    Level->>Enemy: LevelInit(wave, group, ai, patrol)
+    Level->>Scene: AddToGroup / timeline bind
+    Level->>Enemy: EnterScene(scene)
+```
+
 ## 初始化
 
 `CombatEnemy::Init` 顺序：
@@ -167,6 +233,32 @@ updated_at: 2026-06-20
 | `Type == Species_Doodad` | 强制加 `Feature_NoTarget` 和 `Feature_NoHit`。 |
 | `NoTargetBuff` | 写入 `m_uNoTargetBuff`。 |
 
+### Enemy 初始化时序图
+
+```mermaid
+sequenceDiagram
+    participant Handler as SceneUnitHandler
+    participant Enemy as CombatEnemy
+    participant Unit as CombatUnit
+    participant Conf as UnitConf
+    participant Skill as SkillMgr
+    participant Attr as CombatAttrCalc
+    participant XEcs as XEcs
+
+    Handler->>Enemy: Init(conf, scene)
+    Enemy->>Enemy: 写 template/present/species
+    Enemy->>Unit: InitComponents()
+    Enemy->>Conf: InitConf()
+    Enemy->>Unit: InitTimers()
+    Enemy->>Enemy: 创建 AIEnemyAgent
+    Enemy->>Skill: InitSkills(scene)
+    Enemy->>Attr: InitEnemyAttr()
+    Enemy->>Enemy: StateManager.Init / InitSkill
+    Enemy->>Enemy: InitFightGroup()
+    Enemy->>XEcs: xecs::create()
+    Enemy->>Skill: PostInit / BindEcs()
+```
+
 ## 进场和离场
 
 `OnPreEnterScene`：
@@ -196,6 +288,31 @@ updated_at: 2026-06-20
 | Boss 从 scene boss 消息通道移除。 |
 | 调 `HostDel` 通知召唤关系删除。 |
 
+### 进场和离场时序图
+
+```mermaid
+sequenceDiagram
+    participant Caller as 调用方
+    participant Enemy as CombatEnemy
+    participant Unit as CombatUnit
+    participant Scene as SceneBattle
+    participant AI as AIEnemyAgent
+
+    Caller->>Enemy: EnterScene(scene)
+    Enemy->>Enemy: OnPreEnterScene()
+    Enemy->>Enemy: InitLevel / InitBufflist / 场景自适应
+    Enemy->>Scene: 注册 Boss 消息通道
+    Enemy->>AI: StartLoad(scene)
+    Enemy->>Unit: CombatUnit::OnPreEnterScene()
+    Unit->>Scene: AddUnit(this)
+    Enemy->>Enemy: OnPostEnterScene()
+    Caller->>Enemy: LeaveScene()
+    Enemy->>AI: LeaveScene()
+    Enemy->>Scene: 移除 Boss 消息通道
+    Enemy->>Enemy: HostDel()
+    Enemy->>Unit: CombatUnit::LeaveScene()
+```
+
 ## LevelInit
 
 字段写入：
@@ -212,6 +329,28 @@ updated_at: 2026-06-20
 | `waveRange` | `AIUnitAgent::SetSight` | 覆盖视野。 |
 | `patrolID` | `AIEnemyAgent::SetPatrol` | 覆盖巡逻。 |
 | `AICustom` | `AIAgent::StoreCustomVariable` | 自定义变量。 |
+
+### LevelInit 流程图
+
+```mermaid
+flowchart TD
+    A["LevelInit 参数"] --> B["写 wave / group / waveIndex"]
+    B --> C["写 hostlevel / keep count"]
+    C --> D["写 interactExstring"]
+    D --> E{"aiID 是否覆盖"}
+    E -->|是| F["AIAgent::SetOriginAIID"]
+    E -->|否| G["保留模板 AIID"]
+    F --> H{"waveRange 是否覆盖"}
+    G --> H
+    H -->|是| I["AIUnitAgent::SetSight"]
+    H -->|否| J["保留 AI 配置视野"]
+    I --> K{"patrolID 是否覆盖"}
+    J --> K
+    K -->|是| L["AIEnemyAgent::SetPatrol"]
+    K -->|否| M["保留模板 PatrolID"]
+    L --> N["StoreCustomVariable"]
+    M --> N
+```
 
 ## 更新和死亡
 
@@ -244,6 +383,28 @@ updated_at: 2026-06-20
 | 打印 reason。 |
 | Doodad 清理时触发 `SceneEventDoodadCleanArgs`。 |
 | 非 destroying 时 `LeaveScene`。 |
+
+### 死亡和清理流程图
+
+```mermaid
+flowchart TD
+    A["CombatEnemy::Update"] --> B["CombatUnit::Update"]
+    B --> C{"m_deadtime > 0"}
+    C -->|否| D["CheckTrigger"]
+    C -->|是| E["按 SceneActionRate 扣倒计时"]
+    E --> F{"m_deadtime <= 0 或 magic 100"}
+    F -->|否| Z["等待下一帧"]
+    F -->|是| G["DoDeadDisappear"]
+    H["OnDied"] --> I["设置 m_deadtime"]
+    I --> J["SceneEventEnemyDieArgs"]
+    J --> K["LevelEventEnemyArgs_Die"]
+    K --> L["AI Dead 消息"]
+    L --> M["CombatUnit::OnDied"]
+    G --> N["CleanUpInScene(reason)"]
+    N --> O{"是否 destroying"}
+    O -->|否| P["LeaveScene"]
+    O -->|是| Q["跳过重复清理"]
+```
 
 ## 常见排查
 

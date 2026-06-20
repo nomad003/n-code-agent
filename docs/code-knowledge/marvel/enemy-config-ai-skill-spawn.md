@@ -40,6 +40,42 @@ updated_at: 2026-06-20
 | `SpawnLimit.ID` | `SpawnControl` | 召唤数量限制。 |
 | `DestructibleObject.TemplateID` | `DestructibleUnit::STATISTICS_ID` | 可破坏物覆盖配置。 |
 
+### 配置依赖图谱
+
+```mermaid
+flowchart TD
+    Stats["XEntityStatistics"]
+    Present["XEntityPresentation"]
+    UnitAI["UnitAITable / SquadMemberAITable"]
+    SkillEnemy["SkillListForEnemy"]
+    SkillRole["SkillListForRole"]
+    Buff["BuffTable / BuffIDTable"]
+    SpawnFollow["SpawnFollow"]
+    SpawnLimit["SpawnLimit"]
+    Destructible["DestructibleObject"]
+    Enemy["CombatEnemy"]
+    SkillMgr["SkillMgr"]
+    AI["AIEnemyAgent"]
+    Attr["CombatAttrCalc"]
+    SpawnControl["SpawnControl"]
+
+    Stats --> Present
+    Stats --> UnitAI
+    Stats --> SkillEnemy
+    Stats --> SkillRole
+    Stats --> Buff
+    Stats --> Attr
+    UnitAI --> AI
+    UnitAI --> SkillMgr
+    SkillEnemy --> SkillMgr
+    SkillRole --> SkillMgr
+    SpawnFollow --> Enemy
+    SpawnLimit --> SpawnControl
+    Destructible --> Enemy
+    Enemy --> AI
+    Enemy --> SkillMgr
+```
+
 ## XEntityStatistics 字段
 
 核心字段：
@@ -91,6 +127,21 @@ AI/技能字段：
 | `SkillListTable` | 非 0 时走 `SKILL_SPAWN`。 |
 | `SkillStatisticsID` | 复用另一个 statistics ID 的 `SkillListForEnemy`。 |
 
+### 模板字段到运行时流程图
+
+```mermaid
+flowchart TD
+    A["XEntityStatistics.ID"] --> B["SceneUnitHandler::CreateUnit"]
+    B --> C["CombatEnemy::Init"]
+    C --> D["PresentID -> UnitConf::InitFromPresent"]
+    C --> E["Type -> 派生类和组件 typelist"]
+    C --> F["Fightgroup -> InitFightGroup"]
+    C --> G["AIID -> AIEnemyAgent"]
+    C --> H["AppearSkill / OtherSkills -> SkillMgr"]
+    C --> I["BaseAttr / AttrCopy / ApplyScale -> CombatAttrCalc"]
+    C --> J["DeadDisappearTime / Feature / NoTargetBuff -> InitFromTemplate"]
+```
+
 ## XEntityPresentation 字段
 
 | 字段 | 用途 |
@@ -108,6 +159,22 @@ AI/技能字段：
 | `StateAbilityLocation` | 状态能力资源。 |
 | `LevelConfigFile` | 平台/关卡配置文件。 |
 | `ActionScript` | 动作脚本。 |
+
+### 表现配置加载流程图
+
+```mermaid
+flowchart TD
+    A["UnitConf::InitFromPresent(PresentID)"] --> B["读取 Prefab / Anim / Skill / Curve"]
+    B --> C["读取 Scale"]
+    C --> D["计算 BoundRadius / BoundHeight"]
+    D --> E{"Huge 是否开启"}
+    E -->|是| F["解析 HugeMonsterColliders"]
+    E -->|否| G["普通碰撞体"]
+    F --> H["写 UnitPhysicsConf"]
+    G --> H
+    H --> I["BuffListTag / CollisionStatus"]
+    I --> J["UnitMove / UnitController / Buff 目标判断使用"]
+```
 
 ## AI 配置链路
 
@@ -146,6 +213,24 @@ AI ID 选择：
 | `AIEnemyAgent::OnEnterScene` | 初始化巡逻路径。 |
 | `AIEnemyAgent::SetPatrol` | 关卡覆盖巡逻 ID。 |
 | `AIUnitAgent::DetectEnemyInSight` | 视野找敌并合并战斗组。 |
+
+### AI 加载与进战流程图
+
+```mermaid
+flowchart TD
+    A["CombatEnemy::Init"] --> B["new AIEnemyAgent(enemy, scene)"]
+    B --> C["_GetAIIDFromConfig"]
+    C --> D{"AIID[1]"}
+    D -->|0| E["读取 UnitAITable"]
+    D -->|1| F["读取 SquadMemberAITable"]
+    E --> G["AIUnitAgent::LoadConfig"]
+    F --> G
+    G --> H["加载 Tree / StateMachine / CustomVariables"]
+    H --> I["CombatEnemy::OnPreEnterScene"]
+    I --> J["AI StartLoad(scene)"]
+    J --> K["AIEnemyAgent::OnEnterScene"]
+    K --> L["巡逻 / DetectEnemyInSight / 进战"]
+```
 
 ## 技能配置链路
 
@@ -195,6 +280,31 @@ Spawn 技能：
 | `caster:%u skill:[%u %s] not find in conf` | `SkillCore::InitEnemySkill` 未拿到配置。 |
 | `skill:[%u-%u %s] not find in conf` | Spawn 技能走 `SkillListForRole` 查不到。 |
 
+### 技能查表时序图
+
+```mermaid
+sequenceDiagram
+    participant SkillMgr as SkillMgr
+    participant AIConf as UnitAITable
+    participant Stats as XEntityStatistics
+    participant Config as SkillConfig
+    participant Core as SkillCore
+
+    SkillMgr->>Stats: 判断 SkillListTable
+    alt 普通 Enemy
+        SkillMgr->>AIConf: 读取 Main/Left/Right 等技能名
+        SkillMgr->>Config: GetEnemySkillConfigX(statisticsID, skillHash)
+        Config-->>SkillMgr: 命中 SkillListForEnemy 或 fallback 0
+        SkillMgr->>Core: InitEnemySkill()
+    else Spawn
+        SkillMgr->>Config: GetSpawnSkillConfigX(roleSkillTable, skillHash)
+        Config-->>SkillMgr: 命中 SkillListForRole
+        SkillMgr->>Core: InitSpawnSkill()
+    end
+    SkillMgr->>Stats: 读取 AppearSkill / OtherSkills
+    SkillMgr->>SkillMgr: RegisterAIMgr / InitConditionSkills
+```
+
 ## 属性配置链路
 
 普通 Enemy：
@@ -217,6 +327,30 @@ Spawn 技能：
 | `CallerAttrList` | 按比例覆盖指定属性。 |
 | `DefaultLevel == 0` | 继承 caller 等级。 |
 | caller 是 Enemy | 可走队伍缩放。 |
+
+### 属性配置流程图
+
+```mermaid
+flowchart TD
+    A{"属性初始化类型"}
+    A -->|普通 Enemy| B["InitEnemyAttr"]
+    A -->|召唤物| C["InitSpawnAttr"]
+    B --> D["InitEnemyAttr_OfTable"]
+    C --> D
+    D --> E{"AttrCopy 非 0"}
+    E -->|是| F["切换复制模板读取基础属性"]
+    E -->|否| G["读取自身模板基础属性"]
+    F --> H["写 BaseAtk / BaseDef / BaseHp / BaseAttr"]
+    G --> H
+    H --> I{"ApplyScale 非 0"}
+    I -->|是| J["SceneScaleAttr / TeamScaleAttr"]
+    I -->|否| K["跳过场景缩放"]
+    J --> L["InitAttr_AtLast"]
+    K --> L
+    C --> M["复制 caller 未初始化属性"]
+    M --> N["CallerAttrList 按比例覆盖"]
+    N --> L
+```
 
 ## 召唤配置
 
@@ -258,6 +392,28 @@ Spawn 技能：
 - 旧召唤物先 `force2idle`，再 `drive2skill(dead_skill)`。
 - `OnDel` 从 `unit2group` 和 `group2units` 删除 UID。
 
+### 召唤控制流程图
+
+```mermaid
+flowchart TD
+    A["CreateUnitByCaller"] --> B["查召唤模板"]
+    B --> C["创建 CombatEnemy"]
+    C --> D["设置 host / finalhost / hostlevel / keep"]
+    D --> E{"SpawnFollow 是否存在"}
+    E -->|是| F["使用 caller 相对坐标"]
+    F --> G["xecs::bindTo(spawn, caller, Rigid)"]
+    E -->|否| H["使用传入世界坐标"]
+    G --> I["SetAttrByCaller"]
+    H --> I
+    I --> J["EnterScene"]
+    J --> K["finalhost SpawnControl::OnAdd"]
+    K --> L{"是否超过 SpawnLimit"}
+    L -->|否| M["记录召唤物 UID"]
+    L -->|是| N["最早召唤物 force2idle"]
+    N --> O["drive2skill(dead_skill)"]
+    O --> M
+```
+
 ## 可破坏物配置
 
 主链路：
@@ -286,6 +442,22 @@ Spawn 技能：
 | `InBornBuff` | 可破坏物出生 Buff。 |
 | `Fightgroup` | 阵营覆盖。 |
 | `TriggerObject` | 触发形状。 |
+
+### 可破坏物配置流程图
+
+```mermaid
+flowchart TD
+    A["创建 DestructibleUnit"] --> B["使用公共 XEntityStatistics 38000"]
+    B --> C["读取 DestructibleObject.TemplateID"]
+    C --> D["覆盖 BaseHp / ApplyScale / Fightgroup"]
+    D --> E["PresentationStages 选择阶段表现"]
+    E --> F["InitConf / InitBodySize"]
+    F --> G["OverrideDestructibleAttr"]
+    G --> H{"受到技能伤害"}
+    H --> I["检查 RoleSkillTypes / MonsterMinSkillDestructLevel / DestructLevel"]
+    I -->|可破坏| J["扣血 / 切阶段 / 死亡掉落"]
+    I -->|不可破坏| K["忽略或只播放受击表现"]
+```
 
 ## 常见排查
 
