@@ -94,6 +94,60 @@
     },
   ];
 
+  const MERMAID_FENCE_LANGS = new Set([
+    "mermaid",
+    "flowchart",
+    "graph",
+    "sequencediagram",
+    "classdiagram",
+    "statediagram",
+    "statediagram-v2",
+    "erdiagram",
+    "journey",
+    "gantt",
+    "pie",
+    "gitgraph",
+    "mindmap",
+    "timeline",
+    "quadrantchart",
+    "requirementdiagram",
+    "c4context",
+    "c4container",
+    "c4component",
+    "c4dynamic",
+    "xychart",
+    "block",
+    "packet",
+  ]);
+
+  const MERMAID_LABELS = {
+    flowchart: "流程图",
+    graph: "流程图",
+    sequenceDiagram: "时序图",
+    classDiagram: "类图",
+    stateDiagram: "状态图",
+    "stateDiagram-v2": "状态图",
+    erDiagram: "ER 图",
+    journey: "用户旅程",
+    gantt: "甘特图",
+    pie: "饼图",
+    gitGraph: "Git 图",
+    mindmap: "思维导图",
+    timeline: "时间线",
+    quadrantChart: "四象限图",
+    requirementDiagram: "需求图",
+    C4Context: "C4 图",
+    C4Container: "C4 图",
+    C4Component: "C4 图",
+    C4Dynamic: "C4 图",
+    xychart: "XY 图",
+    block: "Block 图",
+    packet: "Packet 图",
+  };
+
+  let diagramSeq = 0;
+  let mermaidLoadPromise = null;
+
   function pathToView(pathname) {
     if (pathname.indexOf("/admin/llm-traces") === 0) return "traces";
     if (pathname.indexOf("/knowledge/graph") === 0) return "graph";
@@ -294,12 +348,81 @@
       .replace(/'/g, "&#39;");
   }
 
+  function escapeAttr(text) {
+    return escapeHtml(text).replace(/`/g, "&#96;");
+  }
+
   function renderInline(text) {
     return escapeHtml(text)
+      .replace(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+|\/[^)\s]+|\.{1,2}\/[^)\s]+|[^):\s][^)\s]*)\)/g, '<img src="$2" alt="$1" loading="lazy">')
       .replace(/`([^`]+)`/g, "<code>$1</code>")
       .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
       .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>')
       .replace(/\[([^\]]+)\]\(([^):\s][^)\s]*)\)/g, '<span class="internal-link">$1</span>');
+  }
+
+  function parseTableRow(line) {
+    return line
+      .trim()
+      .replace(/^\|/, "")
+      .replace(/\|$/, "")
+      .split("|")
+      .map((cell) => cell.trim());
+  }
+
+  function isTableLine(line) {
+    return /^\s*\|.+\|\s*$/.test(line || "");
+  }
+
+  function isTableSeparator(line) {
+    return /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line || "");
+  }
+
+  function normalizedFenceLang(info) {
+    return String(info || "").trim().split(/\s+/)[0].replace(/[{}]/g, "");
+  }
+
+  function mermaidDirective(source) {
+    const first = String(source || "").trim().split(/\r?\n/, 1)[0] || "";
+    return first.trim().split(/\s+/, 1)[0] || "mermaid";
+  }
+
+  function diagramLabel(source, lang) {
+    const directive = mermaidDirective(source);
+    if (MERMAID_LABELS[directive]) return MERMAID_LABELS[directive];
+    const normalized = String(lang || "").toLowerCase();
+    const key = Object.keys(MERMAID_LABELS).find((item) => item.toLowerCase() === normalized);
+    return key ? MERMAID_LABELS[key] : "图";
+  }
+
+  function isMermaidFence(lang) {
+    return MERMAID_FENCE_LANGS.has(String(lang || "").toLowerCase());
+  }
+
+  function normalizedMermaidSource(lang, source) {
+    const raw = String(source || "").trim();
+    const normalized = String(lang || "").trim();
+    const lower = normalized.toLowerCase();
+    if (!raw || lower === "mermaid") return raw;
+    if (!isMermaidFence(normalized)) return raw;
+    const first = mermaidDirective(raw).toLowerCase();
+    if (MERMAID_FENCE_LANGS.has(first)) return raw;
+    if ((lower === "flowchart" || lower === "graph") && /^(td|lr|bt|rl)\b/i.test(raw)) {
+      return `${normalized} ${raw}`;
+    }
+    return `${normalized}\n${raw}`;
+  }
+
+  function renderDiagramFence(lang, source) {
+    const diagramSource = normalizedMermaidSource(lang, source);
+    const label = diagramLabel(diagramSource, lang);
+    return [
+      `<figure class="diagram-card" data-diagram-engine="mermaid" data-diagram-lang="${escapeAttr(lang || "mermaid")}">`,
+      '<figcaption><span>Mermaid</span><strong>' + escapeHtml(label) + '</strong><em class="diagram-status">待渲染</em></figcaption>',
+      '<div class="diagram-stage"><div class="diagram-canvas" aria-label="' + escapeAttr(label) + '"></div></div>',
+      '<pre class="diagram-source"><code>' + escapeHtml(diagramSource) + '</code></pre>',
+      "</figure>",
+    ].join("");
   }
 
   function stripFrontMatter(markdown) {
@@ -314,9 +437,11 @@
     const lines = stripFrontMatter(markdown).split(/\r?\n/);
     const html = [];
     let inCode = false;
+    let codeLang = "";
     let code = [];
     let list = [];
     let paragraph = [];
+    let table = [];
 
     function flushParagraph() {
       if (!paragraph.length) return;
@@ -331,19 +456,48 @@
     }
 
     function flushCode() {
-      html.push("<pre><code>" + escapeHtml(code.join("\n")) + "</code></pre>");
+      const source = code.join("\n");
+      if (isMermaidFence(codeLang)) {
+        html.push(renderDiagramFence(codeLang || "mermaid", source));
+      } else {
+        const langClass = codeLang ? ` class="language-${escapeAttr(codeLang)}"` : "";
+        html.push("<pre><code" + langClass + ">" + escapeHtml(source) + "</code></pre>");
+      }
       code = [];
+      codeLang = "";
+    }
+
+    function flushTable() {
+      if (!table.length) return;
+      if (table.length < 2 || !isTableSeparator(table[1])) {
+        table.forEach((line) => paragraph.push(line));
+        table = [];
+        return;
+      }
+      const header = parseTableRow(table[0]);
+      const body = table.slice(2).map(parseTableRow);
+      html.push(
+        '<div class="markdown-table-wrap"><table><thead><tr>'
+        + header.map((cell) => "<th>" + renderInline(cell) + "</th>").join("")
+        + "</tr></thead><tbody>"
+        + body.map((row) => "<tr>" + row.map((cell) => "<td>" + renderInline(cell) + "</td>").join("") + "</tr>").join("")
+        + "</tbody></table></div>"
+      );
+      table = [];
     }
 
     for (const line of lines) {
-      if (line.trim().startsWith("```")) {
+      const fence = /^```\s*([^`]*)$/.exec(line.trim());
+      if (fence) {
         if (inCode) {
           flushCode();
           inCode = false;
         } else {
           flushParagraph();
           flushList();
+          flushTable();
           inCode = true;
+          codeLang = normalizedFenceLang(fence[1]);
         }
         continue;
       }
@@ -351,15 +505,23 @@
         code.push(line);
         continue;
       }
+      if (isTableLine(line)) {
+        flushParagraph();
+        flushList();
+        table.push(line);
+        continue;
+      }
       if (!line.trim()) {
         flushParagraph();
         flushList();
+        flushTable();
         continue;
       }
       const heading = /^(#{1,4})\s+(.+)$/.exec(line);
       if (heading) {
         flushParagraph();
         flushList();
+        flushTable();
         const level = heading[1].length;
         html.push(`<h${level}>${renderInline(heading[2])}</h${level}>`);
         continue;
@@ -367,14 +529,17 @@
       const bullet = /^\s*[-*]\s+(.+)$/.exec(line);
       if (bullet) {
         flushParagraph();
+        flushTable();
         list.push(bullet[1]);
         continue;
       }
+      flushTable();
       paragraph.push(line);
     }
     if (inCode) flushCode();
     flushParagraph();
     flushList();
+    flushTable();
     return html.join("\n") || '<p class="empty">选择或新建一个知识卡片。</p>';
   }
 
@@ -701,6 +866,104 @@
     ).catch(() => {});
   }
 
+  function loadMermaid() {
+    if (!mermaidLoadPromise) {
+      mermaidLoadPromise = loadAnyScript(
+        ["/static/vendor/mermaid.min.js", "https://unpkg.com/mermaid@10/dist/mermaid.min.js"],
+        () => Boolean(window.mermaid && window.mermaid.render),
+        4000
+      );
+    }
+    return mermaidLoadPromise;
+  }
+
+  function initMermaidTheme() {
+    if (!window.mermaid || !window.mermaid.initialize) return;
+    const isLight = document.documentElement.classList.contains("theme-light");
+    window.mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: "strict",
+      theme: isLight ? "base" : "dark",
+      themeVariables: {
+        background: cssVar("--surface-2", isLight ? "#ffffff" : "#111929"),
+        primaryColor: cssVar("--surface-3", isLight ? "#e7edf7" : "#18223a"),
+        primaryTextColor: cssVar("--text", isLight ? "#162033" : "#f1f5ff"),
+        primaryBorderColor: cssVar("--border-2", isLight ? "#b9c8dc" : "#253452"),
+        lineColor: cssVar("--blue-hi", isLight ? "#1e55c4" : "#7badfa"),
+        secondaryColor: cssVar("--blue-dim", isLight ? "#e7efff" : "#0b1830"),
+        tertiaryColor: cssVar("--code-bg-soft", isLight ? "#e8eef7" : "#080d1c"),
+        noteBkgColor: cssVar("--surface-4", isLight ? "#dce6f3" : "#1e2c45"),
+        noteTextColor: cssVar("--text", isLight ? "#162033" : "#f1f5ff"),
+        actorBkg: cssVar("--surface-3", isLight ? "#e7edf7" : "#18223a"),
+        actorTextColor: cssVar("--text", isLight ? "#162033" : "#f1f5ff"),
+        actorBorder: cssVar("--border-2", isLight ? "#b9c8dc" : "#253452"),
+        signalColor: cssVar("--text-2", isLight ? "#526278" : "#a0b4cc"),
+        signalTextColor: cssVar("--text", isLight ? "#162033" : "#f1f5ff"),
+        fontFamily: cssVar("--font", "\"Plus Jakarta Sans\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif"),
+      },
+    });
+  }
+
+  function setDiagramStatus(figure, text, failed) {
+    const status = figure.querySelector(".diagram-status");
+    if (status) status.textContent = text;
+    figure.classList.toggle("has-error", Boolean(failed));
+  }
+
+  async function renderKnowledgeDiagrams(force = false) {
+    const root = document.querySelector(".markdown-preview");
+    if (!root) return;
+    const figures = Array.from(root.querySelectorAll('.diagram-card[data-diagram-engine="mermaid"]'));
+    if (!figures.length) return;
+    if (force) {
+      figures.forEach((figure) => {
+        figure.dataset.diagramRendered = "";
+        figure.dataset.diagramRendering = "";
+        figure.classList.remove("is-rendered", "has-error");
+        const canvas = figure.querySelector(".diagram-canvas");
+        if (canvas) canvas.innerHTML = "";
+        setDiagramStatus(figure, "待渲染", false);
+      });
+    }
+    const pending = figures.filter((figure) => figure.dataset.diagramRendered !== "1" && figure.dataset.diagramRendering !== "1");
+    if (!pending.length) return;
+    pending.forEach((figure) => {
+      figure.dataset.diagramRendering = "1";
+      setDiagramStatus(figure, "渲染中", false);
+    });
+    const loaded = await loadMermaid();
+    if (!loaded || !window.mermaid) {
+      pending.forEach((figure) => {
+        figure.dataset.diagramRendering = "";
+        setDiagramStatus(figure, "Mermaid 未加载，显示源码", true);
+      });
+      return;
+    }
+    initMermaidTheme();
+    for (const figure of pending) {
+      const source = figure.querySelector(".diagram-source code");
+      const canvas = figure.querySelector(".diagram-canvas");
+      if (!source || !canvas) continue;
+      const id = `code-agent-diagram-${Date.now()}-${diagramSeq++}`;
+      try {
+        const result = await window.mermaid.render(id, source.textContent || "");
+        canvas.innerHTML = typeof result === "string" ? result : (result.svg || "");
+        figure.dataset.diagramRendered = "1";
+        figure.dataset.diagramRendering = "";
+        figure.classList.add("is-rendered");
+        setDiagramStatus(figure, "已渲染", false);
+      } catch (err) {
+        canvas.innerHTML = "";
+        figure.dataset.diagramRendered = "1";
+        figure.dataset.diagramRendering = "";
+        setDiagramStatus(figure, "渲染失败，显示源码", true);
+        if (window.console && window.console.warn) {
+          window.console.warn("Mermaid render failed", err);
+        }
+      }
+    }
+  }
+
   function mountVueApp() {
   const app = window.Vue.createApp({
     data() {
@@ -823,6 +1086,9 @@
       });
       this.loadRepos().then(() => this.activateView());
     },
+    updated() {
+      this.scheduleKnowledgeDiagramRender(false);
+    },
     methods: {
       async apiJson(url, options) {
         const res = await fetch(url, options);
@@ -874,7 +1140,10 @@
         this.shell.theme = this.shell.theme === "dark" ? "light" : "dark";
         saveTheme(this.shell.theme);
         this.syncThemeClass();
-        this.$nextTick(() => this.refreshGraphTheme());
+        this.$nextTick(() => {
+          this.refreshGraphTheme();
+          this.scheduleKnowledgeDiagramRender(true);
+        });
       },
       shortQuestion(question) {
         return compactText(question || "无问题文本", 96);
@@ -1001,14 +1270,27 @@
           this.knowledge.meta = data.meta || {};
           this.knowledge.editing = false;
           this.knowledge.mode = "cards";
+          this.scheduleKnowledgeDiagramRender(true);
         });
       },
       newCard() {
         this.knowledge.name = "new-module.md";
         this.knowledge.meta = {};
-        this.knowledge.content = "---\ntype: Code Module\ntitle: 新模块\ntags: \n---\n\n# 新模块\n\n## 框架\n\n## 关键流程\n\n## 常见问题\n";
+        this.knowledge.content = "---\ntype: Code Module\ntitle: 新模块\ntags: \n---\n\n# 新模块\n\n## 框架\n\n## 关键流程\n\n```mermaid\nflowchart TD\n    A[\"入口\"] --> B[\"处理\"]\n    B --> C[\"结果\"]\n```\n\n## 常见问题\n";
         this.knowledge.mode = "cards";
         this.knowledge.editing = true;
+      },
+      showCardPreview() {
+        this.knowledge.editing = false;
+        this.scheduleKnowledgeDiagramRender(true);
+      },
+      scheduleKnowledgeDiagramRender(force) {
+        if (this.view !== "knowledge" || this.knowledge.mode !== "cards" || this.knowledge.editing) return;
+        if (this._diagramFrame) window.cancelAnimationFrame(this._diagramFrame);
+        this._diagramFrame = window.requestAnimationFrame(() => {
+          this._diagramFrame = null;
+          renderKnowledgeDiagrams(Boolean(force)).catch(() => {});
+        });
       },
       async saveCard() {
         await this.withLoading("保存卡片", async () => {

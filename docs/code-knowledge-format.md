@@ -212,6 +212,33 @@ updated_at: 2026-06-18
 ## 相关卡片
 ```
 
+## 图表约定
+
+每个稳定功能卡片不只写字段说明，还应补对应图表：
+
+- 模块关系：优先用 `flowchart` 表达上下游依赖。
+- 运行流程：优先用 `flowchart TD` 表达入口、条件分支和结果。
+- 调用时序：跨对象调用必须用 `sequenceDiagram`。
+- 状态/生命周期：状态切换可用 `stateDiagram-v2` 或流程图。
+- 数据模型：配置表、实体、字段关系可用 `erDiagram` 或流程图。
+
+前端 Markdown 预览支持 Mermaid fenced block，会按暗色/亮色主题渲染，并在加载失败时显示源码：
+
+````md
+```mermaid
+sequenceDiagram
+    participant A as 调用方
+    participant B as 运行模块
+    A->>B: Init()
+    B-->>A: ready
+```
+````
+
+可使用的 Mermaid 类型包括 `flowchart`、`sequenceDiagram`、`classDiagram`、
+`stateDiagram-v2`、`erDiagram`、`gantt`、`pie`、`mindmap`、`timeline`、`journey`
+和 `gitGraph`。推荐统一使用 ```` ```mermaid ```` 作为 fence 语言，避免不同 Markdown
+工具对非标准 fence 的兼容差异。
+
 ## 描述写法
 
 - `description` 只写短摘要。

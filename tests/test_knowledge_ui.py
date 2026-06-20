@@ -25,7 +25,13 @@ def test_knowledge_page_smoke():
     assert "调查" in html and "复盘" in html and "知识" in html and "图谱" in html
     assert "theme-toggle" in html
     assert "markdown-preview" in html
+    assert "showCardPreview" in html
     assert "brand-mark" not in html
+    app_js = Path("code_agent/static/app.js").read_text(encoding="utf-8")
+    assert "renderKnowledgeDiagrams" in app_js
+    assert "mermaid.min.js" in app_js
+    assert "diagram-card" in app_js
+    assert "markdown-table-wrap" in app_js
 
 
 def test_knowledge_graph_page_smoke():

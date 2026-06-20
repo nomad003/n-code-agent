@@ -853,6 +853,48 @@ summary {
   margin-top: 4px;
 }
 
+.markdown-table-wrap {
+  width: 100%;
+  overflow: auto;
+  margin: 12px 0 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+
+.markdown-preview table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.markdown-preview th,
+.markdown-preview td {
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdown-preview th:last-child,
+.markdown-preview td:last-child {
+  border-right: 0;
+}
+
+.markdown-preview tr:last-child td {
+  border-bottom: 0;
+}
+
+.markdown-preview th {
+  color: var(--text);
+  background: var(--surface-3);
+  font-weight: 800;
+}
+
 .markdown-preview code {
   border: 1px solid var(--border-2);
   border-radius: var(--r-xs);
@@ -874,6 +916,107 @@ summary {
   background: transparent;
   color: inherit;
   padding: 0;
+}
+
+.markdown-preview img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 12px 0 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+
+.diagram-card {
+  margin: 14px 0 20px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: linear-gradient(180deg, var(--surface), var(--surface-2));
+}
+
+.diagram-card figcaption {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.diagram-card figcaption span {
+  border: 1px solid rgba(34, 211, 238, 0.28);
+  border-radius: var(--r-full);
+  background: rgba(34, 211, 238, 0.08);
+  color: var(--cyan);
+  padding: 3px 7px;
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.diagram-card figcaption strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.diagram-status {
+  margin-left: auto;
+  color: var(--text-3);
+  font-style: normal;
+  font-size: 11px;
+}
+
+.diagram-stage {
+  overflow: auto;
+  background:
+    linear-gradient(90deg, var(--body-grid-x) 1px, transparent 1px),
+    linear-gradient(180deg, var(--body-grid-y) 1px, transparent 1px),
+    var(--surface-2);
+  background-size: 28px 28px, 28px 28px, auto;
+}
+
+.diagram-canvas {
+  min-height: 120px;
+  min-width: 520px;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.diagram-canvas:empty::before {
+  content: "准备渲染图";
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.diagram-canvas svg {
+  max-width: none;
+  height: auto;
+}
+
+.diagram-source {
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--code-bg);
+}
+
+.diagram-card.is-rendered .diagram-source {
+  display: none;
+}
+
+.diagram-card.has-error {
+  border-color: rgba(252, 129, 129, 0.45);
+}
+
+.diagram-card.has-error .diagram-status {
+  color: var(--red);
 }
 
 .markdown-preview a,

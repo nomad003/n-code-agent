@@ -245,7 +245,7 @@
             <h2>模块卡片</h2>
             <div class="actions compact">
               <button class="ghost" v-if="!knowledge.editing" @click="knowledge.editing = true">编辑</button>
-              <button class="ghost" v-if="knowledge.editing" @click="knowledge.editing = false">预览</button>
+              <button class="ghost" v-if="knowledge.editing" @click="showCardPreview">预览</button>
               <button class="primary" v-if="knowledge.editing" @click="saveCard" :disabled="loading || !knowledge.name.trim()">保存</button>
             </div>
           </div>
