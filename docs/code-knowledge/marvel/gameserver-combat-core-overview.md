@@ -316,7 +316,9 @@ updated_at: 2026-06-20
 
 - `scene-battle-framework.md`：SceneBattle、SceneHandler、场景事件。
 - `level-spawner-framework.md`：LevelSpawner、Level、刷怪和 Lua 关卡。
-- `unit-framework.md`：CombatUnit、CombatEnemy、CombatRole、组件 typelist。
+- [Unit 通用层](unit-framework.md)：CombatUnit、组件 typelist、通用 Unit 配置映射。已建立。
+- `enemy-framework.md`：CombatEnemy、怪物、召唤物、可破坏物。
+- `role-framework.md`：CombatRole、玩家、伙伴、机器人、切人。
 - `skill-framework.md`：SkillMgr、SkillCore、SkillConfig、技能配置链路。
 - `buff-framework.md`：XBuffContainer、BuffConfig、Buff effect/trigger。
 - `ai-framework.md`：AIAgent、AIUnitAgent、AI 节点、AI 配置。
@@ -325,3 +327,4 @@ updated_at: 2026-06-20
 ## 相关卡片
 
 - [marvel 代码知识库索引](index.md)
+- [Unit 通用层](unit-framework.md)
