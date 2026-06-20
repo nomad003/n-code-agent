@@ -17,7 +17,7 @@ A "游戏服务器/战斗/客户端/引擎 代码理解服务" (code-comprehensi
 Request flow:
 
 ```
-HTTP POST /ask  →  FastAPI (code_agent.interfaces.main)  →  LLM agent loop (code_agent.core.agent)
+HTTP POST /ask  →  FastAPI (code_agent.server.app)  →  LLM agent loop (code_agent.core.agent)
                                               │  litellm
                                               ▼
                                    mushigen proxy → gemini-3.5-flash
@@ -53,7 +53,9 @@ Intended module responsibilities:
 | `code_agent/retrieval/` | Search tools, offline index build/query, shortcut, per-repo navigation/profile |
 | `code_agent/kb/` | Knowledge flywheel, OKF graph, module cards, Assert catalog, knowledge evaluation |
 | `code_agent/diagnostics/` | Runtime diagnosis (方向 F): parse backtrace, map frames to code via index, run agent |
-| `code_agent/interfaces/` | FastAPI service, MCP server and CLI entrypoints |
+| `code_agent/server/` | FastAPI service, HTTP API routes, cache and concurrency gate |
+| `code_agent/frontend/` | Bundled Vue frontend assets and page shell helpers |
+| `code_agent/interfaces/` | CLI and MCP entrypoints, plus the legacy HTTP import shim |
 | `code_agent/observability/` | Per-request JSONL trace and `/admin/llm-traces` helpers |
 | `code_agent/evals/` | Eval harness (方向 E): score {question → expected files/symbols}; `--twice` measures flywheel recall |
 | `code_agent/*.py` | Compatibility shims for old imports and `python -m code_agent.<module>` commands |

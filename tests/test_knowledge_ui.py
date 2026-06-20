@@ -28,7 +28,7 @@ def test_knowledge_page_smoke():
     assert "knowledge-tree" in html
     assert "showCardPreview" in html
     assert "brand-mark" not in html
-    app_js = Path("code_agent/static/app.js").read_text(encoding="utf-8")
+    app_js = Path("code_agent/frontend/static/app.js").read_text(encoding="utf-8")
     assert "renderKnowledgeDiagrams" in app_js
     assert "knowledgeCardRows" in app_js
     assert "toggleKnowledgeTree" in app_js
@@ -53,7 +53,7 @@ def test_trace_page_smoke():
     assert "Round 明细" in html
     assert "本轮原始事件" in html
     assert '<script src="https://unpkg.com' not in html
-    app_js = Path("code_agent/static/app.js").read_text(encoding="utf-8")
+    app_js = Path("code_agent/frontend/static/app.js").read_text(encoding="utf-8")
     assert "renderTraceFallback" in app_js
     assert "/static/vendor/vue.global.prod.js" in app_js
 

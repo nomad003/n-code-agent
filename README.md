@@ -10,7 +10,7 @@
 客户端 (HTTP POST /ask)
     │
     ▼
-FastAPI 服务 (code_agent.interfaces.main)
+FastAPI 服务 (code_agent.server.app)
     │
     ▼
 LLM Agent (code_agent.core.agent) ── litellm ──► mushigen proxy ──► gemini-3.5-flash
@@ -137,7 +137,9 @@ curl -X POST http://localhost:8900/ask \
 | `code_agent/retrieval/` | 沙箱工具、离线索引、索引查询、repo profile |
 | `code_agent/kb/` | 知识库、知识图谱、模块卡、Assert 知识 |
 | `code_agent/diagnostics/` | backtrace/log 诊断 |
-| `code_agent/interfaces/` | HTTP、CLI、MCP 入口 |
+| `code_agent/server/` | FastAPI 服务、HTTP API、缓存和并发闸门 |
+| `code_agent/frontend/` | Vue 前端资产和页面 shell |
+| `code_agent/interfaces/` | CLI、MCP 入口，以及旧 HTTP shim |
 | `code_agent/*.py` | 旧路径兼容 shim，例如 `python -m code_agent.main` 仍可用 |
 | `docs/` | 项目文档 |
 | `scripts/` | 启动、测试、索引、评测脚本 |

@@ -37,7 +37,7 @@ def test_health(client):
 def test_ui_page(client):
     r = client.get("/ui")
     assert r.status_code == 200
-    assert "Code Agent 提问测试" in r.text
+    assert "Code Agent Workbench" in r.text
     assert "question_type" in r.text
 
 

@@ -12,7 +12,7 @@
 客户端
   │  HTTP POST /ask   或   CLI
   ▼
-code_agent.interfaces.main / code_agent.interfaces.cli
+code_agent.server.app / code_agent.interfaces.cli
                             入口（HTTP 服务 / 命令行），HTTP 入口带问答缓存
   ▼
 agent.answer(question, repo=...)  按 repo 选择目标仓库，按 AGENT_BACKEND 分发
@@ -121,10 +121,12 @@ custom 的 system prompt 分三层：基础工具策略、`plain/technical/edit`
 | `code_agent/retrieval/` | 沙箱工具、离线索引、索引查询、shortcut、repo profile |
 | `code_agent/kb/` | 知识飞轮、知识图谱、模块知识卡、Assert catalog、知识评测 |
 | `code_agent/diagnostics/` | backtrace/log 诊断与预解析 |
-| `code_agent/interfaces/` | FastAPI、MCP server、CLI |
+| `code_agent/server/` | FastAPI 服务、HTTP API、缓存、并发闸门、页面路由 |
+| `code_agent/frontend/` | Vue 前端静态资源和页面 shell helper |
+| `code_agent/interfaces/` | MCP server、CLI，以及旧 HTTP shim |
 | `code_agent/observability/` | LLM trace 写入和 trace viewer API |
 | `code_agent/evals/` | `/ask` 回答质量评测 |
-| `code_agent/static/` | Vue 前端静态资源 |
+| `code_agent/static` | 指向 `code_agent/frontend/static` 的兼容路径 |
 | `code_agent/*.py` | 旧路径兼容 shim，不放业务逻辑 |
 | `vendor/claude-cli/` | 内置 Claude Code CLI（linux-x64，二进制经 Git LFS） |
 

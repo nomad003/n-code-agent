@@ -1,6 +1,6 @@
-"""Compatibility shim for :mod:`code_agent.interfaces.main`."""
+"""Compatibility shim for :mod:`code_agent.server.app`."""
 import sys as _sys
-from .interfaces import main as _impl
+from .server import app as _impl
 
 
 if __name__ == "__main__":
