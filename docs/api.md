@@ -91,6 +91,14 @@ curl -X POST http://localhost:8900/ask \
 ```json
 {
   "default": "gameserver",
+  "modes": {
+    "default": "plain",
+    "allowed": ["plain", "technical"],
+    "labels": {
+      "plain": "level 1 / non-programmer",
+      "technical": "level 2 / programmer"
+    }
+  },
   "repos": [
     {"name": "gameserver", "path": "/path/to/gameserver"},
     {"name": "ecs", "path": "/path/to/ecs"}

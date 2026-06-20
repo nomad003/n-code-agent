@@ -117,15 +117,16 @@ AGENT_BACKEND = os.environ.get("AGENT_BACKEND", "custom").strip().lower()
 # - technical = programmer-oriented code interpretation.
 # - edit      = direct code-modification mode, only if the backend/tools allow it.
 #
-# The request may choose a mode, but it must be enabled here. Default is the
-# safest external mode; open higher levels explicitly, e.g.
+# The request may choose a mode, but it must be enabled here. The workbench
+# enables read-only programmer analysis by default; direct edit mode remains
+# opt-in, e.g.
 #   AGENT_ALLOWED_MODES=plain,technical
 #   AGENT_ALLOWED_MODES=plain,technical,edit
 AGENT_DEFAULT_MODE = operation_modes.normalize(
     os.environ.get("AGENT_DEFAULT_MODE", "plain")
 )
 AGENT_ALLOWED_MODES = operation_modes.parse_allowed(
-    os.environ.get("AGENT_ALLOWED_MODES", AGENT_DEFAULT_MODE)
+    os.environ.get("AGENT_ALLOWED_MODES", "plain,technical")
 )
 
 # Model used by the SDK backend (Bedrock model id). Falls back to the

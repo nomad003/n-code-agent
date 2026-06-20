@@ -986,6 +986,11 @@
         defaultRepo: "",
         repos: [],
         selectedRepo: "",
+        modes: {
+          default: "plain",
+          allowed: ["plain"],
+          labels: {},
+        },
         ask: {
           mode: "technical",
           question_type: "outage_log",
@@ -995,6 +1000,7 @@
           answer: "",
           raw: "",
         },
+        errorText: "",
         traceDir: "",
         traceFiles: [],
         selectedTrace: "",
@@ -1163,6 +1169,15 @@
           edges: (this.knowledge.graph.edges || []).length,
         };
       },
+      modeOptions() {
+        const allowed = Array.isArray(this.modes.allowed) && this.modes.allowed.length
+          ? this.modes.allowed
+          : ["plain"];
+        return allowed.map((mode) => ({
+          value: mode,
+          label: this.modes.labels && this.modes.labels[mode] ? `${mode} - ${this.modes.labels[mode]}` : mode,
+        }));
+      },
     },
     mounted() {
       this.syncSidebarClass();
@@ -1194,13 +1209,15 @@
       async withLoading(label, fn) {
         this.loading = true;
         this.statusText = label;
+        this.errorText = "";
         try {
           const result = await fn();
           this.statusText = "完成";
           return result;
         } catch (err) {
           this.statusText = "失败";
-          throw err;
+          this.errorText = err && err.message ? err.message : String(err || "请求失败");
+          return null;
         } finally {
           this.loading = false;
         }
@@ -1275,9 +1292,30 @@
           const data = await this.apiJson("/repos");
           this.defaultRepo = data.default || "";
           this.repos = data.repos || [];
+          this.modes = {
+            default: data.modes && data.modes.default ? data.modes.default : "plain",
+            allowed: data.modes && Array.isArray(data.modes.allowed) && data.modes.allowed.length ? data.modes.allowed : ["plain"],
+            labels: data.modes && data.modes.labels ? data.modes.labels : {},
+          };
+          this.syncModeSelection();
           const current = this.repos.find((repo) => repo.name === this.defaultRepo) || this.repos[0];
           if (current && !this.selectedRepo) this.selectedRepo = current.name;
         });
+      },
+      syncModeSelection() {
+        const allowed = Array.isArray(this.modes.allowed) && this.modes.allowed.length
+          ? this.modes.allowed
+          : ["plain"];
+        const fallback = allowed.includes(this.modes.default) ? this.modes.default : allowed[0];
+        if (!allowed.includes(this.ask.mode)) this.ask.mode = fallback;
+      },
+      preferredKnowledgeQaMode() {
+        const allowed = Array.isArray(this.modes.allowed) && this.modes.allowed.length
+          ? this.modes.allowed
+          : ["plain"];
+        if (allowed.includes("technical")) return "technical";
+        if (allowed.includes(this.ask.mode)) return this.ask.mode;
+        return allowed.includes(this.modes.default) ? this.modes.default : allowed[0];
       },
       fillExample() {
         this.ask.question = EXAMPLE_LOG;
@@ -1988,7 +2026,7 @@
               repo: this.selectedRepo,
               question: this.knowledge.curateQuestion,
               question_type: this.knowledge.curateQuestionType,
-              mode: "technical",
+              mode: this.preferredKnowledgeQaMode(),
             }),
           });
           this.selectQa({

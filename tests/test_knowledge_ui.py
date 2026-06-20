@@ -30,12 +30,18 @@ def test_knowledge_page_smoke():
     assert "brand-mark" not in html
     app_js = Path("frontend/static/app.js").read_text(encoding="utf-8")
     assert "renderKnowledgeDiagrams" in app_js
+    assert "modeOptions" in app_js
+    assert "preferredKnowledgeQaMode" in app_js
     assert "knowledgeCardRows" in app_js
     assert "toggleKnowledgeTree" in app_js
     assert "encodePath(name)" in app_js
     assert "mermaid.min.js" in app_js
+    assert "/static/vendor/vis-network.min.js" in app_js
     assert "diagram-card" in app_js
     assert "markdown-table-wrap" in app_js
+    assert Path("frontend/static/vendor/vue.global.prod.js").exists()
+    assert Path("frontend/static/vendor/vis-network.min.js").exists()
+    assert Path("frontend/static/vendor/mermaid.min.js").exists()
 
 
 def test_knowledge_graph_page_smoke():

@@ -18,7 +18,7 @@ cp .env.example .env     # 填入 LLM_API_KEY，按需改 TARGET_CODE_PATH / COD
 |------|--------|------|
 | `AGENT_BACKEND` | `custom` | 后端：`custom`（litellm）或 `sdk`（Claude Agent SDK） |
 | `AGENT_DEFAULT_MODE` | `plain` | 默认回答/操作等级：`plain`、`technical`、`edit` |
-| `AGENT_ALLOWED_MODES` | `plain` | agent 开启的模式白名单，逗号分隔；接口只能选择这里已开启的模式 |
+| `AGENT_ALLOWED_MODES` | `plain,technical` | agent 开启的模式白名单，逗号分隔；接口只能选择这里已开启的模式；`edit` 必须显式追加 |
 | `TARGET_CODE_PATH` | `./target_code` | **被分析的目标代码库路径** |
 | `CODE_REPOS` | （空） | 多仓库配置，格式 `gameserver=/path/to/gameserver,ecs=/path/to/ecs`；不设时走 `TARGET_CODE_PATH` 单仓库兼容模式 |
 | `CODE_REPO_DEFAULT` | `default` 或 `CODE_REPOS` 首项 | 默认仓库名；`/ask`、CLI、MCP 不传 `repo` 时使用 |
@@ -98,10 +98,10 @@ python -m code_agent.retrieval.repo_profile --repo ecs
 | `technical` | 2 | 程序员 | 允许代码级解读、调用链、风险点、文件和行号；不直接改代码 |
 | `edit` | 3 | 程序员 / agent 自动改码 | 允许直接代码修改类任务；必须显式开启，且仍受后端工具能力和沙箱限制 |
 
-默认只开启 `plain`。例如要开放程序员解读：
+默认开启 `plain` 和 `technical`，不传 `mode` 时仍使用 `AGENT_DEFAULT_MODE=plain`。如果要只开放非程序员回答：
 
 ```bash
-AGENT_ALLOWED_MODES=plain,technical scripts/serve.sh
+AGENT_ALLOWED_MODES=plain scripts/serve.sh
 ```
 
 要开放直接改码入口：
@@ -109,6 +109,8 @@ AGENT_ALLOWED_MODES=plain,technical scripts/serve.sh
 ```bash
 AGENT_ALLOWED_MODES=plain,technical,edit scripts/serve.sh
 ```
+
+前端会读取 `/repos` 返回的 `modes.allowed`，只展示当前服务真正允许的模式，避免选择未开启模式后收到 403。
 
 > `SYSTEM_PROMPT_BASE` 和各模式提示词只在代码中维护；运行时用 `system_prompt_for_mode(mode)` 组合。
 

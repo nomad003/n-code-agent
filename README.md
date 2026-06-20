@@ -75,6 +75,7 @@ AGENT_BACKEND=sdk scripts/cli.sh "SceneMgr 是做什么的？"
 | `TARGET_CODE_PATH` | `./target_code` | 被分析的目标代码库路径 |
 | `CODE_REPOS` | （空） | 多仓库配置，如 `gameserver=/path/a,ecs=/path/b`；不设时使用 `TARGET_CODE_PATH` 单仓库模式 |
 | `CODE_REPO_DEFAULT` | `default` 或首个仓库 | 默认仓库名 |
+| `AGENT_ALLOWED_MODES` | `plain,technical` | 允许的回答/操作模式；`edit` 需显式追加 |
 | `LLM_API_KEY` | （必填，无默认） | 认证 token，从环境变量 / `.env` 读取，不写进代码 |
 
 ## 仓库概览 / 导航缓存

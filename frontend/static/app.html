@@ -57,6 +57,7 @@
           <p>{{ viewSubtitle }}</p>
         </div>
         <div class="topbar-actions">
+          <span class="status" :class="{ busy: loading }">{{ statusText }}</span>
           <button class="theme-toggle" type="button" @click="toggleTheme" :aria-label="shell.theme === 'dark' ? '切换亮色模式' : '切换暗色模式'" :title="shell.theme === 'dark' ? '切换亮色模式' : '切换暗色模式'">
             <span :class="{ active: shell.theme === 'dark' }">暗</span>
             <span :class="{ active: shell.theme === 'light' }">亮</span>
@@ -65,8 +66,9 @@
       </header>
 
       <section v-if="!vueReady" class="notice danger">
-        Vue 没有加载成功，请检查浏览器是否能访问 Vue CDN，或改成本地 vendored Vue 文件。
+        Vue 没有加载成功，请检查 /static/vendor/vue.global.prod.js 是否存在。
       </section>
+      <section v-if="errorText" class="notice danger">{{ errorText }}</section>
 
       <section v-if="view === 'ask'" class="workspace two-col">
         <div class="panel">
@@ -84,8 +86,7 @@
             </label>
             <label>模式
               <select v-model="ask.mode">
-                <option value="plain">plain</option>
-                <option value="technical">technical</option>
+                <option v-for="mode in modeOptions" :key="mode.value" :value="mode.value">{{ mode.label }}</option>
               </select>
             </label>
             <label>问题类型
@@ -380,7 +381,7 @@
             </div>
 
             <div v-if="!graphStats.concepts && !graphStats.tags" class="notice graph-empty">当前仓库没有可展示的知识图谱节点。请切换到 {{ defaultRepo || '默认聚合仓库' }}，或先新增知识卡片。</div>
-            <div v-else-if="!knowledge.graphVisAvailable" class="notice graph-empty">vis-network 没有加载成功，请检查浏览器是否能访问 CDN。</div>
+            <div v-else-if="!knowledge.graphVisAvailable" class="notice graph-empty">vis-network 没有加载成功，请检查 /static/vendor/vis-network.min.js 是否存在。</div>
             <div v-show="graphStats.concepts || graphStats.tags" id="graph-canvas" ref="graphCanvas"></div>
             <div class="graph-status">{{ knowledge.graphStatus }}</div>
           </div>

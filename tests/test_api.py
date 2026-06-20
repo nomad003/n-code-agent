@@ -41,6 +41,15 @@ def test_ui_page(client):
     assert "question_type" in r.text
 
 
+def test_repos_exposes_enabled_modes(client):
+    r = client.get("/repos")
+    assert r.status_code == 200
+    modes = r.json()["modes"]
+    assert modes["default"] == "plain"
+    assert modes["allowed"] == ["plain"]
+    assert modes["labels"]["plain"]
+
+
 def test_ask_returns_answer(client):
     r = client.post("/ask", json={"question": "什么是 SceneMgr？"})
     assert r.status_code == 200

@@ -192,6 +192,14 @@ def health() -> dict:
 def repos() -> dict:
     return {
         "default": config.CODE_REPO_DEFAULT,
+        "modes": {
+            "default": config.AGENT_DEFAULT_MODE,
+            "allowed": list(config.AGENT_ALLOWED_MODES),
+            "labels": {
+                mode: operation_modes.MODE_LABELS.get(mode, mode)
+                for mode in config.AGENT_ALLOWED_MODES
+            },
+        },
         "repos": [
             {
                 "name": name,
