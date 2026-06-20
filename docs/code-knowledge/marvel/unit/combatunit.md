@@ -10,8 +10,8 @@ symbols: CombatUnit, CombatUnit::EnterScene, CombatUnit::LeaveScene, CombatUnit:
 logs: enter scene, leave scene, Check cond
 asserts: CHECK_COND, CHECK_COND_NORETURN
 question_types: crash_stack, outage_log, feature_impl
-part_of: ../unit-framework.md
-depends_on: ../unit-framework.md
+part_of: unit/index.md
+depends_on: unit/index.md
 updated_at: 2026-06-20
 ---
 

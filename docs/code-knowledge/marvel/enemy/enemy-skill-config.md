@@ -4,13 +4,13 @@ title: Enemy 技能配置查表
 description: Enemy 技能从 AI 技能名、AppearSkill、OtherSkills 查 SkillListForEnemy 或 Spawn SkillListForRole。
 repo: marvel
 module: gameserver/unit/enemy-skill-config
-resource: gameserver/unit/skill
+resource: gameserver/tableload/skillconfig.cpp, gameserver/unit/skill/skillcore.cpp, gameserver/unit/skill/skillmgr.cpp
 tags: enemy, skill, config, skilllist, spawn
 symbols: SkillConfig::GetEnemySkillConfigX, SkillCore::InitEnemySkill, SkillCore::InitSpawnSkill, SkillListForEnemy, SkillListForRole
 logs: enemy conf skill, skill not find in conf
-asserts: CHECK_COND_WITH_LOG_RETURN
+asserts: CHECK_COND, CHECK_COND_WITH_LOG_RETURN
 question_types: crash_stack, outage_log, feature_impl, config_impl
-part_of: ../enemy-framework.md
+part_of: enemy/index.md
 depends_on: ../unit/skill-mgr.md, enemy-template-config.md
 updated_at: 2026-06-20
 ---
@@ -24,6 +24,16 @@ updated_at: 2026-06-20
 | 模块 | Enemy/Spawn 技能查表链路。 |
 | 职责 | 把 AI 技能名和模板技能字段转成 `SkillCore` 配置。 |
 | 关键风险 | 普通 Enemy 和 Spawn 查不同表。 |
+
+## 回答要求
+
+用户贴 `enemy conf skill` / `not find in conf` / `InitEnemySkill` / `GetEnemySkillConfigX` 日志时，最终答案必须原样列出：
+
+- 配置查表函数：`SkillConfig::GetEnemySkillConfigX`。
+- 技能初始化函数：`SkillCore::InitEnemySkill`。
+- 配置表：`SkillListForEnemy`。
+- 关键文件：`gameserver/tableload/skillconfig.cpp`、`gameserver/unit/skill/skillcore.cpp`、`gameserver/unit/skill/skillmgr.cpp`。
+- 原始日志短语：`not find in conf`。
 
 ## 查表规则
 
@@ -64,4 +74,3 @@ sequenceDiagram
 | `enemy conf skill:[...] not find` | `SkillListForEnemy` 缺 `(statisticsID, skillHash)`，fallback 也没有。 |
 | `caster:%u skill:[%u %s] not find in conf` | `SkillCore::InitEnemySkill` 未拿到配置。 |
 | `skill:[%u-%u %s] not find in conf` | Spawn 走 `SkillListForRole` 查不到。 |
-

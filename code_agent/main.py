@@ -398,7 +398,8 @@ def knowledge_save(req: KnowledgeSaveRequest) -> dict:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(req.content.rstrip() + "\n")
-    return {"repo": repo_name, "name": os.path.basename(path), "saved": True}
+    rel = os.path.relpath(path, _knowledge_repo_dir(repo_name)).replace(os.sep, "/")
+    return {"repo": repo_name, "name": rel, "saved": True}
 
 
 @app.get("/knowledge/api/graph")
@@ -424,9 +425,10 @@ def knowledge_precipitate(req: KnowledgePrecipitateRequest) -> dict:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(content.rstrip() + "\n")
+    rel = os.path.relpath(path, _knowledge_repo_dir(repo_name)).replace(os.sep, "/")
     return {
         "repo": repo_name,
-        "name": os.path.basename(path),
+        "name": rel,
         "saved": True,
         "content": content,
     }

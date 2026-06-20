@@ -7,7 +7,9 @@ from code_agent import module_knowledge
 def _write_knowledge_card(tmp_path, name, content):
     root = tmp_path / "docs" / "code-knowledge" / "marvel"
     root.mkdir(parents=True, exist_ok=True)
-    (root / name).write_text(content, encoding="utf-8")
+    path = root / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
 
 
 def test_recall_monster_config_card(monkeypatch, tmp_path):
@@ -107,3 +109,85 @@ def test_build_messages_injects_module_card(monkeypatch, tmp_path):
     assert "代码知识库地图" in msgs[0]["content"]
     assert "已命中的模块知识卡" in msgs[0]["content"]
     assert "SkillListForEnemy" in msgs[0]["content"]
+
+
+def test_build_messages_injects_split_enemy_cards(monkeypatch, tmp_path):
+    _write_knowledge_card(
+        tmp_path,
+        "enemy/enemy-skill-config.md",
+        (
+            "---\n"
+            "type: Code Module\n"
+            "title: Enemy 技能配置查表\n"
+            "description: Enemy 技能缺失日志和 SkillListForEnemy 查表。\n"
+            "repo: marvel\n"
+            "tags: enemy, skill, config, 怪物, 技能, 配置\n"
+            "symbols: SkillConfig::GetEnemySkillConfigX, SkillCore::InitEnemySkill, SkillListForEnemy\n"
+            "logs: enemy conf skill, skill not find in conf\n"
+            "updated_at: 2026-06-20\n"
+            "---\n\n"
+            "# Enemy 技能配置查表\n\n"
+            "普通 Enemy 走 SkillListForEnemy；Spawn 走 SkillListForRole。\n"
+        ),
+    )
+    _write_knowledge_card(
+        tmp_path,
+        "enemy/enemy-ai-agent.md",
+        (
+            "---\n"
+            "type: Code Module\n"
+            "title: AIEnemyAgent 怪物 AI\n"
+            "description: AIID、UnitAITable、Sight 和 PatrolID 排查。\n"
+            "repo: marvel\n"
+            "tags: enemy, ai, 怪物\n"
+            "symbols: AIEnemyAgent, AIUnitAgent\n"
+            "updated_at: 2026-06-20\n"
+            "---\n\n"
+            "# AIEnemyAgent 怪物 AI\n\nAIID 选择 UnitAITable 或 SquadMemberAITable。\n"
+        ),
+    )
+    monkeypatch.setattr(config, "PROJECT_ROOT", str(tmp_path))
+    monkeypatch.setattr(config, "CODE_REPOS", {})
+    monkeypatch.setattr(config, "CODE_REPO_DEFAULT", "marvel")
+    monkeypatch.setattr(config, "TARGET_CODE_PATH", str(tmp_path))
+    monkeypatch.setattr(config, "LLM_PROMPT_CACHE", False)
+
+    a = agent.CodeAgent(mode="plain")
+    a.question = "GetEnemySkillConfigX enemy conf skill not find，怪物技能配置缺失怎么查？"
+    msgs = a._build_messages(with_tools=True)
+
+    assert "enemy/enemy-skill-config.md" in msgs[0]["content"]
+    assert "Enemy 技能配置查表" in msgs[0]["content"]
+    assert "SkillListForEnemy" in msgs[0]["content"]
+
+
+def test_answer_evidence_footer_uses_specific_card_fields(monkeypatch, tmp_path):
+    _write_knowledge_card(
+        tmp_path,
+        "enemy/enemy-skill-config.md",
+        (
+            "---\n"
+            "type: Code Module\n"
+            "title: Enemy 技能配置查表\n"
+            "tags: enemy, skill, config, 怪物\n"
+            "resource: gameserver/tableload/skillconfig.cpp, gameserver/unit/skill/skillcore.cpp\n"
+            "symbols: SkillConfig::GetEnemySkillConfigX, SkillCore::InitEnemySkill, SkillListForEnemy\n"
+            "logs: enemy conf skill, not find in conf\n"
+            "asserts: CHECK_COND\n"
+            "---\n\n"
+            "# Enemy 技能配置查表\n\nSkillListForEnemy 缺失会触发 not find in conf。\n"
+        ),
+    )
+    monkeypatch.setattr(config, "PROJECT_ROOT", str(tmp_path))
+    monkeypatch.setattr(config, "CODE_REPOS", {})
+    monkeypatch.setattr(config, "CODE_REPO_DEFAULT", "marvel")
+    monkeypatch.setattr(config, "TARGET_CODE_PATH", str(tmp_path))
+
+    a = agent.CodeAgent(mode="technical")
+    a.question = "GetEnemySkillConfigX enemy conf skill not find in conf"
+    footer = a._knowledge_evidence_footer("已有回答")
+
+    assert "enemy/enemy-skill-config.md" in footer
+    assert "gameserver/unit/skill/skillcore.cpp" in footer
+    assert "SkillConfig::GetEnemySkillConfigX" in footer
+    assert "not find in conf" in footer

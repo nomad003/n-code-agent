@@ -10,7 +10,7 @@ symbols: CombatAttrCalc, CombatAttrCalc::InitEnemyAttr, CombatAttrCalc::InitSpaw
 logs: Check cond
 asserts: CHECK_COND
 question_types: outage_log, feature_impl, config_impl
-part_of: ../unit-framework.md
+part_of: unit/index.md
 depends_on: unit-combat-attribute.md, unit-conf.md
 updated_at: 2026-06-20
 ---

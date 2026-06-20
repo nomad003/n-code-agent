@@ -10,7 +10,7 @@ symbols: SceneUnitHandler, SceneUnitHandler::CreateUnit, SceneUnitHandler::Creat
 logs: can't find monster template id, caller create not find template id, Spawn Enemy failed
 asserts: CHECK_COND_NORETURN
 question_types: crash_stack, outage_log, feature_impl, config_impl
-part_of: ../enemy-framework.md
+part_of: enemy/index.md
 depends_on: combat-enemy.md
 updated_at: 2026-06-20
 ---

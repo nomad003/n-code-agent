@@ -15,6 +15,10 @@ def test_classify_config_impl():
     assert question_intent.classify("这个配置项怎么加载和生效？") == "config_impl"
 
 
+def test_classify_table_like_identifier_as_config_impl():
+    assert question_intent.classify("SpawnFollow 和 SpawnLimit 数量不对怎么查？") == "config_impl"
+
+
 def test_classify_feature_impl():
     assert question_intent.classify("匹配功能是怎么实现的，调用链是什么？") == "feature_impl"
 

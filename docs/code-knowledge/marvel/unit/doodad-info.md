@@ -10,7 +10,7 @@ symbols: DoodadInfo, DropObject, DoodadConfig
 logs: Check cond
 asserts: CHECK_COND
 question_types: feature_impl, config_impl, outage_log
-part_of: ../unit-framework.md
+part_of: unit/index.md
 depends_on: unit-components.md
 updated_at: 2026-06-20
 ---

@@ -23,8 +23,8 @@ updated_at: 2026-06-20
 
 ## 已整理
 
-- [gameserver 核心战斗总体框架](gameserver-combat-core-overview.md)
-- [Unit 通用层](unit-framework.md)
+- [gameserver 核心战斗总体框架](gameserver/combat-core-overview.md)
+- [Unit 层索引](unit/index.md)
 - [CombatUnit 运行骨架](unit/combatunit.md)
 - [Unit 组件系统](unit/unit-components.md)
 - [UnitConf 配置封装](unit/unit-conf.md)
@@ -41,7 +41,7 @@ updated_at: 2026-06-20
 - [DoodadInfo 掉落物信息](unit/doodad-info.md)
 - [BindInfo 平台绑定](unit/bind-info.md)
 - [Unit 同步模块](unit/unit-sync.md)
-- [Enemy 层](enemy-framework.md)
+- [Enemy 层索引](enemy/index.md)
 - [CombatEnemy 生命周期](enemy/combat-enemy.md)
 - [SceneUnitHandler 创建入口](enemy/scene-unit-handler.md)
 - [Level::SpawnEnemy 刷怪入口](enemy/level-spawn-enemy.md)

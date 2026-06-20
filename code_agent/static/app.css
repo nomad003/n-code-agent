@@ -730,61 +730,109 @@ summary {
 
 .knowledge-tree {
   display: grid;
-  gap: 8px;
+  gap: 2px;
+  margin-top: 2px;
 }
 
-.tree-group {
-  margin-top: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  background: var(--surface-2);
-  overflow: hidden;
-}
-
-.tree-group summary {
-  min-height: 34px;
+.tree-folder {
+  width: 100%;
+  min-height: 32px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
-  margin: 0;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
-  color: var(--text);
+  gap: 7px;
+  border-color: transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  padding: 6px 8px 6px calc(8px + var(--tree-depth, 0) * 16px);
   font-size: 12px;
   font-weight: 900;
+  text-align: left;
 }
 
-.tree-group summary small {
+.tree-folder:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.tree-caret {
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid currentColor;
+  transform: translateX(2px);
+  transition: transform 0.16s ease;
+}
+
+.tree-folder.open .tree-caret {
+  transform: rotate(90deg) translateX(2px);
+}
+
+.tree-folder-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-folder small {
   min-width: 22px;
   min-height: 20px;
   display: grid;
   place-items: center;
   border-radius: var(--r-full);
-  background: var(--surface-3);
-  color: var(--text-2);
+  background: var(--surface-2);
+  color: var(--text-3);
   font-family: var(--mono);
   font-size: 10px;
 }
 
 .tree-card {
-  border-width: 0 0 1px;
-  border-radius: 0;
-  padding-left: calc(10px + var(--tree-depth, 0) * 12px);
+  border-color: transparent;
+  border-radius: var(--r-sm);
+  padding: 8px 10px 8px calc(22px + var(--tree-depth, 0) * 16px);
   background: transparent;
 }
 
-.tree-card:last-child {
-  border-bottom: 0;
-}
-
 .tree-card:hover {
-  background: var(--surface-3);
+  border-color: transparent;
+  background: var(--surface-2);
 }
 
 .tree-card.active {
+  border-color: var(--border-2);
   background: var(--blue-mid);
   box-shadow: inset 3px 0 0 var(--blue);
+}
+
+.tree-card span {
+  font-size: 12px;
+}
+
+.tree-card small {
+  display: grid;
+  gap: 2px;
+}
+
+.tree-card small strong,
+.tree-card small em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-card small strong {
+  color: var(--text-3);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.tree-card small em {
+  color: var(--text-3);
+  font-style: normal;
 }
 
 .segmented {

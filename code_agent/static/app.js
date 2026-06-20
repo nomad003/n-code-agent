@@ -584,6 +584,13 @@
     return value || fallback;
   }
 
+  function encodePath(path) {
+    return String(path || "")
+      .split("/")
+      .map((segment) => encodeURIComponent(segment))
+      .join("/");
+  }
+
   applyDocumentTheme(readTheme());
 
   async function fallbackApiJson(url) {
@@ -1000,6 +1007,7 @@
           content: "",
           meta: {},
           editing: false,
+          treeOpen: {},
           graph: { nodes: [], edges: [] },
           graphRelations: GRAPH_RELATIONS.slice(),
           graphSourceRepo: "",
@@ -1062,36 +1070,84 @@
       renderedKnowledge() {
         return renderMarkdown(this.knowledge.content);
       },
-      knowledgeCardGroups() {
-        const order = ["_root", "unit", "enemy", "gameserver", "ecs", "common"];
-        const groups = new Map();
+      knowledgeCardRows() {
+        const order = ["index.md", "gameserver", "unit", "enemy", "ecs", "common"];
+        const root = { children: [], childMap: new Map() };
+        const ensureFolder = (parent, segment, path, depth) => {
+          if (!parent.childMap) parent.childMap = new Map();
+          if (!parent.childMap.has(segment)) {
+            const folder = {
+              kind: "folder",
+              id: path,
+              label: segment,
+              depth,
+              count: 0,
+              children: [],
+              childMap: new Map(),
+            };
+            parent.childMap.set(segment, folder);
+            parent.children.push(folder);
+          }
+          return parent.childMap.get(segment);
+        };
         (this.knowledge.cards || []).forEach((card) => {
           const segments = Array.isArray(card.segments) && card.segments.length
             ? card.segments
-            : String(card.name || "").split("/");
-          const groupId = segments.length > 1 ? segments[0] : "_root";
-          if (!groups.has(groupId)) {
-            groups.set(groupId, {
-              id: groupId,
-              label: groupId === "_root" ? "根目录" : groupId,
-              cards: [],
-            });
-          }
-          groups.get(groupId).cards.push(Object.assign({}, card, {
-            treeDepth: Math.max(0, segments.length - 1),
-          }));
-        });
-        return Array.from(groups.values())
-          .sort((a, b) => {
-            const ai = order.indexOf(a.id);
-            const bi = order.indexOf(b.id);
-            if (ai !== -1 || bi !== -1) return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-            return a.label.localeCompare(b.label);
-          })
-          .map((group) => {
-            group.cards.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
-            return group;
+            : String(card.name || "").split("/").filter(Boolean);
+          if (!segments.length) return;
+          let parent = root;
+          let prefix = "";
+          segments.slice(0, -1).forEach((segment, index) => {
+            prefix = prefix ? `${prefix}/${segment}` : segment;
+            parent = ensureFolder(parent, segment, prefix, index);
           });
+          const leaf = segments[segments.length - 1];
+          parent.children.push({
+            kind: "card",
+            id: card.name,
+            label: card.title || leaf,
+            leaf,
+            depth: Math.max(0, segments.length - 1),
+            card,
+          });
+        });
+        const rank = (node) => {
+          const key = node.kind === "folder" ? node.label : node.leaf;
+          const index = order.indexOf(key);
+          return index === -1 ? 99 : index;
+        };
+        const sortTree = (node) => {
+          node.children.sort((a, b) => {
+            const ar = rank(a);
+            const br = rank(b);
+            if (ar !== br) return ar - br;
+            if (a.kind !== b.kind) return a.kind === "folder" ? -1 : 1;
+            return String(a.label || "").localeCompare(String(b.label || ""));
+          });
+          node.children.forEach((child) => {
+            if (child.kind === "folder") {
+              sortTree(child);
+              child.count = child.children.reduce(
+                (total, item) => total + (item.kind === "folder" ? item.count : 1),
+                0
+              );
+            }
+          });
+        };
+        const rows = [];
+        const flatten = (children) => {
+          children.forEach((node) => {
+            if (node.kind === "folder") {
+              rows.push(node);
+              if (this.isKnowledgeTreeOpen(node.id)) flatten(node.children);
+            } else {
+              rows.push(node);
+            }
+          });
+        };
+        sortTree(root);
+        flatten(root.children);
+        return rows;
       },
       knowledgeMetaRows() {
         return Object.entries(this.knowledge.meta || {}).map(([key, value]) => ({
@@ -1175,6 +1231,15 @@
           this.refreshGraphTheme();
           this.scheduleKnowledgeDiagramRender(true);
         });
+      },
+      isKnowledgeTreeOpen(id) {
+        return this.knowledge.treeOpen[id] !== false;
+      },
+      toggleKnowledgeTree(id) {
+        this.knowledge.treeOpen = {
+          ...this.knowledge.treeOpen,
+          [id]: !this.isKnowledgeTreeOpen(id),
+        };
       },
       shortQuestion(question) {
         return compactText(question || "无问题文本", 96);
@@ -1286,15 +1351,17 @@
         await this.withLoading("加载知识库", async () => {
           const data = await this.apiJson("/knowledge/api?repo=" + encodeURIComponent(this.selectedRepo));
           this.knowledge.cards = data.cards || [];
-          if (this.knowledge.cards.length && !this.knowledge.name) {
-            await this.loadCard(this.knowledge.cards[0].name);
+          const selectedExists = this.knowledge.cards.some((card) => card.name === this.knowledge.name);
+          if (this.knowledge.cards.length && (!this.knowledge.name || !selectedExists)) {
+            const first = this.knowledge.cards.find((card) => card.name === "index.md") || this.knowledge.cards[0];
+            await this.loadCard(first.name);
           }
           if (this.knowledge.mode === "qa") await this.loadKnowledgeQa();
         });
       },
       async loadCard(name) {
         await this.withLoading("读取卡片", async () => {
-          const url = "/knowledge/api/" + encodeURIComponent(this.selectedRepo) + "/" + encodeURIComponent(name);
+          const url = "/knowledge/api/" + encodeURIComponent(this.selectedRepo) + "/" + encodePath(name);
           const data = await this.apiJson(url);
           this.knowledge.name = data.name || name;
           this.knowledge.content = data.content || "";
@@ -1305,7 +1372,7 @@
         });
       },
       newCard() {
-        this.knowledge.name = "new-module.md";
+        this.knowledge.name = "unit/new-module.md";
         this.knowledge.meta = {};
         this.knowledge.content = "---\ntype: Code Module\ntitle: 新模块\ntags: \n---\n\n# 新模块\n\n## 框架\n\n## 关键流程\n\n```mermaid\nflowchart TD\n    A[\"入口\"] --> B[\"处理\"]\n    B --> C[\"结果\"]\n```\n\n## 常见问题\n";
         this.knowledge.mode = "cards";
@@ -1325,7 +1392,7 @@
       },
       async saveCard() {
         await this.withLoading("保存卡片", async () => {
-          await this.apiJson("/knowledge/api", {
+          const data = await this.apiJson("/knowledge/api", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -1334,6 +1401,7 @@
               content: this.knowledge.content,
             }),
           });
+          this.knowledge.name = data.name || this.knowledge.name;
           await this.loadKnowledge();
           this.knowledge.editing = false;
         });

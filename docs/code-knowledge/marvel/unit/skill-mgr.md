@@ -10,7 +10,7 @@ symbols: SkillMgr, SkillCore, SkillMgr::Init, SkillMgr::CreateSkill, SkillMgr::R
 logs: skill not find in conf
 asserts: CHECK_COND_WITH_LOG_RETURN
 question_types: crash_stack, outage_log, feature_impl, config_impl
-part_of: ../unit-framework.md
+part_of: unit/index.md
 depends_on: combatunit.md
 updated_at: 2026-06-20
 ---

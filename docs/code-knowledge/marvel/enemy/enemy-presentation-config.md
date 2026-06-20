@@ -10,7 +10,7 @@ symbols: XEntityPresentation, UnitConf::InitFromPresent, UnitConf::InitBodySize
 logs: Check cond
 asserts: CHECK_COND_NORETURN
 question_types: feature_impl, config_impl, outage_log
-part_of: ../enemy-framework.md
+part_of: enemy/index.md
 depends_on: enemy-template-config.md, ../unit/unit-conf.md
 updated_at: 2026-06-20
 ---

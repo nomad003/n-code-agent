@@ -120,14 +120,15 @@ docs/code-knowledge/
   common/
   marvel/
     index.md
-    gameserver-combat-core-overview.md
-    unit-framework.md
-    enemy-framework.md
+    gameserver/
+      combat-core-overview.md
     unit/
+      index.md
       combatunit.md
       unit-conf.md
       skill-mgr.md
     enemy/
+      index.md
       combat-enemy.md
       enemy-skill-config.md
       spawn-control.md

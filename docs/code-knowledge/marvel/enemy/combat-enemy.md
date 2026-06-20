@@ -10,7 +10,7 @@ symbols: CombatEnemy, CombatEnemy::Init, CombatEnemy::LevelInit, CombatEnemy::On
 logs: create enemy uid, pre enter scene, post enter scene, dead disappear, clear up scene, leave scene
 asserts: CHECK_COND, CHECK_COND_NORETURN
 question_types: crash_stack, outage_log, feature_impl
-part_of: ../enemy-framework.md
+part_of: enemy/index.md
 depends_on: ../unit/combatunit.md
 updated_at: 2026-06-20
 ---

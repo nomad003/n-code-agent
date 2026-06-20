@@ -68,8 +68,10 @@ scripts/knowledge-eval.sh eval/knowledge.marvel.jsonl --top-k 5
 其中 `expect_top_card` 检查 raw top1 排序；`expect_cards` 检查有效命中集合：
 raw top-K + `links_to` / `part_of` / `depends_on` / `supplements` / `contradicts` / `supersedes` 一跳扩展。
 
-默认集 `eval/knowledge.marvel.jsonl` 是当前活跃知识库的评测入口。旧版
-`marvel` 卡片已归档到 `docs/code-knowledge-archive/2026-06-20/`，对应旧评测集也保存在该归档目录。
+默认集 `eval/knowledge.marvel.jsonl` 是当前活跃知识库的评测入口。当前内容是怪物专项集，
+覆盖 Enemy 技能缺失日志、模板/表现配置、AI、刷怪、属性、召唤、可破坏物，以及怪物依赖的
+Unit 移动、导航、物理、状态、Buff、绑定和同步模块。旧版 `marvel` 卡片已归档到
+`docs/code-knowledge-archive/2026-06-20/`，对应旧评测集也保存在该归档目录。
 
 ## /ask 回答质量评测（方向 E，需要可用代理 + key）
 

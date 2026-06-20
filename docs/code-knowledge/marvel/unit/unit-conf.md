@@ -10,7 +10,7 @@ symbols: UnitConf, UnitPhysicsConf, UnitConf::InitFromPresent, UnitConf::InitFro
 logs: can't find monster template id
 asserts: CHECK_COND_NORETURN
 question_types: outage_log, feature_impl, config_impl
-part_of: ../unit-framework.md
+part_of: unit/index.md
 depends_on: combatunit.md
 updated_at: 2026-06-20
 ---

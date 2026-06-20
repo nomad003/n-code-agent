@@ -1,27 +1,23 @@
 ---
-type: Code Module
-title: Unit 通用层
+type: Reference
+title: Unit 层索引
 description: CombatUnit 通用组件地图。排除 Enemy/Role 派生细节。
 repo: marvel
 module: gameserver/unit
 resource: gameserver/unit
-tags: unit, combatunit, component, attr, move, state, skill, buff, ai, sync, ecs, config, 战斗单位
-symbols: CombatUnit, IUnitComponent, UnitConf, UnitCombatAttribute, CombatAttrCalc, UnitMove, StateManager, SkillMgr, XBuffContainer, AIEntity, XNavigation, UnitEffect, DoodadInfo, BindInfo, UnitController, EcsSnapshot, XActionSender, XActionReceiver
-logs: enter scene, leave scene, can't find monster template id, UnitLogInf, UnitLogErr, SyncStep, Check cond
-asserts: CHECK_COND, CHECK_COND_NORETURN
-question_types: crash_stack, outage_log, feature_impl, config_impl
-part_of: gameserver-combat-core-overview.md
-depends_on: gameserver-combat-core-overview.md
+tags: unit, combatunit, layer, index, 战斗单位
+part_of: ../gameserver/combat-core-overview.md
+depends_on: ../gameserver/combat-core-overview.md
 updated_at: 2026-06-20
 ---
 
-# Unit 通用层
+# Unit 层索引
 
 ## 卡片说明
 
 | 项 | 内容 |
 | --- | --- |
-| 用途 | 说明 `CombatUnit` 通用骨架。 |
+| 用途 | 作为 Unit 层目录，指向每个独立模块知识卡。 |
 | 覆盖 | Unit 生命周期、组件组合、通用配置来源。 |
 | 不展开 | `CombatEnemy`、`CombatRole` 的派生初始化和业务细节。 |
 | 适用问题 | crash 栈、宕机日志、功能实现、配置实现。 |
@@ -75,22 +71,22 @@ updated_at: 2026-06-20
 
 | 子卡 | 重点 | 适用问题 |
 | --- | --- | --- |
-| [CombatUnit 运行骨架](unit/combatunit.md) | Unit 身份、场景生命周期、更新、死亡入口。 | crash 栈、离场后引用、死亡没触发。 |
-| [Unit 组件系统](unit/unit-components.md) | 组件 typelist、`InitComponents`、`PartialCall`。 | 组件为空、组件未调用。 |
-| [UnitConf 配置封装](unit/unit-conf.md) | 模板/表现/物理参数聚合。 | 配置缺失、体型/碰撞异常。 |
-| [UnitCombatAttribute 属性容器](unit/unit-combat-attribute.md) | 属性数组、当前值约束、属性变化事件。 | 属性读写和同步异常。 |
-| [CombatAttrCalc 属性初始化](unit/combat-attr-calc.md) | 属性加载、复制、缩放、最终当前值。 | 属性过高/过低、召唤继承。 |
-| [UnitMove 移动与碰撞修正](unit/unit-move.md) | 移动入口、阻挡、动态墙、可行走区。 | 穿墙、拉回、高度异常。 |
-| [XNavigation 导航模块](unit/xnavigation.md) | 目标修正、路径、直线可达、传送判定。 | AI 导航失败。 |
-| [UnitController 物理控制器](unit/unit-controller.md) | PhysX CCT、碰撞过滤、控制器释放。 | 物理碰撞和 CCT crash。 |
-| [StateManager 状态管理](unit/state-manager.md) | 阶段、Mode、机制条、技能/hit 窗口。 | 状态切换、状态技能。 |
-| [SkillMgr 技能管理](unit/skill-mgr.md) | 技能创建、AI 注册、条件技能、ECS 绑定。 | 技能对象和 AI 技能。 |
-| [XBuffContainer Buff 容器接入](unit/xbuff-container.md) | Buff 生命周期和 Unit 事件接入。 | 出生 Buff、技能 Buff。 |
-| [AIEntity AI 容器](unit/ai-entity.md) | AI agent 生命周期和每帧驱动。 | AI 不运行。 |
-| [UnitEffect Affix Effect](unit/unit-effect.md) | Affix effect 事件触发。 | Effect/Buff/属性修正。 |
-| [DoodadInfo 掉落物信息](unit/doodad-info.md) | Doodad/drop 生命周期。 | 掉落物清理和拾取。 |
-| [BindInfo 平台绑定](unit/bind-info.md) | 平台自动绑定、脚本绑定和解绑。 | 平台绑定错位。 |
-| [Unit 同步模块](unit/unit-sync.md) | 输入接收、ECS snapshot、状态广播。 | 位置/技能同步错误。 |
+| [CombatUnit 运行骨架](combatunit.md) | Unit 身份、场景生命周期、更新、死亡入口。 | crash 栈、离场后引用、死亡没触发。 |
+| [Unit 组件系统](unit-components.md) | 组件 typelist、`InitComponents`、`PartialCall`。 | 组件为空、组件未调用。 |
+| [UnitConf 配置封装](unit-conf.md) | 模板/表现/物理参数聚合。 | 配置缺失、体型/碰撞异常。 |
+| [UnitCombatAttribute 属性容器](unit-combat-attribute.md) | 属性数组、当前值约束、属性变化事件。 | 属性读写和同步异常。 |
+| [CombatAttrCalc 属性初始化](combat-attr-calc.md) | 属性加载、复制、缩放、最终当前值。 | 属性过高/过低、召唤继承。 |
+| [UnitMove 移动与碰撞修正](unit-move.md) | 移动入口、阻挡、动态墙、可行走区。 | 穿墙、拉回、高度异常。 |
+| [XNavigation 导航模块](xnavigation.md) | 目标修正、路径、直线可达、传送判定。 | AI 导航失败。 |
+| [UnitController 物理控制器](unit-controller.md) | PhysX CCT、碰撞过滤、控制器释放。 | 物理碰撞和 CCT crash。 |
+| [StateManager 状态管理](state-manager.md) | 阶段、Mode、机制条、技能/hit 窗口。 | 状态切换、状态技能。 |
+| [SkillMgr 技能管理](skill-mgr.md) | 技能创建、AI 注册、条件技能、ECS 绑定。 | 技能对象和 AI 技能。 |
+| [XBuffContainer Buff 容器接入](xbuff-container.md) | Buff 生命周期和 Unit 事件接入。 | 出生 Buff、技能 Buff。 |
+| [AIEntity AI 容器](ai-entity.md) | AI agent 生命周期和每帧驱动。 | AI 不运行。 |
+| [UnitEffect Affix Effect](unit-effect.md) | Affix effect 事件触发。 | Effect/Buff/属性修正。 |
+| [DoodadInfo 掉落物信息](doodad-info.md) | Doodad/drop 生命周期。 | 掉落物清理和拾取。 |
+| [BindInfo 平台绑定](bind-info.md) | 平台自动绑定、脚本绑定和解绑。 | 平台绑定错位。 |
+| [Unit 同步模块](unit-sync.md) | 输入接收、ECS snapshot、状态广播。 | 位置/技能同步错误。 |
 
 | 生命周期 | 入口 | 主要动作 |
 | --- | --- | --- |
@@ -245,7 +241,7 @@ updated_at: 2026-06-20
 
 ## 相关卡片
 
-- [gameserver 核心战斗总体框架](gameserver-combat-core-overview.md)
-- [Enemy 层](enemy-framework.md)
-- [CombatUnit 运行骨架](unit/combatunit.md)
-- [Unit 组件系统](unit/unit-components.md)
+- [gameserver 核心战斗总体框架](../gameserver/combat-core-overview.md)
+- [Enemy 层索引](../enemy/index.md)
+- [CombatUnit 运行骨架](combatunit.md)
+- [Unit 组件系统](unit-components.md)

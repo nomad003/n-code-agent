@@ -427,24 +427,30 @@ def score_card(query: str, card: KnowledgeCard) -> int:
     terms = terms_for_query(query)
     if not terms:
         return 0
+    is_reference = is_reference_card(card)
     hay_parts = [
         card.id,
         card.title,
         card.type,
         card.description,
-        card.body,
     ]
+    if not is_reference:
+        hay_parts.append(card.body)
     for key in (
         "tags",
-        "symbols",
-        "logs",
-        "asserts",
-        "question_types",
-        *SEMANTIC_RELATIONS,
         "resource",
         "module",
     ):
         hay_parts.append(card.meta.get(key, ""))
+    if not is_reference:
+        for key in (
+            "symbols",
+            "logs",
+            "asserts",
+            "question_types",
+            *SEMANTIC_RELATIONS,
+        ):
+            hay_parts.append(card.meta.get(key, ""))
     hay = " ".join(hay_parts).lower()
     score = 0
     tag_values = {
@@ -455,7 +461,52 @@ def score_card(query: str, card: KnowledgeCard) -> int:
     for term in terms:
         if term in hay:
             score += 3 if term in tag_values else 1
+    if score and is_reference and is_broad_knowledge_query(query):
+        score += 2
+    if score:
+        score = max(0, score - reference_card_penalty(query, card))
     return score
+
+
+def reference_card_penalty(query: str, card: KnowledgeCard) -> int:
+    """Prefer concrete module cards unless the user asks for a map/overview."""
+    if not is_reference_card(card):
+        return 0
+    if is_broad_knowledge_query(query):
+        return 0
+    return 24
+
+
+def is_broad_knowledge_query(query: str) -> bool:
+    text = (query or "").lower()
+    broad_hints = (
+        "总体",
+        "框架",
+        "概览",
+        "索引",
+        "目录",
+        "模块",
+        "有哪些",
+        "架构",
+        "地图",
+        "层",
+        "overview",
+        "framework",
+        "architecture",
+        "module",
+        "modules",
+        "index",
+        "map",
+    )
+    return any(hint in text for hint in broad_hints)
+
+
+def is_reference_card(card: KnowledgeCard) -> bool:
+    return (
+        card.type.lower() == "reference"
+        or card.id == "index.md"
+        or card.id.endswith("/index.md")
+    )
 
 
 def terms_for_query(text: str) -> list[str]:

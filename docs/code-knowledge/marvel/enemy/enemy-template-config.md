@@ -10,7 +10,7 @@ symbols: XEntityStatistics, UnitConf::InitFromTemplate, CombatEnemy::InitFromTem
 logs: can't find monster template id
 asserts: CHECK_COND_NORETURN
 question_types: outage_log, feature_impl, config_impl
-part_of: ../enemy-framework.md
+part_of: enemy/index.md
 depends_on: combat-enemy.md
 updated_at: 2026-06-20
 ---

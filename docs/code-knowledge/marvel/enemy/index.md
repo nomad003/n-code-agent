@@ -1,28 +1,24 @@
 ---
-type: Code Module
-title: Enemy 层
+type: Reference
+title: Enemy 层索引
 description: CombatEnemy 初始化、刷怪、AI/技能/死亡和配置链路。
 repo: marvel
 module: gameserver/unit/enemy
 resource: gameserver/unit/enemy
-tags: enemy, combatenemy, monster, boss, elite, spawn, doodad, destructible, ai, skill, buff, death, config, 怪物
-symbols: CombatEnemy, EnemyCleanUpReason, SceneUnitHandler, Level::SpawnEnemy, SceneUnitHandler::CreateUnit, SceneUnitHandler::CreateUnitByCaller, AIEnemyAgent, SkillMgr, SkillCore, CombatAttrCalc, SpawnConfig, SpawnControl, DestructibleUnit, CEnemyOutLook
-logs: can't find monster template id, enemy conf skill, skill not find in conf, Spawn Enemy failed, create enemy uid, pre enter scene, post enter scene, dead disappear, not find final host, clear up scene, Check cond
-asserts: CHECK_COND, CHECK_COND_NORETURN, CHECK_COND_WITH_LOG_RETURN, ASSERT_FALSE
-question_types: crash_stack, outage_log, feature_impl, config_impl
-part_of: gameserver-combat-core-overview.md
-depends_on: unit-framework.md, gameserver-combat-core-overview.md
-supplements: unit-framework.md
+tags: enemy, monster, combatenemy, layer, index, 怪物
+part_of: ../gameserver/combat-core-overview.md
+depends_on: ../unit/index.md, ../gameserver/combat-core-overview.md
+supplements: ../unit/index.md
 updated_at: 2026-06-20
 ---
 
-# Enemy 层
+# Enemy 层索引
 
 ## 卡片说明
 
 | 项 | 内容 |
 | --- | --- |
-| 用途 | 说明 `CombatEnemy` 派生层。 |
+| 用途 | 作为 Enemy 层目录，指向每个独立模块知识卡。 |
 | 覆盖 | 创建、初始化、Level 接入、AI、技能、Buff、属性、死亡清理。 |
 | 特殊路径 | 召唤物、跟随召唤物、Doodad、Destructible、MovablePlat。 |
 | 不展开 | Role 侧创建、网络协议、客户端表现细节。 |
@@ -59,16 +55,16 @@ updated_at: 2026-06-20
 
 | 子卡 | 重点 | 适用问题 |
 | --- | --- | --- |
-| [CombatEnemy 生命周期](enemy/combat-enemy.md) | 字段、初始化、进离场、`LevelInit`、死亡清理。 | 进离场、死亡不清理、wave/group。 |
-| [SceneUnitHandler 创建入口](enemy/scene-unit-handler.md) | 查模板、选择派生类、创建 Enemy/召唤物/可破坏物。 | 创建失败、模板缺失。 |
-| [Level::SpawnEnemy 刷怪入口](enemy/level-spawn-enemy.md) | Lua/关卡参数、坐标修正、进场。 | 刷怪失败、group/wave。 |
-| [XEntityStatistics 怪物模板配置](enemy/enemy-template-config.md) | 怪物主模板字段。 | 怪物怎么配、模板字段。 |
-| [XEntityPresentation 表现配置](enemy/enemy-presentation-config.md) | 资源、缩放、碰撞体、Buff tag。 | 体型/碰撞配置。 |
-| [AIEnemyAgent 怪物 AI](enemy/enemy-ai-agent.md) | AI 表选择、行为树、视野、巡逻。 | AI 不动、不索敌。 |
-| [Enemy 技能配置查表](enemy/enemy-skill-config.md) | `SkillListForEnemy` / Spawn 技能查表。 | 技能缺失日志。 |
-| [Enemy 属性初始化](enemy/enemy-attr-init.md) | 属性表、复制、缩放、召唤继承。 | 属性异常。 |
-| [SpawnControl 召唤控制](enemy/spawn-control.md) | 召唤数量、跟随、超限技能。 | 召唤物异常。 |
-| [DestructibleUnit 可破坏物](enemy/destructible-unit.md) | 可破坏物配置覆盖、阶段、掉落。 | 可破坏物打不掉。 |
+| [CombatEnemy 生命周期](combat-enemy.md) | 字段、初始化、进离场、`LevelInit`、死亡清理。 | 进离场、死亡不清理、wave/group。 |
+| [SceneUnitHandler 创建入口](scene-unit-handler.md) | 查模板、选择派生类、创建 Enemy/召唤物/可破坏物。 | 创建失败、模板缺失。 |
+| [Level::SpawnEnemy 刷怪入口](level-spawn-enemy.md) | Lua/关卡参数、坐标修正、进场。 | 刷怪失败、group/wave。 |
+| [XEntityStatistics 怪物模板配置](enemy-template-config.md) | 怪物主模板字段。 | 怪物怎么配、模板字段。 |
+| [XEntityPresentation 表现配置](enemy-presentation-config.md) | 资源、缩放、碰撞体、Buff tag。 | 体型/碰撞配置。 |
+| [AIEnemyAgent 怪物 AI](enemy-ai-agent.md) | AI 表选择、行为树、视野、巡逻。 | AI 不动、不索敌。 |
+| [Enemy 技能配置查表](enemy-skill-config.md) | `SkillListForEnemy` / Spawn 技能查表。 | 技能缺失日志。 |
+| [Enemy 属性初始化](enemy-attr-init.md) | 属性表、复制、缩放、召唤继承。 | 属性异常。 |
+| [SpawnControl 召唤控制](spawn-control.md) | 召唤数量、跟随、超限技能。 | 召唤物异常。 |
+| [DestructibleUnit 可破坏物](destructible-unit.md) | 可破坏物配置覆盖、阶段、掉落。 | 可破坏物打不掉。 |
 
 类型来自 `XEntityStatistics.Type`：
 
@@ -366,7 +362,7 @@ AI 技能：
 
 ## 相关卡片
 
-- [Unit 通用层](unit-framework.md)
-- [gameserver 核心战斗总体框架](gameserver-combat-core-overview.md)
-- [CombatEnemy 生命周期](enemy/combat-enemy.md)
-- [Enemy 技能配置查表](enemy/enemy-skill-config.md)
+- [Unit 层索引](../unit/index.md)
+- [gameserver 核心战斗总体框架](../gameserver/combat-core-overview.md)
+- [CombatEnemy 生命周期](combat-enemy.md)
+- [Enemy 技能配置查表](enemy-skill-config.md)

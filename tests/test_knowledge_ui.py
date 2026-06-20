@@ -30,6 +30,9 @@ def test_knowledge_page_smoke():
     assert "brand-mark" not in html
     app_js = Path("code_agent/static/app.js").read_text(encoding="utf-8")
     assert "renderKnowledgeDiagrams" in app_js
+    assert "knowledgeCardRows" in app_js
+    assert "toggleKnowledgeTree" in app_js
+    assert "encodePath(name)" in app_js
     assert "mermaid.min.js" in app_js
     assert "diagram-card" in app_js
     assert "markdown-table-wrap" in app_js
@@ -149,13 +152,14 @@ def test_knowledge_graph_links_and_tags(knowledge_env):
 
 
 def test_knowledge_nested_card_path(knowledge_env):
-    main.knowledge_save(
+    saved = main.knowledge_save(
         main.KnowledgeSaveRequest(
             repo="marvel",
             name="gameserver/scene.md",
             content="---\ntitle: 场景子目录\ntags: scene\n---\n\n# 场景子目录\n",
         )
     )
+    assert saved["name"] == "gameserver/scene.md"
     listed = main.knowledge_list("marvel")
     assert listed["cards"][0]["name"] == "gameserver/scene.md"
     assert listed["cards"][0]["segments"] == ["gameserver", "scene.md"]

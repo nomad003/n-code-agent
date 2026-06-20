@@ -112,6 +112,11 @@ def _looks_like_outage_log(q: str, low: str) -> bool:
 def _looks_like_config_impl(q: str, low: str) -> bool:
     if re.search(r"\b(config|configuration|cfg|ini|yaml|yml|json|toml|xml|env)\b", low):
         return True
+    if re.search(
+        r"\b[A-Z][A-Za-z0-9_]*(Config|Table|Limit|Follow|Statistics|Presentation)\b",
+        q,
+    ):
+        return True
     return any(
         s in low
         for s in (
@@ -174,20 +179,22 @@ _PROMPTS = {
 2. 普通日志先调用 find_log_source(message) 定位打印点；必要时再 grep_code 搜固定片段或错误码。
 3. 读取打印点附近代码，沿错误分支、返回码、上游调用、配置/数据来源继续追踪。
 4. 结论必须包含：日志含义、触发条件、代码位置、可能影响范围、排查顺序和需要补充的运行时信息。
-5. 不要只翻译日志文本；必须把日志反查到代码语义。""",
+5. 不要只翻译日志文本；必须把日志反查到代码语义。
+6. 最终答案必须保留关键函数名、配置表名、文件路径和原始日志短语；例如不要把 `not find in conf` 只改写成中文。""",
     "feature_impl": """\
 最佳实践：
 1. 先用 repo_overview() 或 glob/grep_code(files) 缩小模块范围，再用 find_symbol/grep_code(content) 定位入口。
 2. 按入口 -> 核心分支 -> 下游调用 -> 数据读写/事件/消息 的顺序追踪。
 3. 对跨工程问题，默认同时考虑 gameserver 和 ecs：先找调用点，再沿 include、符号名、组件类型到另一侧查定义。
 4. 结论必须包含：入口、关键类/函数、主流程、关键数据结构、边界条件、扩展/修改入口。
-5. 不要泛泛描述模块；每个关键结论都尽量绑定文件路径和行号。""",
+5. 用户点名的核心模块必须列出对应文件路径；每个关键结论都尽量绑定文件路径和行号。
+6. 如果问题里出现类似 XConfig/XTable/XLimit/XFollow/Statistics/Presentation 的配置表或字段名，要同时说明配置加载文件和运行时使用文件。""",
     "config_impl": """\
 最佳实践：
 1. 先定位配置文件/配置表名/字段名；用 glob 找配置文件，用 grep_code(files/count) 看使用分布。
 2. 追踪配置加载、解析、校验、缓存、热更/重载、默认值和错误处理。
 3. 再找业务读取点，说明配置项如何影响功能流程或开关行为。
-4. 结论必须包含：配置来源、字段含义、加载链路、使用位置、默认/非法值行为、修改后如何验证。
+4. 结论必须包含：配置来源、字段含义、加载链路、配置加载文件、运行时使用文件、默认/非法值行为、修改后如何验证。
 5. 若字段只在数据表中出现但代码未读取，要明确说明“未找到代码使用点”。""",
     "general": """\
 最佳实践：

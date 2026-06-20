@@ -9,7 +9,9 @@ from code_agent import main
 def _write_knowledge_card(tmp_path, name, content):
     root = tmp_path / "docs" / "code-knowledge" / "marvel"
     root.mkdir(parents=True, exist_ok=True)
-    (root / name).write_text(content, encoding="utf-8")
+    path = root / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
 
 
 def test_ranked_cards_hits_marvel_monster_card(monkeypatch, tmp_path):
@@ -36,6 +38,47 @@ def test_ranked_cards_hits_marvel_monster_card(monkeypatch, tmp_path):
 
     assert ranked
     assert ranked[0]["id"] == "monster-config.md"
+
+
+def test_ranked_cards_prefers_concrete_module_over_reference(monkeypatch, tmp_path):
+    _write_knowledge_card(
+        tmp_path,
+        "enemy/index.md",
+        (
+            "---\n"
+            "type: Reference\n"
+            "title: Enemy 层索引\n"
+            "tags: enemy, monster, skill, config, ai, spawn, 怪物, 技能, 配置\n"
+            "symbols: CombatEnemy, SkillListForEnemy, AIEnemyAgent\n"
+            "---\n\n"
+            "# Enemy 层索引\n\nEnemy 技能、AI、配置、召唤物模块目录。\n"
+        ),
+    )
+    _write_knowledge_card(
+        tmp_path,
+        "enemy/enemy-skill-config.md",
+        (
+            "---\n"
+            "type: Code Module\n"
+            "title: Enemy 技能配置查表\n"
+            "tags: enemy, skill, config, 怪物, 技能, 配置\n"
+            "symbols: SkillConfig::GetEnemySkillConfigX, SkillListForEnemy\n"
+            "logs: enemy conf skill, skill not find in conf\n"
+            "---\n\n"
+            "# Enemy 技能配置查表\n\nSkillListForEnemy 是具体技能缺失排查入口。\n"
+        ),
+    )
+    monkeypatch.setattr(config, "PROJECT_ROOT", str(tmp_path))
+    monkeypatch.setattr(config, "CODE_REPOS", {})
+    monkeypatch.setattr(config, "CODE_REPO_DEFAULT", "marvel")
+    monkeypatch.setattr(config, "TARGET_CODE_PATH", str(tmp_path))
+
+    ranked = knowledge_eval.ranked_cards(
+        "GetEnemySkillConfigX enemy conf skill not find，怪物技能配置缺失怎么查？",
+        repo="marvel",
+    )
+
+    assert ranked[0]["id"] == "enemy/enemy-skill-config.md"
 
 
 def test_evaluate_case_checks_fields_and_relations(tmp_path, monkeypatch):

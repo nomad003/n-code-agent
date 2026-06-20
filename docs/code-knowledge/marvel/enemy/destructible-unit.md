@@ -10,7 +10,7 @@ symbols: DestructibleUnit, DestructibleObject, CombatAttrCalc::OverrideDestructi
 logs: Check cond
 asserts: CHECK_COND
 question_types: outage_log, feature_impl, config_impl
-part_of: ../enemy-framework.md
+part_of: enemy/index.md
 depends_on: enemy-template-config.md, enemy-presentation-config.md
 updated_at: 2026-06-20
 ---

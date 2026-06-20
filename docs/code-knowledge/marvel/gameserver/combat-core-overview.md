@@ -1,16 +1,12 @@
 ---
-type: Code Module
+type: Reference
 title: gameserver 核心战斗总体框架
 description: 战斗域模块地图。覆盖 Scene/Level/Unit/Skill/Buff/AI/XEcs。
 repo: marvel
 module: gameserver/combat-core
 resource: gameserver
 tags: gameserver, combat, battle, scene, level, unit, enemy, role, buff, ai, skill, ecs, xecs
-symbols: SceneBattle, SceneHandler, LevelSpawner, Level, CombatUnit, CombatEnemy, CombatRole, XCombat, SkillMgr, SkillCore, XBuffContainer, AIEntity, AIAgent, AIUnitAgent, AIEnemyAgent, AIRoleAgent, XFacility, XSirius
-logs: UnitLogErr, LogError, Check cond, skill not find, buff
-asserts: CHECK_COND
-question_types: crash_stack, outage_log, feature_impl, config_impl
-part_of: index.md
+part_of: ../index.md
 updated_at: 2026-06-20
 ---
 
@@ -316,13 +312,13 @@ updated_at: 2026-06-20
 
 - `scene-battle-framework.md`：SceneBattle、SceneHandler、场景事件。
 - `level-spawner-framework.md`：LevelSpawner、Level、刷怪和 Lua 关卡。
-- [Unit 通用层](unit-framework.md)：CombatUnit、组件 typelist、通用 Unit 配置映射。已建立。
-- [Enemy 层](enemy-framework.md)：CombatEnemy、怪物、召唤物、可破坏物。已建立。
-- [CombatUnit 运行骨架](unit/combatunit.md)：Unit 身份、生命周期、更新和死亡。已建立。
-- [Unit 组件系统](unit/unit-components.md)：typelist、组件绑定和 PartialCall。已建立。
-- [SkillMgr 技能管理](unit/skill-mgr.md)：技能创建、AI 注册和 ECS 绑定。已建立。
-- [CombatEnemy 生命周期](enemy/combat-enemy.md)：Enemy 初始化、LevelInit、死亡清理。已建立。
-- [Enemy 技能配置查表](enemy/enemy-skill-config.md)：Enemy/Spawn 技能配置查表。已建立。
+- [Unit 层索引](../unit/index.md)：CombatUnit、组件 typelist、通用 Unit 配置映射。已建立。
+- [Enemy 层索引](../enemy/index.md)：CombatEnemy、怪物、召唤物、可破坏物。已建立。
+- [CombatUnit 运行骨架](../unit/combatunit.md)：Unit 身份、生命周期、更新和死亡。已建立。
+- [Unit 组件系统](../unit/unit-components.md)：typelist、组件绑定和 PartialCall。已建立。
+- [SkillMgr 技能管理](../unit/skill-mgr.md)：技能创建、AI 注册和 ECS 绑定。已建立。
+- [CombatEnemy 生命周期](../enemy/combat-enemy.md)：Enemy 初始化、LevelInit、死亡清理。已建立。
+- [Enemy 技能配置查表](../enemy/enemy-skill-config.md)：Enemy/Spawn 技能配置查表。已建立。
 - `role-framework.md`：CombatRole、玩家、伙伴、机器人、切人。
 - `skill-framework.md`：SkillMgr、SkillCore、SkillConfig、技能配置链路。
 - `buff-framework.md`：XBuffContainer、BuffConfig、Buff effect/trigger。
@@ -331,10 +327,10 @@ updated_at: 2026-06-20
 
 ## 相关卡片
 
-- [marvel 代码知识库索引](index.md)
-- [Unit 通用层](unit-framework.md)
-- [Enemy 层](enemy-framework.md)
-- [CombatUnit 运行骨架](unit/combatunit.md)
-- [Unit 组件系统](unit/unit-components.md)
-- [CombatEnemy 生命周期](enemy/combat-enemy.md)
-- [Enemy 技能配置查表](enemy/enemy-skill-config.md)
+- [marvel 代码知识库索引](../index.md)
+- [Unit 层索引](../unit/index.md)
+- [Enemy 层索引](../enemy/index.md)
+- [CombatUnit 运行骨架](../unit/combatunit.md)
+- [Unit 组件系统](../unit/unit-components.md)
+- [CombatEnemy 生命周期](../enemy/combat-enemy.md)
+- [Enemy 技能配置查表](../enemy/enemy-skill-config.md)

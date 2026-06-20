@@ -19,6 +19,7 @@ import json
 import litellm
 
 from . import config
+from . import knowledge_graph
 from . import llm_trace
 from . import module_knowledge
 from . import operation_modes
@@ -128,6 +129,18 @@ def _looks_like_answer(text: str) -> bool:
     if not text or len(text) < 120:
         return False
     return any(p in text for p in ("。", ".", "：", ":", "\n"))
+
+
+def _unique_nonempty(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in items:
+        value = str(item or "").strip()
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        out.append(value)
+    return out
 
 
 class CodeAgent:
@@ -460,8 +473,69 @@ class CodeAgent:
         self.history = []
         self.recalled = self._recalled_context(question)
         answer = self._loop()
+        answer = self._augment_answer(answer)
         self._precipitate(answer)
         return answer
+
+    def _augment_answer(self, answer: str) -> str:
+        footer = self._knowledge_evidence_footer(answer)
+        if not footer:
+            return answer
+        return f"{(answer or '').rstrip()}\n\n{footer}".strip()
+
+    def _knowledge_evidence_footer(self, answer: str) -> str:
+        try:
+            cards = knowledge_graph.load_cards(
+                config.current_repo().name,
+                include_common=True,
+            )
+        except Exception:
+            return ""
+        scored = [
+            (knowledge_graph.score_card(self.question, card), card)
+            for card in cards
+        ]
+        scored = [(score, card) for score, card in scored if score > 0]
+        if not scored:
+            return ""
+        scored.sort(
+            key=lambda item: (
+                knowledge_graph.is_reference_card(item[1]),
+                -item[0],
+                item[1].id,
+            )
+        )
+        selected = [card for _score, card in scored[:3]]
+        files = self._referenced_files()
+        symbols: list[str] = []
+        logs: list[str] = []
+        asserts: list[str] = []
+        card_ids: list[str] = []
+        for card in selected:
+            card_ids.append(card.id)
+            files.extend(card.field_list("resource"))
+            symbols.extend(card.field_list("symbols"))
+            logs.extend(card.field_list("logs"))
+            asserts.extend(card.field_list("asserts"))
+        files = _unique_nonempty(files)[:8]
+        symbols = _unique_nonempty(symbols)[:10]
+        logs = _unique_nonempty(logs)[:6]
+        asserts = _unique_nonempty(asserts)[:6]
+        card_ids = _unique_nonempty(card_ids)[:3]
+        if not any((files, symbols, logs, asserts, card_ids)):
+            return ""
+        lines = ["## 关键线索"]
+        if card_ids:
+            lines.append(f"- 知识卡: {', '.join(card_ids)}")
+        if files:
+            lines.append(f"- 关键文件: {', '.join(files)}")
+        if symbols:
+            lines.append(f"- 关键符号: {', '.join(symbols)}")
+        if logs:
+            lines.append(f"- 日志短语: {', '.join(logs)}")
+        if asserts:
+            lines.append(f"- 断言: {', '.join(asserts)}")
+        return "\n".join(lines)
 
     def _loop(self) -> str:
         last_assistant_text = ""
