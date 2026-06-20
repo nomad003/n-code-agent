@@ -4,7 +4,26 @@ from code_agent import config
 from code_agent import module_knowledge
 
 
+def _write_knowledge_card(tmp_path, name, content):
+    root = tmp_path / "docs" / "code-knowledge" / "marvel"
+    root.mkdir(parents=True, exist_ok=True)
+    (root / name).write_text(content, encoding="utf-8")
+
+
 def test_recall_monster_config_card(monkeypatch, tmp_path):
+    _write_knowledge_card(
+        tmp_path,
+        "monster-config.md",
+        (
+            "---\n"
+            "title: 怪物配置与敌人技能配置链路\n"
+            "tags: 怪物, monster, enemy, 技能, 配置\n"
+            "symbols: CombatEnemy, SkillListForEnemy\n"
+            "---\n\n"
+            "# 怪物配置\n\n怪物技能通过 SkillListForEnemy 配置。\n"
+        ),
+    )
+    monkeypatch.setattr(config, "PROJECT_ROOT", str(tmp_path))
     monkeypatch.setattr(config, "CODE_REPOS", {})
     monkeypatch.setattr(config, "CODE_REPO_DEFAULT", "marvel")
     monkeypatch.setattr(config, "TARGET_CODE_PATH", str(tmp_path))
@@ -25,6 +44,18 @@ def test_read_card_accepts_okf_style_tag_list(tmp_path):
 
 
 def test_recall_cjk_compound_terms(monkeypatch, tmp_path):
+    _write_knowledge_card(
+        tmp_path,
+        "level-framework.md",
+        (
+            "---\n"
+            "title: 关卡框架\n"
+            "tags: 关卡, 刷怪, level, spawner\n"
+            "---\n\n"
+            "# 关卡框架\n\n关卡刷怪流程由 LevelSpawner 处理。\n"
+        ),
+    )
+    monkeypatch.setattr(config, "PROJECT_ROOT", str(tmp_path))
     monkeypatch.setattr(config, "CODE_REPOS", {})
     monkeypatch.setattr(config, "CODE_REPO_DEFAULT", "marvel")
     monkeypatch.setattr(config, "TARGET_CODE_PATH", str(tmp_path))
@@ -50,6 +81,22 @@ def test_load_cards_recurses_okf_bundle(monkeypatch, tmp_path):
 
 
 def test_build_messages_injects_module_card(monkeypatch, tmp_path):
+    _write_knowledge_card(
+        tmp_path,
+        "monster-config.md",
+        (
+            "---\n"
+            "type: Config Chain\n"
+            "title: 怪物配置与敌人技能配置链路\n"
+            "description: 怪物配置和 enemy skill not find 排查。\n"
+            "tags: 怪物, monster, enemy, 技能, 配置\n"
+            "symbols: SkillListForEnemy, GetEnemySkillConfigX\n"
+            "logs: enemy conf skill, skill not find in conf\n"
+            "---\n\n"
+            "# 怪物配置\n\nSkillListForEnemy 是怪物技能配置排查入口。\n"
+        ),
+    )
+    monkeypatch.setattr(config, "PROJECT_ROOT", str(tmp_path))
     monkeypatch.setattr(config, "CODE_REPOS", {})
     monkeypatch.setattr(config, "CODE_REPO_DEFAULT", "marvel")
     monkeypatch.setattr(config, "TARGET_CODE_PATH", str(tmp_path))

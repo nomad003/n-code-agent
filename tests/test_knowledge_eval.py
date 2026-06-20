@@ -6,7 +6,26 @@ from code_agent import knowledge_eval
 from code_agent import main
 
 
+def _write_knowledge_card(tmp_path, name, content):
+    root = tmp_path / "docs" / "code-knowledge" / "marvel"
+    root.mkdir(parents=True, exist_ok=True)
+    (root / name).write_text(content, encoding="utf-8")
+
+
 def test_ranked_cards_hits_marvel_monster_card(monkeypatch, tmp_path):
+    _write_knowledge_card(
+        tmp_path,
+        "monster-config.md",
+        (
+            "---\n"
+            "title: 怪物配置与敌人技能配置链路\n"
+            "tags: 怪物, monster, enemy, 技能, 配置\n"
+            "symbols: SkillListForEnemy\n"
+            "---\n\n"
+            "# 怪物配置\n\n怪物技能在哪里配。\n"
+        ),
+    )
+    monkeypatch.setattr(config, "PROJECT_ROOT", str(tmp_path))
     monkeypatch.setattr(config, "CODE_REPOS", {})
     monkeypatch.setattr(config, "CODE_REPO_DEFAULT", "marvel")
     monkeypatch.setattr(config, "TARGET_CODE_PATH", str(tmp_path))
@@ -111,6 +130,19 @@ def test_validate_repo_reports_broken_semantic_relation(tmp_path, monkeypatch):
 
 
 def test_evaluate_summary(tmp_path, monkeypatch):
+    _write_knowledge_card(
+        tmp_path,
+        "buff-framework.md",
+        (
+            "---\n"
+            "title: Buff 框架\n"
+            "tags: buff, BuffConfig, XBuffContainer\n"
+            "symbols: BuffConfig, XBuffContainer\n"
+            "---\n\n"
+            "# Buff 框架\n\nBuff 配置字段在哪里解析。\n"
+        ),
+    )
+    monkeypatch.setattr(config, "PROJECT_ROOT", str(tmp_path))
     monkeypatch.setattr(config, "CODE_REPOS", {})
     monkeypatch.setattr(config, "CODE_REPO_DEFAULT", "marvel")
     monkeypatch.setattr(config, "TARGET_CODE_PATH", str(tmp_path))

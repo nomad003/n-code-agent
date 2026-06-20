@@ -186,6 +186,8 @@ def evaluate(path: str, *, top_k: int = DEFAULT_TOP_K, validate: bool = True) ->
 
     passed = sum(1 for item in results if item["passed"])
     repos = sorted({result["repo"] for result in results})
+    if validate and not repos:
+        repos = [config.resolve_repo_name(None)]
     validations = {repo: validate_repo(repo) for repo in repos} if validate else {}
     validation_ok = all(item["valid"] for item in validations.values())
     total = len(results)
