@@ -30,6 +30,10 @@ curl http://localhost:8900/health
 
 提问。
 
+内部处理链路见 [ask-diagnose-flow.md](ask-diagnose-flow.md)。简要规则：
+`/ask` 进入完整 Agent loop 时会先注入知识图谱和模块知识卡，再由模型按问题决定
+是否调用代码检索/读取工具；缓存和 shortcut 命中时会跳过完整 loop。
+
 **请求体**
 
 ```json
@@ -182,6 +186,9 @@ GET /knowledge
 ### `POST /diagnose`
 
 分析崩溃栈（coredump backtrace），结合代码库定位根因（方向 F）。
+
+内部处理链路见 [ask-diagnose-flow.md](ask-diagnose-flow.md)。`/diagnose` 会先解析
+栈帧、日志打印点和断言上下文，再把这些线索交给 Agent 继续分析。
 
 **请求体**
 
