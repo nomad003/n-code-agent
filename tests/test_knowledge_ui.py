@@ -1,5 +1,6 @@
 """Tests for the module knowledge maintenance UI/API helpers."""
 import asyncio
+from pathlib import Path
 
 import pytest
 
@@ -41,6 +42,10 @@ def test_trace_page_smoke():
     assert "trace-question-card" in html
     assert "Round 明细" in html
     assert "本轮原始事件" in html
+    assert '<script src="https://unpkg.com' not in html
+    app_js = Path("code_agent/static/app.js").read_text(encoding="utf-8")
+    assert "renderTraceFallback" in app_js
+    assert "/static/vendor/vue.global.prod.js" in app_js
 
 
 def test_knowledge_save_list_read(knowledge_env):

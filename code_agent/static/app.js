@@ -1,9 +1,4 @@
 (function () {
-  if (!window.Vue) {
-    document.body.classList.add("vue-missing");
-    return;
-  }
-
   const EXAMPLE_LOG = `15:04:47:429[61285][0000006133] [Error] GetEnemySkillConfigX(skillconfig.cpp:489) enemy conf skill:[0 921948522 monster_livinglaser_lightstream] not find
 15:04:47:429[61285][0000006133] [Error] InitEnemySkill(skillcore.cpp:80) [COMBAT] unit: [type=enemy uid=1153743939307804815 tid=302250101 role=0 user= name= sid=0 scene=0-0 map=0], caster:302250101 skill:[921948522 monster_livinglaser_lightstream] not find in conf
 15:04:47:429[61285][0000006133] [Error] InitEnemySkill(skillcore.cpp:81) Check cond: <false> failed
@@ -200,6 +195,96 @@
     return `${(value / 1024 / 1024).toFixed(1)} MB`;
   }
 
+  function buildTraceSummary(rows, header = {}) {
+    const traceRows = rows || [];
+    const isRoundStart = (row) => row.event === "llm_request" || row.event === "sdk_request";
+    const isToolEvent = (row) => (
+      row.event === "tool_result"
+      || row.event === "sdk_tool_use"
+      || row.event === "tool_call"
+      || Boolean(row.tool || row.name)
+    );
+    const llmRequests = traceRows.filter((row) => row.event === "llm_request");
+    const llmResponses = traceRows.filter((row) => row.event === "llm_response");
+    const toolRows = traceRows.filter(isToolEvent);
+    const anchors = traceRows
+      .map((row, index) => ({ row, index }))
+      .filter((item) => isRoundStart(item.row));
+    const hasModelRequest = Boolean(anchors.length);
+    if (!anchors.length && traceRows.length) anchors.push({ row: traceRows[0], index: 0 });
+
+    const roundDetails = anchors.map((anchor, i) => {
+      const end = anchors[i + 1] ? anchors[i + 1].index : traceRows.length;
+      const slice = traceRows.slice(anchor.index, end);
+      const request = slice.find(isRoundStart) || {};
+      const messages = Array.isArray(request.messages) ? request.messages : [];
+      const userMessage = [...messages].reverse().find((message) => message.role === "user");
+      const toolRequests = slice.flatMap(rowToolCalls);
+      const toolResults = slice
+        .filter((row) => row.event === "tool_result" || row.event === "sdk_tool_use" || row.event === "tool_call")
+        .map((row, index) => ({
+          key: `${anchor.index}-${index}-${row.name || row.event}`,
+          event: row.event || "tool_result",
+          name: rowToolName(row) || "tool",
+          arguments: asPrettyJson(row.arguments || row.input || row.raw_arguments, 1400),
+          result: clipText(row.result || row.content || row.output || row.error || "", 2600),
+          is_error: Boolean(row.is_error || row.error),
+        }));
+      const responseRows = slice.filter((row) => (
+        row.event === "llm_response"
+        || row.event === "llm_error"
+        || row.event === "sdk_text"
+        || row.event === "sdk_result"
+        || row.event === "final_answer"
+        || row.event === "request_end"
+        || row.event === "shortcut"
+        || row.event === "cache_hit"
+      ));
+      const answerParts = [];
+      responseRows.forEach((row) => {
+        const text = clipText(rowText(row), 3600);
+        if (text && !answerParts.includes(text)) answerParts.push(text);
+      });
+      const tools = Array.from(new Set(
+        [...toolRequests, ...toolResults]
+          .map((item) => item.name)
+          .filter(Boolean)
+      ));
+      return {
+        id: request.round || anchor.row.round || i + 1,
+        events: slice.length,
+        duration: traceDuration(slice),
+        model: request.model || anchor.row.model || header.model || "",
+        messageCount: messages.length || (request.prompt ? 1 : 0),
+        withTools: request.with_tools === true ? "开启" : request.with_tools === false ? "关闭" : "-",
+        userPrompt: clipText(messageContent(userMessage) || request.prompt || header.question || "", 1800),
+        tools,
+        toolResults: [...toolRequests, ...toolResults],
+        answer: answerParts.join("\n\n"),
+        raw: slice.map((row) => JSON.stringify(row, null, 2)).join("\n"),
+      };
+    });
+
+    const findings = [];
+    if (!traceRows.length) {
+      findings.push("请选择一个 trace 文件。");
+    } else {
+      if (!hasModelRequest) findings.push("没有记录模型请求事件，无法复盘提示词输入。");
+      if (!toolRows.length) findings.push("没有工具调用记录，复杂代码问题可能缺少代码检索证据。");
+      if (!traceRows.some((row) => row.event === "request_end" || row.event === "final_answer")) {
+        findings.push("没有看到 request_end/final_answer，确认请求是否中途失败。");
+      }
+      if (llmResponses.length > 4) findings.push("LLM 轮次偏多，建议检查工具结果是否足够聚焦。");
+    }
+
+    return {
+      rounds: roundDetails.length,
+      tools: toolRows.length,
+      findings,
+      roundDetails,
+    };
+  }
+
   function escapeHtml(text) {
     return String(text || "")
       .replace(/&/g, "&amp;")
@@ -336,7 +421,288 @@
 
   applyDocumentTheme(readTheme());
 
-  const app = Vue.createApp({
+  async function fallbackApiJson(url) {
+    const res = await fetch(url);
+    const text = await res.text();
+    let data = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch (_err) {
+      data = { raw: text };
+    }
+    if (!res.ok) throw new Error(data.detail || data.error || text || res.statusText);
+    return data;
+  }
+
+  function traceHeaderFrom(file, rows) {
+    const first = (rows || [])[0] || {};
+    return {
+      file: file.file || first.request_id || "",
+      question: file.question || first.question || "",
+      mode: file.mode || first.mode || "",
+      backend: file.backend || first.backend || "",
+      model: file.model || first.model || "",
+      size: file.size || 0,
+    };
+  }
+
+  function renderTraceFallback() {
+    const root = document.getElementById("app");
+    if (!root) return;
+    document.body.classList.add("vue-missing");
+    root.removeAttribute("v-cloak");
+    root.className = "";
+
+    if (pathToView(window.location.pathname) !== "traces") {
+      root.innerHTML = `
+        <main class="main">
+          <section class="notice danger">
+            Vue 没有加载成功，请检查浏览器是否能访问 Vue CDN。当前页面已停止渲染，请使用 /admin/llm-traces 查看 trace 兜底页面。
+          </section>
+        </main>`;
+      return;
+    }
+
+    root.innerHTML = `
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-copy">
+            <div class="brand-title">Code Agent Workbench</div>
+            <div class="brand-subtitle">代码调查 / 调用复盘 / 知识沉淀</div>
+          </div>
+        </div>
+        <nav class="nav">
+          <button type="button" onclick="location.href='/ui'" title="代码调查"><span class="nav-icon">Q</span><span class="nav-text">调查</span></button>
+          <button type="button" class="active" title="调用复盘"><span class="nav-icon">T</span><span class="nav-text">复盘</span></button>
+          <button type="button" onclick="location.href='/knowledge'" title="知识工作台"><span class="nav-icon">K</span><span class="nav-text">知识</span></button>
+          <button type="button" onclick="location.href='/knowledge/graph'" title="知识图谱"><span class="nav-icon">G</span><span class="nav-text">图谱</span></button>
+        </nav>
+        <div class="side-note">
+          <div class="label">前端状态</div>
+          <strong>Vue CDN 未加载</strong>
+        </div>
+      </aside>
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h1>调用复盘</h1>
+            <p>Vue 未加载时的 trace 兜底视图，可查看会话、问题、Round 和原始事件。</p>
+          </div>
+          <div class="topbar-actions">
+            <button class="ghost" type="button" id="fallback-refresh">刷新</button>
+          </div>
+        </header>
+        <section class="workspace trace-layout">
+          <div class="panel list-panel trace-list-panel">
+            <div class="panel-head"><h2>会话</h2><span class="pill" id="fallback-count">0</span></div>
+            <div class="trace-dir"><span>目录</span><strong id="fallback-dir">logs/llm</strong></div>
+            <div id="fallback-list" class="fallback-list"></div>
+          </div>
+          <div class="panel trace-detail-panel" id="fallback-detail">
+            <div class="trace-question-card">
+              <div class="trace-question-label">问题</div>
+              <h2>正在加载 trace...</h2>
+            </div>
+          </div>
+        </section>
+      </main>`;
+
+    const listEl = root.querySelector("#fallback-list");
+    const detailEl = root.querySelector("#fallback-detail");
+    const countEl = root.querySelector("#fallback-count");
+    const dirEl = root.querySelector("#fallback-dir");
+    const state = { files: [], selected: "", traceDir: "" };
+
+    function renderList() {
+      countEl.textContent = String(state.files.length);
+      dirEl.textContent = state.traceDir || "logs/llm";
+      if (!state.files.length) {
+        listEl.innerHTML = '<div class="trace-empty">暂无 trace 文件。</div>';
+        return;
+      }
+      listEl.innerHTML = state.files.map((file) => `
+        <button type="button" class="list-item trace-session ${state.selected === file.file ? "active" : ""}" data-file="${escapeHtml(file.file)}">
+          <span class="trace-session-question">${escapeHtml(compactText(file.question || "无问题文本", 96))}</span>
+          <small class="trace-session-meta">${escapeHtml([file.mode || "mode -", file.backend || "backend -", file.last_event || "event -", file.last_ts || file.mtime || ""].filter(Boolean).join(" · "))}</small>
+          <small class="trace-session-file">${escapeHtml(file.file)}</small>
+        </button>`).join("");
+      listEl.querySelectorAll("[data-file]").forEach((button) => {
+        button.addEventListener("click", () => loadTrace(button.dataset.file));
+      });
+    }
+
+    function renderDetail(file, rows) {
+      const header = traceHeaderFrom(file, rows);
+      const summary = buildTraceSummary(rows, header);
+      const findings = summary.findings.length ? `
+        <div class="notice">
+          <strong>质量检查</strong>
+          <ul>${summary.findings.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+        </div>` : "";
+      const rounds = summary.roundDetails.map((round, index) => `
+        <details class="round-card" ${index === 0 ? "open" : ""}>
+          <summary>
+            <span class="round-title">Round ${escapeHtml(round.id)}</span>
+            <span class="round-summary">${round.events} events · ${round.tools.length} tools · ${escapeHtml(round.duration || "-")}</span>
+          </summary>
+          <div class="round-body">
+            <div class="round-grid">
+              <div class="round-panel">
+                <h4>模型输入</h4>
+                <dl class="trace-kv">
+                  <div><dt>模型</dt><dd>${escapeHtml(round.model || "-")}</dd></div>
+                  <div><dt>消息</dt><dd>${round.messageCount} 条</dd></div>
+                  <div><dt>工具开关</dt><dd>${escapeHtml(round.withTools)}</dd></div>
+                </dl>
+                ${round.userPrompt ? `<pre>${escapeHtml(round.userPrompt)}</pre>` : ""}
+              </div>
+              <div class="round-panel">
+                <h4>模型输出</h4>
+                ${round.answer ? `<pre>${escapeHtml(round.answer)}</pre>` : '<div class="trace-muted">本轮没有文本输出。</div>'}
+              </div>
+            </div>
+            <div class="round-panel">
+              <h4>工具链</h4>
+              <div class="tool-chain">
+                ${round.tools.length ? round.tools.map((tool) => `<span>${escapeHtml(tool)}</span>`).join("") : "<em>未调用工具</em>"}
+              </div>
+              <div class="tool-results">
+                ${round.toolResults.map((tool) => `
+                  <div class="tool-result ${tool.is_error ? "danger" : ""}">
+                    <div class="tool-result-head"><strong>${escapeHtml(tool.name)}</strong><span>${escapeHtml(tool.event)}</span></div>
+                    ${tool.arguments ? `<pre>${escapeHtml(tool.arguments)}</pre>` : ""}
+                    ${tool.result ? `<pre>${escapeHtml(tool.result)}</pre>` : ""}
+                  </div>`).join("")}
+              </div>
+            </div>
+            <details class="raw-round">
+              <summary>本轮原始事件</summary>
+              <pre>${escapeHtml(round.raw)}</pre>
+            </details>
+          </div>
+        </details>`).join("");
+
+      detailEl.innerHTML = `
+        <div class="trace-question-card">
+          <div class="trace-question-label">问题</div>
+          <h2>${escapeHtml(header.question || "请选择一个会话")}</h2>
+          <div class="trace-meta">
+            <span>${escapeHtml(header.file || "-")}</span>
+            <span>${escapeHtml(header.mode || "mode -")}</span>
+            <span>${escapeHtml(header.backend || "backend -")}</span>
+            <span>${escapeHtml(header.model || "model -")}</span>
+            <span>${escapeHtml(formatBytesValue(header.size))}</span>
+          </div>
+        </div>
+        <div class="metrics">
+          <div><strong>${summary.rounds}</strong><span>Round</span></div>
+          <div><strong>${summary.tools}</strong><span>工具事件</span></div>
+          <div><strong>${summary.findings.length}</strong><span>检查项</span></div>
+        </div>
+        ${findings}
+        <div class="trace-section-head"><h3>Round 明细</h3><span>${rows.length} events</span></div>
+        ${rounds}
+        <details class="raw-all">
+          <summary>原始事件</summary>
+          <pre>${escapeHtml(rows.map((row) => JSON.stringify(row, null, 2)).join("\n"))}</pre>
+        </details>`;
+    }
+
+    async function loadTrace(name) {
+      state.selected = name;
+      renderList();
+      detailEl.innerHTML = '<div class="trace-question-card"><div class="trace-question-label">问题</div><h2>读取 trace...</h2></div>';
+      try {
+        const data = await fallbackApiJson("/admin/llm-traces/api/" + encodeURIComponent(name));
+        const file = state.files.find((item) => item.file === name) || { file: name };
+        renderDetail(file, data.rows || []);
+      } catch (err) {
+        detailEl.innerHTML = `<div class="notice danger">读取 trace 失败：${escapeHtml(err.message || err)}</div>`;
+      }
+    }
+
+    async function loadTraces() {
+      try {
+        const data = await fallbackApiJson("/admin/llm-traces/api");
+        state.traceDir = data.trace_dir || "";
+        state.files = data.files || [];
+        state.selected = state.files[0] ? state.files[0].file : "";
+        renderList();
+        if (state.selected) {
+          await loadTrace(state.selected);
+        } else {
+          detailEl.innerHTML = '<div class="notice">暂无 trace 文件。</div>';
+        }
+      } catch (err) {
+        listEl.innerHTML = `<div class="notice danger">加载 trace 失败：${escapeHtml(err.message || err)}</div>`;
+      }
+    }
+
+    root.querySelector("#fallback-refresh").addEventListener("click", loadTraces);
+    loadTraces();
+  }
+
+  function loadScript(src, timeoutMs = 2500) {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      let done = false;
+      const timer = window.setTimeout(() => {
+        if (done) return;
+        done = true;
+        script.remove();
+        reject(new Error("script load timeout: " + src));
+      }, timeoutMs);
+      script.onload = () => {
+        if (done) return;
+        done = true;
+        window.clearTimeout(timer);
+        resolve();
+      };
+      script.onerror = () => {
+        if (done) return;
+        done = true;
+        window.clearTimeout(timer);
+        script.remove();
+        reject(new Error("script load failed: " + src));
+      };
+      script.src = src;
+      document.head.appendChild(script);
+    });
+  }
+
+  async function loadAnyScript(sources, isReady, timeoutMs) {
+    if (isReady()) return true;
+    for (const src of sources) {
+      try {
+        await loadScript(src, timeoutMs);
+        if (isReady()) return true;
+      } catch (_err) {
+        // Try the next source.
+      }
+    }
+    return false;
+  }
+
+  async function ensureVue() {
+    const loaded = await loadAnyScript(
+      ["/static/vendor/vue.global.prod.js", "https://unpkg.com/vue@3/dist/vue.global.prod.js"],
+      () => Boolean(window.Vue && window.Vue.createApp),
+      2500
+    );
+    if (!loaded) throw new Error("Vue unavailable");
+    window.__CODE_AGENT_VUE_READY__ = true;
+  }
+
+  function loadVisNetwork() {
+    loadAnyScript(
+      ["/static/vendor/vis-network.min.js", "https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"],
+      () => Boolean(window.vis && window.vis.Network),
+      2500
+    ).catch(() => {});
+  }
+
+  function mountVueApp() {
+  const app = window.Vue.createApp({
     data() {
       return {
         vueReady: window.__CODE_AGENT_VUE_READY__ === true,
@@ -428,93 +794,7 @@
         };
       },
       traceSummary() {
-        const rows = this.traceRows || [];
-        const isRoundStart = (row) => row.event === "llm_request" || row.event === "sdk_request";
-        const isToolEvent = (row) => (
-          row.event === "tool_result"
-          || row.event === "sdk_tool_use"
-          || row.event === "tool_call"
-          || Boolean(row.tool || row.name)
-        );
-        const llmRequests = rows.filter((row) => row.event === "llm_request");
-        const llmResponses = rows.filter((row) => row.event === "llm_response");
-        const toolRows = rows.filter(isToolEvent);
-        const anchors = rows
-          .map((row, index) => ({ row, index }))
-          .filter((item) => isRoundStart(item.row));
-        const hasModelRequest = Boolean(anchors.length);
-        if (!anchors.length && rows.length) anchors.push({ row: rows[0], index: 0 });
-
-        const roundDetails = anchors.map((anchor, i) => {
-          const end = anchors[i + 1] ? anchors[i + 1].index : rows.length;
-          const slice = rows.slice(anchor.index, end);
-          const request = slice.find(isRoundStart) || {};
-          const messages = Array.isArray(request.messages) ? request.messages : [];
-          const userMessage = [...messages].reverse().find((message) => message.role === "user");
-          const toolRequests = slice.flatMap(rowToolCalls);
-          const toolResults = slice
-            .filter((row) => row.event === "tool_result" || row.event === "sdk_tool_use" || row.event === "tool_call")
-            .map((row, index) => ({
-              key: `${anchor.index}-${index}-${row.name || row.event}`,
-              event: row.event || "tool_result",
-              name: rowToolName(row) || "tool",
-              arguments: asPrettyJson(row.arguments || row.input || row.raw_arguments, 1400),
-              result: clipText(row.result || row.content || row.output || row.error || "", 2600),
-              is_error: Boolean(row.is_error || row.error),
-            }));
-          const responseRows = slice.filter((row) => (
-            row.event === "llm_response"
-            || row.event === "llm_error"
-            || row.event === "sdk_text"
-            || row.event === "sdk_result"
-            || row.event === "final_answer"
-            || row.event === "request_end"
-            || row.event === "shortcut"
-            || row.event === "cache_hit"
-          ));
-          const answerParts = [];
-          responseRows.forEach((row) => {
-            const text = clipText(rowText(row), 3600);
-            if (text && !answerParts.includes(text)) answerParts.push(text);
-          });
-          const tools = Array.from(new Set(
-            [...toolRequests, ...toolResults]
-              .map((item) => item.name)
-              .filter(Boolean)
-          ));
-          return {
-            id: request.round || anchor.row.round || i + 1,
-            events: slice.length,
-            duration: traceDuration(slice),
-            model: request.model || anchor.row.model || this.traceHeader.model,
-            messageCount: messages.length || (request.prompt ? 1 : 0),
-            withTools: request.with_tools === true ? "开启" : request.with_tools === false ? "关闭" : "-",
-            userPrompt: clipText(messageContent(userMessage) || request.prompt || this.traceHeader.question, 1800),
-            tools,
-            toolResults: [...toolRequests, ...toolResults],
-            answer: answerParts.join("\n\n"),
-            raw: slice.map((row) => JSON.stringify(row, null, 2)).join("\n"),
-          };
-        });
-
-        const findings = [];
-        if (!rows.length) {
-          findings.push("请选择一个 trace 文件。");
-        } else {
-          if (!hasModelRequest) findings.push("没有记录模型请求事件，无法复盘提示词输入。");
-          if (!toolRows.length) findings.push("没有工具调用记录，复杂代码问题可能缺少代码检索证据。");
-          if (!rows.some((row) => row.event === "request_end" || row.event === "final_answer")) {
-            findings.push("没有看到 request_end/final_answer，确认请求是否中途失败。");
-          }
-          if (llmResponses.length > 4) findings.push("LLM 轮次偏多，建议检查工具结果是否足够聚焦。");
-        }
-
-        return {
-          rounds: roundDetails.length,
-          tools: toolRows.length,
-          findings,
-          roundDetails,
-        };
+        return buildTraceSummary(this.traceRows || [], this.traceHeader);
       },
       renderedKnowledge() {
         return renderMarkdown(this.knowledge.content);
@@ -1363,4 +1643,14 @@
   });
 
   app.mount("#app");
+  }
+
+  ensureVue()
+    .then(() => {
+      loadVisNetwork();
+      mountVueApp();
+    })
+    .catch(() => {
+      renderTraceFallback();
+    });
 })();
