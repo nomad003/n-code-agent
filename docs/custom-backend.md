@@ -2,8 +2,7 @@
 
 `custom` 是默认后端：它不用 Claude Agent SDK，而是在 `code_agent.core.agent` 里直接实现一个
 litellm tool-calling 循环。它的目标很明确：只读地理解代码库，所有文件访问都必须
-经过 `code_agent.retrieval.tools` 的沙箱工具。旧路径 `code_agent.agent` /
-`code_agent.tools` 仍是兼容 shim。
+经过 `code_agent.retrieval.tools` 的沙箱工具。
 
 ## 总览
 
@@ -331,7 +330,7 @@ for round in 1..MAX_ITERATIONS:
 ### 1. 先给模型代码导航
 
 每轮 `_build_messages()` 会把当前 repo 的 profile 注入 system prompt。profile 来自
-`python -m code_agent.repo_profile --repo <name>` 生成的缓存，通常包含：
+`python -m code_agent.retrieval.repo_profile --repo <name>` 生成的缓存，通常包含：
 
 - 仓库根目录和主要目录
 - 语言和文件分布

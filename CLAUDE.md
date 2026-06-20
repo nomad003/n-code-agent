@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Implemented and verified end-to-end: 方案 1 (litellm/SDK tool-calling loop) + 方案 2 first step (offline tree-sitter C++ symbol index). Entrypoints: `server.app` (REST, with `code_agent.main` compatibility), `code_agent.mcp_server` (MCP), `code_agent.cli`. Offline pytest suite under `tests/`.
+Implemented and verified end-to-end: 方案 1 (litellm/SDK tool-calling loop) + 方案 2 first step (offline tree-sitter C++ symbol index). Entrypoints: `server.app` (REST), `code_agent.interfaces.mcp_server` (MCP), `code_agent.interfaces.cli`. Offline pytest suite under `tests/`.
 
 Detailed docs live in `docs/` ([architecture](docs/architecture.md), [configuration](docs/configuration.md), [api](docs/api.md), [deployment](docs/deployment.md)) — keep them in sync when changing behavior.
 
@@ -30,7 +30,7 @@ HTTP POST /ask  →  FastAPI (server.app)  →  LLM agent loop (code_agent.core.
 - **`custom`** (default) — the litellm tool-calling loop in `code_agent.core.agent` (`CodeAgent`). Provider-agnostic; routes through the `/v1` proxy with the `openai/` prefix. Model = `LLM_MODEL`. Keeps an `Action`/`Observation` event history (`code_agent.core.events`), builds messages in one place (`_build_messages`), retries transient LLM errors (`LLM_NUM_RETRIES`), stops early on repeated identical tool calls (`STUCK_REPEAT_THRESHOLD`), and masks all but the most recent `OBS_KEEP_FULL` tool outputs to bound context.
 - **`sdk`** — the Claude Agent SDK loop in `code_agent.core.agent_sdk` (imported lazily). Uses `claude-agent-sdk` + the Claude Code CLI, routed to **Bedrock** via env vars (`CLAUDE_CODE_USE_BEDROCK`, `ANTHROPIC_BEDROCK_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, …). Model = `SDK_MODEL` (falls back to `ANTHROPIC_MODEL`).
 
-**Both backends share the same `code_agent.retrieval.tools` and `config.system_prompt_for_mode()`.** Public imports such as `code_agent.tools` remain compatibility shims. The SDK backend wraps the existing sandboxed tools as `@tool`/SDK-MCP tools that delegate to `tools.dispatch()` — so the path sandbox and output caps are identical — and disables the SDK's built-in Read/Grep/Glob/Bash/Write/Edit so the model is confined to our tools. `max_turns = MAX_ITERATIONS`.
+**Both backends share the same `code_agent.retrieval.tools` and `config.system_prompt_for_mode()`.** The SDK backend wraps the existing sandboxed tools as `@tool`/SDK-MCP tools that delegate to `tools.dispatch()` — so the path sandbox and output caps are identical — and disables the SDK's built-in Read/Grep/Glob/Bash/Write/Edit so the model is confined to our tools. `max_turns = MAX_ITERATIONS`.
 
 The agent is a **tool-calling loop**: the LLM is given sandboxed repo tools and iterates (call tool → feed result back → repeat) until it can answer. Tools in `code_agent.retrieval.tools`:
 
@@ -55,13 +55,12 @@ Intended module responsibilities:
 | `code_agent/diagnostics/` | Runtime diagnosis (方向 F): parse backtrace, map frames to code via index, run agent |
 | `server/` | FastAPI service, HTTP API routes, cache and concurrency gate |
 | `frontend/` | Bundled Vue frontend assets and page shell helpers |
-| `code_agent/interfaces/` | CLI and MCP entrypoints, plus the legacy HTTP import shim |
+| `code_agent/interfaces/` | CLI and MCP entrypoints |
 | `code_agent/observability/` | Per-request JSONL trace and `/admin/llm-traces` helpers |
 | `code_agent/evals/` | Eval harness (方向 E): score {question → expected files/symbols}; `--twice` measures flywheel recall |
-| `code_agent/*.py` | Compatibility shims for old imports and `python -m code_agent.<module>` commands |
 | `vendor/claude-cli/` | Vendored Claude Code CLI (linux-x64) for the SDK backend; native binary stored via **Git LFS** |
 
-`server.app`, `code_agent.mcp_server`, and `code_agent.cli` are three entrypoints over the same `agent.answer(..., repo=...)`. `code_agent.main` remains a REST compatibility shim. The MCP server (`code_agent.mcp_server`) is a thin FastMCP adapter — high-level tools `ask_codebase(question, mode="", repo="")` and `diagnose_crash(..., repo="")` — run as its own process/port; start with `scripts/mcp.sh`. See [docs/mcp.md](docs/mcp.md).
+`server.app`, `code_agent.interfaces.mcp_server`, and `code_agent.interfaces.cli` are three entrypoints over the same `agent.answer(..., repo=...)`. The MCP server (`code_agent.interfaces.mcp_server`) is a thin FastMCP adapter — high-level tools `ask_codebase(question, mode="", repo="")` and `diagnose_crash(..., repo="")` — run as its own process/port; start with `scripts/mcp.sh`. See [docs/mcp.md](docs/mcp.md).
 
 ### Operation modes & output policy
 
@@ -96,7 +95,7 @@ scripts/ask.sh [--no-cache] "question"    # curl a RUNNING service's POST /ask
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m server.app
-.venv/bin/python -m code_agent.cli ["question"]
+.venv/bin/python -m code_agent.interfaces.cli ["question"]
 ```
 
 Use a venv — the system Python is PEP 668 externally-managed and rejects `pip install`.

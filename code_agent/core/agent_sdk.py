@@ -1,6 +1,6 @@
 """Claude Agent SDK backend (selected by AGENT_BACKEND=sdk).
 
-This wraps the SAME sandboxed tools from ``code_agent.tools`` as in-process SDK tools
+This wraps the SAME sandboxed tools from ``code_agent.retrieval.tools`` as in-process SDK tools
 (``@tool`` + an SDK MCP server), so the security guarantees (path sandbox,
 output caps) are identical to the custom backend. The built-in Read/Grep/Bash
 tools are disabled — the model may use only our four code-search tools.

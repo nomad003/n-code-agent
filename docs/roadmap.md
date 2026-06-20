@@ -17,7 +17,7 @@
 
 ### 服务化与运维
 
-- 三个对等入口（REST `server.app`，兼容 `code_agent.main` / MCP `code_agent.mcp_server` / CLI `code_agent.cli`），都走同一个 `agent.answer(..., repo=...)`。
+- 三个对等入口（REST `server.app` / MCP `code_agent.interfaces.mcp_server` / CLI `code_agent.interfaces.cli`），都走同一个 `agent.answer(..., repo=...)`。
 - `/ask` 失败返回干净 502（非 500 栈），失败不入缓存。
 - MCP 调用日志 → `logs/mcp.log`（轮转）；`serve.sh`/`mcp.sh` 支持 `start/stop/restart/status`。
 - 全量环境变量配置（`.env` / `.env.example`）、离线单元测试套件（见 [testing.md](testing.md)）。
@@ -109,7 +109,7 @@
 **权衡说明（诚实记录）：** 本闭环用到 Memory/RAG，而上面「二、明确舍弃」曾以"只读问答用不到"为由舍弃它。结论不矛盾：当时是**无知识沉淀**场景下的正确取舍；一旦要做"越用越强"的飞轮，RAG 正是其核心机制 —— 这是**有条件地翻回**该决策，触发条件就是方案 3 立项。
 
 - 价值：高（飞轮成立时延迟/成本/质量持续改善）；MVP 成本：低（复用 FTS）；剩余成本：中（向量召回 + 命中率验证 + 去重）。
-- 状态：MVP + 失效 + 同义召回已落地，默认仍关闭。召回管道与正反馈已用 `code_agent.evaluate --twice` 验证（样例集 4/4），但真实命中率待更大评测集（见 E）确认后才开默认；向量召回与统一检索留待后续 V3。
+- 状态：MVP + 失效 + 同义召回已落地，默认仍关闭。召回管道与正反馈已用 `code_agent.evals.evaluate --twice` 验证（样例集 4/4），但真实命中率待更大评测集（见 E）确认后才开默认；向量召回与统一检索留待后续 V3。
 
 ### B. 服务治理（并发治理已落地）
 
@@ -129,7 +129,7 @@ custom 后端的 stuck / 遮蔽 / 重试，SDK 后端目前依赖框架自身机
 
 ### E. 质量评测（已落地）
 
-- `code_agent.evaluate` + `scripts/eval.sh`：跑一个 `{问题 → 期望文件/符号}` 的 JSONL 评测集，对每题调 agent、按"答案是否提到全部期望符号 + 至少一个期望文件（答案或引用文件）"打分，输出通过率。确定性子串打分，无 LLM judge。
+- `code_agent.evals.evaluate` + `scripts/eval.sh`：跑一个 `{问题 → 期望文件/符号}` 的 JSONL 评测集，对每题调 agent、按"答案是否提到全部期望符号 + 至少一个期望文件（答案或引用文件）"打分，输出通过率。确定性子串打分，无 LLM judge。
 - `--twice` 模式同时验证 **方案 3 飞轮召回率**：每题问两次（第一次沉淀、第二次应召回），报告召回命中率——这是"方案 3 是否敢默认开启"的判断信号。
 - 样例集 `eval/dataset.sample.jsonl`（针对仓库自带 target_code 示例）：实测通过率 4/4、飞轮召回 4/4。
 - **诚实说明**：样例集仅 4 题且问题高度相关，召回率天然偏高，只验证了"管道与正反馈成立"；真实命中率需更大、更分散的评测集（针对真实 gameserver 符号）才有统计意义。这是开启方案 3 默认值前要补的一步。

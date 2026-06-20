@@ -1,6 +1,6 @@
 """Tests for the knowledge flywheel (方案 3): store, recall, staleness."""
 from code_agent import config
-from code_agent import knowledge
+from code_agent.kb import knowledge
 import pytest
 
 
@@ -110,12 +110,12 @@ def test_fts_or_query_expands_synonyms():
 
 
 def test_agent_precipitates_after_answer(kb, monkeypatch):
-    from code_agent import agent
+    from code_agent.core import agent
 
     a = agent.CodeAgent()
     # stub the loop so no LLM is called; pretend it read scene.cpp
     import json
-    from code_agent.events import Action
+    from code_agent.core.events import Action
 
     def fake_loop():
         a.history = [Action("c1", "read_file", json.dumps({"path": "scene.cpp"}))]
@@ -130,7 +130,7 @@ def test_agent_precipitates_after_answer(kb, monkeypatch):
 
 
 def test_agent_recalls_into_system_prompt(kb, monkeypatch):
-    from code_agent import agent
+    from code_agent.core import agent
 
     knowledge.store("旧问题 SceneMgr", "旧结论内容", ["scene.cpp"])
     a = agent.CodeAgent()
@@ -147,7 +147,7 @@ def test_agent_recalls_into_system_prompt(kb, monkeypatch):
 
 
 def test_flywheel_off_no_recall_no_store(kb, monkeypatch):
-    from code_agent import agent
+    from code_agent.core import agent
 
     monkeypatch.setattr(config, "USE_KNOWLEDGE", False)
     a = agent.CodeAgent()

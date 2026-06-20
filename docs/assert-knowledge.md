@@ -38,7 +38,7 @@ docs/code-knowledge/marvel/asserts/
 ## 生成命令
 
 ```bash
-./.venv/bin/python -m code_agent.assert_knowledge \
+./.venv/bin/python -m code_agent.kb.assert_knowledge \
   --repo marvel \
   --source gameserver=/home/dev/marvel/gameserver \
   --source XEcsLib=/home/dev/marvel/XEcsLib
@@ -47,7 +47,7 @@ docs/code-knowledge/marvel/asserts/
 新增排除规则：
 
 ```bash
-./.venv/bin/python -m code_agent.assert_knowledge \
+./.venv/bin/python -m code_agent.kb.assert_knowledge \
   --repo marvel \
   --source gameserver=/home/dev/marvel/gameserver \
   --source XEcsLib=/home/dev/marvel/XEcsLib \

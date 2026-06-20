@@ -5,8 +5,8 @@ high-level tool, ``ask_codebase(question)``, which runs the full agent loop
 (via the configured AGENT_BACKEND) and returns a natural-language answer.
 
 Run:
-    python -m code_agent.mcp_server                 # streamable-http on MCP_HOST:MCP_PORT
-    MCP_PORT=8901 python -m code_agent.mcp_server
+    python -m code_agent.interfaces.mcp_server                 # streamable-http on MCP_HOST:MCP_PORT
+    MCP_PORT=8901 python -m code_agent.interfaces.mcp_server
 
 The MCP endpoint is served at the path ``/mcp`` (configurable via MCP_PATH).
 Other services connect with an MCP streamable-http client pointed at

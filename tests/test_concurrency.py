@@ -2,9 +2,9 @@
 import concurrent.futures
 import time
 
-from code_agent import agent
+from code_agent.core import agent
 from code_agent import config
-from code_agent import main
+from server import app as main
 import pytest
 from fastapi.testclient import TestClient
 

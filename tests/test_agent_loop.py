@@ -3,10 +3,10 @@ import json
 import types
 from pathlib import Path
 
-from code_agent import agent
+from code_agent.core import agent
 from code_agent import config
 import pytest
-from code_agent.events import Action, Observation
+from code_agent.core.events import Action, Observation
 
 
 # --- helpers to fake litellm responses -------------------------------------

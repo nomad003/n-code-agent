@@ -15,4 +15,4 @@ ensure_venv
 echo "[index] repos  : ${CODE_REPOS:-<single ${TARGET_CODE_PATH:-./target_code}>}"
 echo "[index] default: ${CODE_REPO_DEFAULT:-<default>}"
 echo "[index] db     : ${INDEX_DB_PATH:-<repo-specific default>}"
-run_py -m code_agent.indexer "$@"
+run_py -m code_agent.retrieval.indexer "$@"

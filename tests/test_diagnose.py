@@ -1,9 +1,9 @@
 """Tests for runtime diagnosis (方向 F): backtrace parsing + frame resolution."""
 from code_agent import config
-from code_agent import diagnose
-from code_agent import indexer
+from code_agent.diagnostics import diagnose
+from code_agent.retrieval import indexer
 import pytest
-from code_agent import tools
+from code_agent.retrieval import tools
 
 
 # --- parsing (no index needed) ---------------------------------------------
@@ -179,7 +179,7 @@ def test_find_assert_context_from_log(log_indexed):
 
 
 def test_diagnose_runs_agent(indexed, monkeypatch):
-    from code_agent import agent
+    from code_agent.core import agent
 
     captured = {}
 
@@ -199,7 +199,7 @@ def test_diagnose_runs_agent(indexed, monkeypatch):
 
 
 def test_diagnose_no_frames_still_answers(indexed, monkeypatch):
-    from code_agent import agent
+    from code_agent.core import agent
 
     captured = {}
 
@@ -215,7 +215,7 @@ def test_diagnose_no_frames_still_answers(indexed, monkeypatch):
 
 
 def test_diagnose_with_plain_summary(indexed, monkeypatch):
-    from code_agent import agent
+    from code_agent.core import agent
 
     calls = []
 
@@ -234,7 +234,7 @@ def test_diagnose_with_plain_summary(indexed, monkeypatch):
 
 
 def test_diagnose_includes_assert_sources(log_indexed, monkeypatch):
-    from code_agent import agent
+    from code_agent.core import agent
 
     (log_indexed / "buff.cpp").write_text(
         'void f(int id) {\n'
@@ -256,7 +256,7 @@ def test_diagnose_includes_assert_sources(log_indexed, monkeypatch):
 
 
 def test_diagnose_without_plain_has_no_plain_key(indexed, monkeypatch):
-    from code_agent import agent
+    from code_agent.core import agent
 
     monkeypatch.setattr(agent, "answer", lambda p, *, verbose=False: "技术分析")
     result = diagnose.diagnose("#0 main() at m.cpp:1")

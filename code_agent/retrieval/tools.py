@@ -7,7 +7,7 @@ blow the model's context window.
 
 This module is intentionally the only place that touches the filesystem, so the
 planned offline index (方案 2) can replace these implementations behind the same
-schemas without changing ``code_agent.agent``.
+schemas without changing ``code_agent.core.agent``.
 """
 import os
 import re
@@ -503,7 +503,7 @@ def find_assert_context(message: str, context: int = 8) -> str:
     if hits is None:
         return (
             "assert index is unavailable; build/update it with "
-            "`python -m code_agent.indexer --repo <name>`"
+            "`python -m code_agent.retrieval.indexer --repo <name>`"
         )
     if not hits:
         # Fall back to existing log-source lookup so the agent still gets leads.
@@ -576,7 +576,7 @@ def repo_overview() -> str:
         if not profile:
             return (
                 "no repository profile found; build it with "
-                "`python -m code_agent.repo_profile --repo <name>`"
+                "`python -m code_agent.retrieval.repo_profile --repo <name>`"
             )
         return repo_profile.format_for_prompt(profile)
     except Exception as exc:

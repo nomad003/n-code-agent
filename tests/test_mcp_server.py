@@ -3,9 +3,9 @@
 The tool is registered on FastMCP; we exercise it both directly (the wrapped
 function) and through the MCP server's tool registry to prove it's discoverable.
 """
-from code_agent import agent
+from code_agent.core import agent
 from code_agent import config
-from code_agent import mcp_server
+from code_agent.interfaces import mcp_server
 import pytest
 
 
@@ -57,7 +57,7 @@ def test_ask_codebase_passes_enabled_mode(monkeypatch):
 
 
 def test_diagnose_crash_accepts_log_without_backtrace(monkeypatch):
-    from code_agent import diagnose
+    from code_agent.diagnostics import diagnose
 
     captured = {}
 
@@ -77,7 +77,7 @@ def test_diagnose_crash_accepts_log_without_backtrace(monkeypatch):
 
 
 def test_diagnose_crash_rejects_empty_input(monkeypatch):
-    from code_agent import diagnose
+    from code_agent.diagnostics import diagnose
 
     called = {"n": 0}
 

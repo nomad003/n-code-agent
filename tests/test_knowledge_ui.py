@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from code_agent import config
-from code_agent import main
+from server import app as main
 
 
 @pytest.fixture

@@ -1,9 +1,9 @@
 """Tests for the offline index: build + query + tool integration."""
 from code_agent import config
-from code_agent import index_query
-from code_agent import indexer
+from code_agent.retrieval import index_query
+from code_agent.retrieval import indexer
 import pytest
-from code_agent import tools
+from code_agent.retrieval import tools
 
 
 @pytest.fixture
@@ -188,41 +188,41 @@ def test_update_without_db_does_full_build(tmp_path, monkeypatch):
 
 
 def test_shortcut_answers_where_defined(built_index):
-    from code_agent import shortcut
+    from code_agent.retrieval import shortcut
 
     out = shortcut.try_answer("SceneMgr 定义在哪")
     assert out and "scenemgr.h" in out and "未经 LLM" in out
 
 
 def test_shortcut_english(built_index):
-    from code_agent import shortcut
+    from code_agent.retrieval import shortcut
 
     out = shortcut.try_answer("where is SceneMgr defined")
     assert out and "scenemgr.h" in out
 
 
 def test_shortcut_ignores_explanatory_question(built_index):
-    from code_agent import shortcut
+    from code_agent.retrieval import shortcut
 
     # "做什么" needs explanation → must NOT short-circuit
     assert shortcut.try_answer("SceneMgr 是做什么的") is None
 
 
 def test_shortcut_unknown_symbol_falls_through(built_index):
-    from code_agent import shortcut
+    from code_agent.retrieval import shortcut
 
     assert shortcut.try_answer("NoSuchClass 定义在哪") is None
 
 
 def test_shortcut_disabled(built_index, monkeypatch):
-    from code_agent import shortcut
+    from code_agent.retrieval import shortcut
 
     monkeypatch.setattr(config, "USE_INDEX", False)
     assert shortcut.try_answer("SceneMgr 定义在哪") is None
 
 
 def test_answer_uses_shortcut(built_index, monkeypatch):
-    from code_agent import agent
+    from code_agent.core import agent
 
     monkeypatch.setattr(config, "USE_SHORTCUT", True)
     monkeypatch.setattr(config, "AGENT_BACKEND", "custom")

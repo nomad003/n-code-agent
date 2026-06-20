@@ -10,4 +10,4 @@ set -euo pipefail
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
 ensure_venv
-run_py -m code_agent.cli "$@"
+run_py -m code_agent.interfaces.cli "$@"

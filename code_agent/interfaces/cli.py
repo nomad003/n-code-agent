@@ -1,8 +1,8 @@
 """Interactive command-line tester for the agent.
 
 Usage:
-    python -m code_agent.cli                 # interactive REPL
-    python -m code_agent.cli "你的问题"       # one-shot, prints the answer and exits
+    python -m code_agent.interfaces.cli                 # interactive REPL
+    python -m code_agent.interfaces.cli "你的问题"       # one-shot, prints the answer and exits
 
 In the REPL, tool calls are echoed so you can watch the agent's search steps.
 """

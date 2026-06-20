@@ -25,4 +25,4 @@ case "$dataset" in
     ;;
 esac
 
-run_py -m code_agent.evaluate "$dataset" "$@"
+run_py -m code_agent.evals.evaluate "$dataset" "$@"

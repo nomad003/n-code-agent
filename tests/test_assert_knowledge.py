@@ -1,8 +1,8 @@
-from code_agent import agent
-from code_agent import assert_knowledge
+from code_agent.core import agent
+from code_agent.kb import assert_knowledge
 from code_agent import config
-from code_agent import indexer
-from code_agent import tools
+from code_agent.retrieval import indexer
+from code_agent.retrieval import tools
 
 
 def test_build_catalog_extracts_neighbor_log_and_matches(monkeypatch, tmp_path):

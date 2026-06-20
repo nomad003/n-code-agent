@@ -25,8 +25,8 @@ Dataset format: JSONL, one object per line:
      "note": str}                    # optional, for humans
 
 Usage:
-    python -m code_agent.evaluate eval/dataset.sample.jsonl
-    python -m code_agent.evaluate <dataset> --twice      # also measure flywheel recall
+    python -m code_agent.evals.evaluate eval/dataset.sample.jsonl
+    python -m code_agent.evals.evaluate <dataset> --twice      # also measure flywheel recall
 """
 from __future__ import annotations
 
@@ -156,7 +156,7 @@ def main(argv: list[str] | None = None) -> int:
     args = [a for a in argv if not a.startswith("-")]
     twice = "--twice" in argv
     if not args:
-        print("usage: python -m code_agent.evaluate <dataset.jsonl> [--twice]")
+        print("usage: python -m code_agent.evals.evaluate <dataset.jsonl> [--twice]")
         return 2
     if twice and not config.USE_KNOWLEDGE:
         print("[warn] --twice 但 USE_KNOWLEDGE 未开，召回率会是 0；设 USE_KNOWLEDGE=1")

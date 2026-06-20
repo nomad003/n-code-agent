@@ -1,7 +1,7 @@
 import json
 
 from code_agent import config
-from code_agent import trace_viewer
+from code_agent.observability import trace_viewer
 import pytest
 
 

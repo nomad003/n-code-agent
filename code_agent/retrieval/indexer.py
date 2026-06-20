@@ -8,7 +8,7 @@ over file contents and assert text. The index lets ``tools.find_symbol`` /
 without scanning the whole tree at query time.
 
 The index is a plain SQLite file (config.current_index_db_path()). It is built offline via
-``python -m code_agent.indexer`` (or scripts/index.sh) and queried read-only by index_query.
+``python -m code_agent.retrieval.indexer`` (or scripts/index.sh) and queried read-only by index_query.
 
 Design notes:
 - Symbols carry file + line + a content hash of the source file, so a future

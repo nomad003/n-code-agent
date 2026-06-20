@@ -4,10 +4,10 @@
 
 - "custom" (default): the litellm tool-calling loop (``CodeAgent`` below) —
   provider-agnostic, speaks the OpenAI tool-call shape, routes through the proxy.
-- "sdk": the Claude Agent SDK loop in ``code_agent.agent_sdk`` (imported lazily so the
+- "sdk": the Claude Agent SDK loop in ``code_agent.core.agent_sdk`` (imported lazily so the
   SDK is only required when actually selected).
 
-Both backends reuse the same sandboxed tools in ``code_agent.tools`` and the same
+Both backends reuse the same sandboxed tools in ``code_agent.retrieval.tools`` and the same
 ``config.SYSTEM_PROMPT``, and expose the identical ``answer(question)`` contract.
 
 The custom loop borrows three ideas from OpenHands' CodeActAgent, trimmed for a
@@ -77,8 +77,7 @@ def _answer_in_repo(
                 return answer_text
 
         if config.AGENT_BACKEND == "sdk":
-            # Keep the public compatibility path patchable by tests/integrations.
-            agent_sdk = importlib.import_module("code_agent.agent_sdk")
+            agent_sdk = importlib.import_module("code_agent.core.agent_sdk")
 
             answer_text = response_policy.enforce(
                 agent_sdk.answer(

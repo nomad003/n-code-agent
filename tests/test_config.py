@@ -1,6 +1,6 @@
 """Tests for config helpers and the agent backend dispatch."""
 from code_agent import config
-from code_agent import operation_modes
+from code_agent.core import operation_modes
 import pytest
 
 
@@ -39,21 +39,21 @@ def test_disabled_mode_is_rejected(monkeypatch):
 
 
 def test_routed_model_adds_openai_prefix(monkeypatch):
-    from code_agent import agent
+    from code_agent.core import agent
 
     monkeypatch.setattr(config, "LLM_MODEL", "vertex_ai/gemini-3.5-flash")
     assert agent._routed_model() == "openai/vertex_ai/gemini-3.5-flash"
 
 
 def test_routed_model_idempotent(monkeypatch):
-    from code_agent import agent
+    from code_agent.core import agent
 
     monkeypatch.setattr(config, "LLM_MODEL", "openai/already")
     assert agent._routed_model() == "openai/already"
 
 
 def test_answer_dispatches_to_custom(monkeypatch):
-    from code_agent import agent
+    from code_agent.core import agent
 
     monkeypatch.setattr(config, "AGENT_BACKEND", "custom")
     monkeypatch.setattr(config, "AGENT_ALLOWED_MODES", ("plain",))
@@ -62,7 +62,7 @@ def test_answer_dispatches_to_custom(monkeypatch):
 
 
 def test_answer_enforces_response_policy(monkeypatch):
-    from code_agent import agent
+    from code_agent.core import agent
 
     monkeypatch.setattr(config, "AGENT_BACKEND", "custom")
     monkeypatch.setattr(config, "AGENT_ALLOWED_MODES", ("plain",))
@@ -77,9 +77,9 @@ def test_answer_dispatches_to_sdk(monkeypatch):
     import sys
     import types
 
-    from code_agent import agent
+    from code_agent.core import agent
 
-    fake = types.ModuleType("code_agent.agent_sdk")
+    fake = types.ModuleType("code_agent.core.agent_sdk")
     captured = {}
 
     def fake_answer(q, *, verbose=False, mode="plain", trace=None):
@@ -88,7 +88,7 @@ def test_answer_dispatches_to_sdk(monkeypatch):
         return f"sdk:{q}"
 
     fake.answer = fake_answer
-    monkeypatch.setitem(sys.modules, "code_agent.agent_sdk", fake)
+    monkeypatch.setitem(sys.modules, "code_agent.core.agent_sdk", fake)
     monkeypatch.setattr(config, "AGENT_BACKEND", "sdk")
     monkeypatch.setattr(config, "AGENT_ALLOWED_MODES", ("plain", "technical"))
     assert agent.answer("hi", mode="technical") == "sdk:hi"

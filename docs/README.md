@@ -5,7 +5,7 @@
 | 文档 | 内容 |
 |------|------|
 | [architecture.md](architecture.md) | 整体架构、请求流程、双后端、工具层 |
-| [code-organization.md](code-organization.md) | 后端代码目录分层、兼容 shim、新功能放置规则 |
+| [code-organization.md](code-organization.md) | 后端代码目录分层、新功能放置规则 |
 | [ask-diagnose-flow.md](ask-diagnose-flow.md) | `/ask` 与 `/diagnose` 的实际处理链路：何时用知识图谱、何时读代码、如何解析 crash/log |
 | [custom-backend.md](custom-backend.md) | custom 后端工作原理：如何按需检索代码、分析问题、组织答案，以及 tool-calling 循环、消息历史、stuck 检测 |
 | [configuration.md](configuration.md) | 全部环境变量、`.env`、两套后端各自的配置 |

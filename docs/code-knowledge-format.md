@@ -249,8 +249,7 @@ sequenceDiagram
 
 ## 召回策略
 
-当前实现位于 `code_agent/kb/module_knowledge.py`，旧路径
-`code_agent/module_knowledge.py` 是兼容 shim：
+当前实现位于 `code_agent/kb/module_knowledge.py`：
 
 1. 按当前 repo 加载 `docs/code-knowledge/common/` 和 `docs/code-knowledge/<repo>/`。
 2. 从用户问题抽取中英文词、符号名和中文短语。

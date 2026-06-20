@@ -1,7 +1,7 @@
 """Tests for the sandboxed code-search tools (pure logic, no LLM)."""
 from code_agent import config
 import pytest
-from code_agent import tools
+from code_agent.retrieval import tools
 
 
 # --- path sandbox ----------------------------------------------------------

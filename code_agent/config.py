@@ -108,7 +108,7 @@ _CURRENT_REPO: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 # "custom" = the litellm tool-calling loop (default, model-agnostic via proxy).
 # "sdk"    = the Claude Agent SDK loop (claude-agent-sdk + Claude Code CLI,
 #            routed through Bedrock env vars). Both reuse the same sandboxed
-#            tools in code_agent.tools and expose the same agent.answer() interface.
+#            tools in code_agent.retrieval.tools and expose the same agent.answer() interface.
 AGENT_BACKEND = os.environ.get("AGENT_BACKEND", "custom").strip().lower()
 
 # --- Operation/response mode ----------------------------------------------
@@ -189,7 +189,7 @@ MAX_LIST_ENTRIES = int(os.environ.get("MAX_LIST_ENTRIES", "300"))
 # --- Offline index (方案 2) ------------------------------------------------
 # SQLite symbol/FTS index. When present, find_symbol/grep_code use it (fast,
 # exact); otherwise they fall back to live filesystem scanning. Build with
-# `python -m code_agent.indexer` / scripts/index.sh.
+# `python -m code_agent.retrieval.indexer` / scripts/index.sh.
 INDEX_DB_PATH = os.environ.get(
     "INDEX_DB_PATH",
     os.path.join(PROJECT_ROOT, "index", "code_index.db"),

@@ -1,4 +1,4 @@
-from code_agent import response_policy
+from code_agent.core import response_policy
 
 
 def test_allows_structured_description():

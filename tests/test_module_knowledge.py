@@ -1,7 +1,7 @@
 """Tests for versioned module knowledge cards."""
-from code_agent import agent
+from code_agent.core import agent
 from code_agent import config
-from code_agent import module_knowledge
+from code_agent.kb import module_knowledge
 
 
 def _write_knowledge_card(tmp_path, name, content):

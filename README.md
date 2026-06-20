@@ -82,8 +82,8 @@ AGENT_BACKEND=sdk scripts/cli.sh "SceneMgr 是做什么的？"
 为避免宽泛问题每次从零遍历目录，可为每个仓库预生成概览：
 
 ```bash
-CODE_REPOS='gameserver=/path/to/gameserver,ecs=/path/to/ecs' python -m code_agent.repo_profile --repo gameserver
-CODE_REPOS='gameserver=/path/to/gameserver,ecs=/path/to/ecs' python -m code_agent.repo_profile --repo ecs
+CODE_REPOS='gameserver=/path/to/gameserver,ecs=/path/to/ecs' python -m code_agent.retrieval.repo_profile --repo gameserver
+CODE_REPOS='gameserver=/path/to/gameserver,ecs=/path/to/ecs' python -m code_agent.retrieval.repo_profile --repo ecs
 ```
 
 概览会写到 `index/repos/<repo>/profile.json`，agent 会自动把它作为检索起点注入 prompt，也可通过工具 `repo_overview` 或 HTTP `GET /repos/{repo}/overview` 查看。
@@ -93,11 +93,10 @@ CODE_REPOS='gameserver=/path/to/gameserver,ecs=/path/to/ecs' python -m code_agen
 ```bash
 # HTTP 服务（端口 8900）
 .venv/bin/python -m server.app
-# 兼容旧入口：.venv/bin/python -m code_agent.main
 
 # 命令行交互测试
-.venv/bin/python -m code_agent.cli
-.venv/bin/python -m code_agent.cli "SceneMgr 是做什么的？"   # 单次提问模式
+.venv/bin/python -m code_agent.interfaces.cli
+.venv/bin/python -m code_agent.interfaces.cli "SceneMgr 是做什么的？"   # 单次提问模式
 ```
 
 ## API
@@ -140,8 +139,7 @@ curl -X POST http://localhost:8900/ask \
 | `code_agent/diagnostics/` | backtrace/log 诊断 |
 | `server/` | FastAPI 服务、HTTP API、缓存和并发闸门 |
 | `frontend/` | Vue 前端资产和页面 shell |
-| `code_agent/interfaces/` | CLI、MCP 入口，以及旧 HTTP shim |
-| `code_agent/*.py` | 旧路径兼容 shim，例如 `python -m code_agent.main` 仍可用 |
+| `code_agent/interfaces/` | CLI、MCP 入口 |
 | `docs/` | 项目文档 |
 | `scripts/` | 启动、测试、索引、评测脚本 |
 | `tests/` | 离线测试 |

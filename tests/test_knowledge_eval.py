@@ -2,8 +2,8 @@
 import json
 
 from code_agent import config
-from code_agent import knowledge_eval
-from code_agent import main
+from code_agent.kb import knowledge_eval
+from server import app as main
 
 
 def _write_knowledge_card(tmp_path, name, content):

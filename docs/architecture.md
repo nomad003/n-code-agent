@@ -33,7 +33,7 @@ agent.answer(question, repo=...)  按 repo 选择目标仓库，按 AGENT_BACKEN
 
 ## 双后端
 
-`agent.answer()` 根据 `AGENT_BACKEND` 环境变量选择后端，**两者共用同一套 `code_agent.retrieval.tools` 工具和 `config.system_prompt_for_mode()`**，对外接口完全一致。`code_agent.tools` 保留为旧路径兼容 shim。
+`agent.answer()` 根据 `AGENT_BACKEND` 环境变量选择后端，**两者共用同一套 `code_agent.retrieval.tools` 工具和 `config.system_prompt_for_mode()`**，对外接口完全一致。
 
 | | `custom`（默认） | `sdk` |
 |---|---|---|
@@ -123,10 +123,9 @@ custom 的 system prompt 分三层：基础工具策略、`plain/technical/edit`
 | `code_agent/diagnostics/` | backtrace/log 诊断与预解析 |
 | `server/` | FastAPI 服务、HTTP API、缓存、并发闸门、页面路由 |
 | `frontend/` | Vue 前端静态资源和页面 shell helper |
-| `code_agent/interfaces/` | MCP server、CLI，以及旧 HTTP shim |
+| `code_agent/interfaces/` | MCP server、CLI |
 | `code_agent/observability/` | LLM trace 写入和 trace viewer API |
 | `code_agent/evals/` | `/ask` 回答质量评测 |
-| `code_agent/*.py` | 旧路径兼容 shim，不放业务逻辑 |
 | `vendor/claude-cli/` | 内置 Claude Code CLI（linux-x64，二进制经 Git LFS） |
 
 更细的放置规则见 [code-organization.md](code-organization.md)。

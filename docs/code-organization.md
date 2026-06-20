@@ -1,13 +1,7 @@
 # 代码目录组织
 
-`code_agent/` 后端代码按职责拆成子包，根目录保留兼容 shim。旧导入方式仍可用：
-
-```python
-from code_agent import agent, tools, diagnose
-```
-
-这些旧模块会直接别名到新实现模块，保留私有调试/测试入口，例如
-`code_agent.main._inflight`、`code_agent.tools._RG_PATH`。
+`code_agent/` 只保留代码理解核心包和配置，不再保留根目录同名 shim。
+HTTP 服务和前端资产位于仓库顶层 `server/`、`frontend/`。
 
 ## 目录分层
 
@@ -19,38 +13,20 @@ from code_agent import agent, tools, diagnose
 | `code_agent/diagnostics/` | 运行时诊断 | `diagnose.py` |
 | `server/` | HTTP 服务 | `app.py` |
 | `frontend/` | 前端资产与 shell | `assets.py`、`static/` |
-| `code_agent/interfaces/` | 非 HTTP 入口和兼容入口 | `mcp_server.py`、`cli.py`、`main.py` |
+| `code_agent/interfaces/` | 非 HTTP 入口 | `mcp_server.py`、`cli.py` |
 | `code_agent/observability/` | 调用观测 | `llm_trace.py`、`trace_viewer.py` |
 | `code_agent/evals/` | 回答质量评测 | `evaluate.py` |
 | `frontend/static/` | Vue 前端静态资源 | `app.html`、`app.css`、`app.js` |
 
-## 兼容入口
-
-根目录下的同名文件是兼容层：
-
-| 旧路径 | 新实现 |
-|--------|--------|
-| `code_agent/agent.py` | `code_agent/core/agent.py` |
-| `code_agent/tools.py` | `code_agent/retrieval/tools.py` |
-| `code_agent/indexer.py` | `code_agent/retrieval/indexer.py` |
-| `code_agent/knowledge_graph.py` | `code_agent/kb/knowledge_graph.py` |
-| `code_agent/assert_knowledge.py` | `code_agent/kb/assert_knowledge.py` |
-| `code_agent/diagnose.py` | `code_agent/diagnostics/diagnose.py` |
-| `code_agent/main.py` | `server/app.py` |
-| `code_agent/interfaces/main.py` | `server/app.py` |
-| `code_agent/evaluate.py` | `code_agent/evals/evaluate.py` |
-
-命令也保持不变：
+## 常用命令
 
 ```bash
-python -m code_agent.indexer --repo marvel
-python -m code_agent.knowledge_eval eval/knowledge.marvel.jsonl
-python -m code_agent.evaluate eval/dataset.sample.jsonl
+python -m code_agent.retrieval.indexer --repo marvel
+python -m code_agent.kb.knowledge_eval eval/knowledge.marvel.jsonl
+python -m code_agent.evals.evaluate eval/dataset.sample.jsonl
 python -m server.app
-python -m code_agent.mcp_server
+python -m code_agent.interfaces.mcp_server
 ```
-
-`python -m code_agent.main` 仍是 REST 兼容入口。
 
 ## 依赖方向
 
@@ -73,7 +49,7 @@ code_agent.evals -> code_agent.core
 - 知识卡、图谱、Assert catalog 的解析放在 `kb/`。
 - HTTP 服务只放在顶层 `server/`；MCP/CLI 放在 `code_agent/interfaces/`。
 - 前端页面资产只放在 `frontend/static/`，服务端只通过 `frontend.assets` 读取页面 shell。
-- 根目录兼容 shim 不放业务逻辑。
+- `code_agent/` 根目录不放业务 shim；新增模块必须进入对应子包。
 
 ## 新代码放置规则
 

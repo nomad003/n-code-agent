@@ -105,13 +105,13 @@ curl -X POST http://localhost:8900/ask \
 构建命令：
 
 ```bash
-python -m code_agent.repo_profile --repo gameserver
-python -m code_agent.repo_profile --repo ecs
+python -m code_agent.retrieval.repo_profile --repo gameserver
+python -m code_agent.retrieval.repo_profile --repo ecs
 ```
 
 ### 缓存说明
 
-缓存是 `server.app` 里的**有界 LRU**（`code_agent.main` 只是兼容 shim；问题 → 答案，上限 `CACHE_MAX_ENTRIES`，超出淘汰最久未用）：
+缓存是 `server.app` 里的**有界 LRU**（问题 → 答案，上限 `CACHE_MAX_ENTRIES`，超出淘汰最久未用）：
 
 - `use_cache=true` 且问题问过 → 直接返回缓存，`cached:true`，**不调 LLM**（省时省 token），且不占并发槽。
 - 缓存 key 包含 `repo + mode + question`，不同仓库不会串答案。
@@ -237,7 +237,7 @@ curl -X POST http://localhost:8900/diagnose \
 
 闸门是一个有界线程池（`MAX_CONCURRENCY` 个 worker）：504 超时无法杀死线程，但该线程仍占用 worker，所以真实并发不会被架空（槽位在线程真正结束时才释放）。缓存命中不占并发槽，直接返回。阈值见 [configuration.md](configuration.md)。
 
-## 命令行（`code_agent.cli`）
+## 命令行（`code_agent.interfaces.cli`）
 
 ```bash
 # 交互模式（会打印工具调用过程）

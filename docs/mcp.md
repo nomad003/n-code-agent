@@ -6,7 +6,7 @@
 - 暴露工具：
   - **`ask_codebase(question: str, mode: str = "", repo: str = "") -> str`** —— 高层问答，内部跑完整 agent 循环（grep/read/list/glob/find_symbol + LLM），返回所选等级的答案；不传 `mode` 时使用 `AGENT_DEFAULT_MODE`，显式选择时必须已在 `AGENT_ALLOWED_MODES` 开启；不传 `repo` 时使用 `CODE_REPO_DEFAULT`。
   - **`diagnose_crash(backtrace: str = "", log_snippet: str = "", repo: str = "") -> str`** —— 分析崩溃栈或日志；可只传日志，逐帧映射代码 + 日志反查打印点定位根因（方向 F）。
-- 实现：`code_agent.mcp_server`，是 `agent.answer()` 的薄封装，沿用同一套 `AGENT_BACKEND`、沙箱工具、repo 选择。
+- 实现：`code_agent.interfaces.mcp_server`，是 `agent.answer()` 的薄封装，沿用同一套 `AGENT_BACKEND`、沙箱工具、repo 选择。
 
 ## 启动
 
@@ -18,7 +18,7 @@ scripts/mcp.sh restart | status                 # 重启 / 查看状态
 MCP_PORT=8901 AGENT_BACKEND=sdk scripts/mcp.sh start
 ```
 
-等价裸命令：`python -m code_agent.mcp_server`（脚本会自动建 venv、加载 `.env`）。
+等价裸命令：`python -m code_agent.interfaces.mcp_server`（脚本会自动建 venv、加载 `.env`）。
 
 ## 配置
 
@@ -73,8 +73,8 @@ asyncio.run(main())
 
 | 入口 | 用途 |
 |------|------|
-| `server.app` / `code_agent.main` 兼容入口（REST，8900） | 给普通 HTTP 客户端 |
-| `code_agent.mcp_server`（MCP，8901） | 给 MCP 客户端/agent |
-| `code_agent.cli` | 本地命令行调试 |
+| `server.app`（REST，8900） | 给普通 HTTP 客户端 |
+| `code_agent.interfaces.mcp_server`（MCP，8901） | 给 MCP 客户端/agent |
+| `code_agent.interfaces.cli` | 本地命令行调试 |
 
 三者都调同一个 `agent.answer()`，行为一致。

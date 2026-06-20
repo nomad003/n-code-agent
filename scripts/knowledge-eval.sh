@@ -14,4 +14,4 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 ensure_venv
 dataset="${1:-eval/knowledge.marvel.jsonl}"
 shift || true
-run_py -m code_agent.knowledge_eval "$dataset" "$@"
+run_py -m code_agent.kb.knowledge_eval "$dataset" "$@"

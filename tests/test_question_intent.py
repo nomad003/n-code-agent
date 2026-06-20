@@ -1,5 +1,5 @@
 """Tests for question-type prompt policy."""
-from code_agent import question_intent
+from code_agent.core import question_intent
 
 
 def test_classify_crash_stack():

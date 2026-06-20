@@ -20,7 +20,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from code_agent import agent
+from code_agent.core import agent
 from code_agent import config
 from code_agent.core import operation_modes
 from code_agent.core import question_intent
@@ -213,7 +213,7 @@ def repo_overview(repo: str) -> dict:
             return {
                 "repo": repo_name,
                 "available": False,
-                "message": "profile not built; run `python -m code_agent.repo_profile --repo <name>`",
+                "message": "profile not built; run `python -m code_agent.retrieval.repo_profile --repo <name>`",
             }
         return {"repo": repo_name, "available": True, "profile": profile}
 

@@ -2,7 +2,7 @@
 import json
 
 from code_agent import config
-from code_agent import evaluate
+from code_agent.evals import evaluate
 import pytest
 
 

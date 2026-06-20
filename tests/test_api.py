@@ -3,9 +3,9 @@
 agent.answer is stubbed so no LLM is called; we count invocations to prove the
 cache short-circuits repeated questions.
 """
-from code_agent import agent
+from code_agent.core import agent
 from code_agent import config
-from code_agent import main
+from server import app as main
 import pytest
 from fastapi.testclient import TestClient
 

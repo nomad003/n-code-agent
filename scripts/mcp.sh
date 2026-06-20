@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # MCP server (streamable-http) exposing ask_codebase to MCP clients.
 #
-# Env (see code_agent.config / code_agent.mcp_server): MCP_HOST, MCP_PORT (8901), MCP_PATH (/mcp),
+# Env (see code_agent.config / code_agent.interfaces.mcp_server): MCP_HOST, MCP_PORT (8901), MCP_PATH (/mcp),
 # plus the usual AGENT_BACKEND / CODE_REPOS / CODE_REPO_DEFAULT / LLM_API_KEY.
 #
 # Usage:
@@ -18,4 +18,4 @@ if [[ -z "${1:-}" ]]; then
   echo "[mcp] backend : ${AGENT_BACKEND:-custom}"
   echo "[mcp] endpoint: http://${MCP_HOST:-0.0.0.0}:${MCP_PORT:-8901}${MCP_PATH:-/mcp}"
 fi
-daemon_dispatch mcp "${1:-}" -m code_agent.mcp_server
+daemon_dispatch mcp "${1:-}" -m code_agent.interfaces.mcp_server
