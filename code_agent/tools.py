@@ -512,7 +512,15 @@ def find_assert_context(message: str, context: int = 8) -> str:
             return "no indexed assert matched; related log source candidates:\n" + log_hit
         return f"no indexed assert matched {message!r}"
 
+    try:
+        from . import assert_knowledge
+
+        playbook = assert_knowledge.format_for_hits(hits, query=message)
+    except Exception:
+        playbook = ""
     blocks: list[str] = []
+    if playbook:
+        blocks.append(playbook)
     for h in hits:
         line = int(h["line"])
         start = max(1, line - context)

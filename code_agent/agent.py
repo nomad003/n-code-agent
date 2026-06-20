@@ -263,6 +263,14 @@ class CodeAgent:
         module_text = module_knowledge.format_for_prompt(self.question)
         if module_text:
             system = system + "\n\n" + module_text
+        try:
+            from . import assert_knowledge
+
+            assert_text = assert_knowledge.format_for_prompt(self.question)
+        except Exception:
+            assert_text = ""
+        if assert_text:
+            system = system + "\n\n" + assert_text
         if self.recalled:
             system = system + "\n\n" + self.recalled
         # Mark the static prefix (system + initial user question) for prompt

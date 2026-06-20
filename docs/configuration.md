@@ -36,6 +36,8 @@ cp .env.example .env     # 填入 LLM_API_KEY，按需改 TARGET_CODE_PATH / COD
 | `USE_KNOWLEDGE` | `0` | 是否启用知识沉淀飞轮（沉淀+召回），默认关 |
 | `CODE_KNOWLEDGE_MAP_ENABLED` | `1` | 是否把 `docs/code-knowledge/<repo>/` 的稳定知识地图注入 agent prompt，默认开 |
 | `CODE_KNOWLEDGE_MAP_MAX_CARDS` | `12` | 知识地图最多注入多少张卡片摘要 |
+| `ASSERT_KNOWLEDGE_ENABLED` | `1` | 是否把 `docs/code-knowledge/<repo>/asserts/assert-catalog.json` 的结构化 Assert 排障知识注入 agent prompt |
+| `ASSERT_KNOWLEDGE_MAX_ITEMS` | `4` | 每次最多注入多少个 Assert 排障条目 |
 | `SERVICE_HOST` | `0.0.0.0` | HTTP 监听地址 |
 | `SERVICE_PORT` | `8900` | HTTP 端口 |
 | `MAX_CONCURRENCY` | `4` | `/ask`+`/diagnose` 最大并发数（线程池 worker 数） |

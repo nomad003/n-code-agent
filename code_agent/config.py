@@ -222,6 +222,12 @@ CODE_KNOWLEDGE_MAP_ENABLED = os.environ.get("CODE_KNOWLEDGE_MAP_ENABLED", "1") n
     "False",
 )
 CODE_KNOWLEDGE_MAP_MAX_CARDS = int(os.environ.get("CODE_KNOWLEDGE_MAP_MAX_CARDS", "12"))
+ASSERT_KNOWLEDGE_ENABLED = os.environ.get("ASSERT_KNOWLEDGE_ENABLED", "1") not in (
+    "0",
+    "false",
+    "False",
+)
+ASSERT_KNOWLEDGE_MAX_ITEMS = int(os.environ.get("ASSERT_KNOWLEDGE_MAX_ITEMS", "4"))
 
 # --- Service ---------------------------------------------------------------
 SERVICE_PORT = int(os.environ.get("SERVICE_PORT", "8900"))

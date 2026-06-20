@@ -165,7 +165,9 @@ flowchart TD
 3. 仓库概览 `repo_profile`。
 4. 知识图谱摘要。
 5. 命中的模块知识卡正文。
-6. 动态问答沉淀召回内容，只有 `USE_KNOWLEDGE=1` 时启用。
+6. 命中的 Assert 结构化排障知识，来自
+   `docs/code-knowledge/<repo>/asserts/assert-catalog.json`。
+7. 动态问答沉淀召回内容，只有 `USE_KNOWLEDGE=1` 时启用。
 
 ### `/ask` 与知识沉淀
 
@@ -237,8 +239,9 @@ flowchart TD
 2. `resolve_frames()` 用符号索引把函数名映射到候选代码位置。
 3. `find_log_source()` 把日志文本反查到打印点。
 4. `find_assert_context()` 把 ASSERT/CHECK/断言失败反查到断言上下文。
-5. 把这些候选位置放入诊断 prompt。
-6. 再调用 `agent.answer()` 继续分析，必要时仍可调用工具读代码。
+5. 若 Assert 知识库命中，会附加对应问题、上下文、原因和排查/修复步骤。
+6. 把这些候选位置放入诊断 prompt。
+7. 再调用 `agent.answer()` 继续分析，必要时仍可调用工具读代码。
 
 因此，`/diagnose` 比 `/ask` 更偏“先定位再分析”，适合 crash 堆栈和宕机日志。
 
