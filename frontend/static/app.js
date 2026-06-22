@@ -1234,7 +1234,6 @@
         vueReady: window.__CODE_AGENT_VUE_READY__ === true,
         view: pathToView(window.location.pathname),
         loading: false,
-        statusText: "就绪",
         shell: {
           sidebarCollapsed: readSidebarCollapsed(),
           theme: readTheme(),
@@ -1477,16 +1476,13 @@
         }
         return data;
       },
-      async withLoading(label, fn) {
+      async withLoading(_label, fn) {
         this.loading = true;
-        this.statusText = label;
         this.errorText = "";
         try {
           const result = await fn();
-          this.statusText = "完成";
           return result;
         } catch (err) {
-          this.statusText = "失败";
           this.errorText = err && err.message ? err.message : String(err || "请求失败");
           return null;
         } finally {

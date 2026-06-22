@@ -57,7 +57,6 @@
           <p>{{ viewSubtitle }}</p>
         </div>
         <div class="topbar-actions">
-          <span class="status" :class="{ busy: loading }">{{ statusText }}</span>
           <button class="theme-toggle" type="button" @click="toggleTheme" :aria-label="shell.theme === 'dark' ? '切换亮色模式' : '切换暗色模式'" :title="shell.theme === 'dark' ? '切换亮色模式' : '切换暗色模式'">
             <span :class="{ active: shell.theme === 'dark' }">暗</span>
             <span :class="{ active: shell.theme === 'light' }">亮</span>
