@@ -240,7 +240,7 @@ class CodeAgent:
         message keyed by tool_call_id. This is the one place that has to keep
         request/result pairing consistent.
         """
-        system = config.system_prompt_for_mode(self.mode)
+        system = config.SYSTEM_PROMPT_BASE
         system = system + "\n\n" + question_intent.prompt(self.question, self.question_type)
         try:
             from ..retrieval import repo_profile
@@ -274,6 +274,9 @@ class CodeAgent:
             system = system + "\n\n" + assert_text
         if self.recalled:
             system = system + "\n\n" + self.recalled
+        # Keep the audience/output contract last so question-type investigation
+        # rules and recalled knowledge cannot accidentally override it.
+        system = operation_modes.prompt(system, self.mode)
         # Mark the static prefix (system + initial user question) for prompt
         # caching when the provider supports it. Anthropic / Bedrock honor
         # ``cache_control``; non-Anthropic backends (Gemini through the proxy)
@@ -493,6 +496,8 @@ class CodeAgent:
         return f"{(answer or '').rstrip()}\n\n{footer}".strip()
 
     def _knowledge_evidence_footer(self, answer: str) -> str:
+        if self.mode == "plain":
+            return ""
         try:
             cards = knowledge_graph.load_cards(
                 config.current_repo().name,

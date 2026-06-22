@@ -17,11 +17,14 @@ def test_require_api_key_returns_value(monkeypatch):
 
 def test_system_prompt_enforces_concise_structured_no_code_by_default():
     prompt = config.SYSTEM_PROMPT
+    assert "渐进披露" in prompt
+    assert "首答只给" in prompt
+    assert "整体框架" in prompt
     assert "简单、精确、结构化" in prompt
     assert "严禁输出任何代码片段" in prompt
     assert "即使用户要求代码或示例" in prompt
     assert "只用结构化文字描述" in prompt
-    assert "不展开底层实现" in prompt
+    assert "不要列出知识卡、文件路径、类名、函数名" in prompt
 
 
 def test_system_prompt_for_technical_mode(monkeypatch):

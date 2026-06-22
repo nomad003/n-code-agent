@@ -42,10 +42,13 @@ scripts/test.sh tests/test_tools.py::test_grep_finds_match   # 跑单个用例
 单元测试不覆盖真实 LLM 链路。要确认实际服务可用，配好 `.env` 后：
 
 ```bash
+python scripts/llm_smoke.py                    # 直接验证 LLM_API_BASE / LLM_MODEL / LLM_API_KEY
 scripts/serve.sh &                            # 起服务
 curl -s http://localhost:8900/health          # {"status":"ok"}
 scripts/ask.sh "SceneMgr 有什么方法？"          # 经真实代理返回答案
 ```
+
+`llm_smoke.py` 会通过 litellm 发一个最小 custom 后端请求，只打印 base/model/是否有 key/响应，不打印 token。默认不传 `max_tokens`；当前代理下显式传过小 `max_tokens` 可能返回空文本和 `finish_reason=length`。
 
 若代理预算超限 / token 失效，`/ask` 会返回 **502**（`上游模型调用失败: ...`）而非 500 栈——这是预期的错误处理。
 

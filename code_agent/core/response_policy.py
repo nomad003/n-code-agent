@@ -32,6 +32,7 @@ _CODE_RE = re.compile(
     r"public:|private:|protected:|return\b|if\s*\(|for\s*\(|while\s*\(|"
     r"try:|except\b|const\s+|let\s+|var\s+)\b"
 )
+_INTERNAL_EVIDENCE_HEADING_RE = re.compile(r"^\s*#{0,3}\s*关键线索\s*$")
 # Any CJK character on a line marks it as natural-language prose — keep it even
 # if it superficially looks like a config/code line (e.g. "- host: 主机地址"
 # from a structured field description).
@@ -86,6 +87,8 @@ def enforce(text: str, mode: str = "plain") -> str:
             notice_pending = False
 
     cleaned = _collapse_blank_lines("\n".join(out)).strip()
+    cleaned = _strip_internal_evidence(cleaned)
+    cleaned = _dedupe_repeated_blocks(cleaned)
     if changed and cleaned and _NOTICE not in cleaned:
         cleaned = f"{cleaned}\n{_NOTICE}"
     if changed and not cleaned:
@@ -127,3 +130,50 @@ def _collapse_blank_lines(text: str) -> str:
         lines.append(line.rstrip())
         blank = is_blank
     return "\n".join(lines)
+
+
+def _strip_internal_evidence(text: str) -> str:
+    """Remove internal evidence footers from plain-mode answers.
+
+    The agent may use knowledge cards, file paths, symbols, logs and asserts as
+    evidence. Plain users should get a progressive overview first, not the raw
+    retrieval/debug footer.
+    """
+    if not text:
+        return text
+    out: list[str] = []
+    skipping = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if _INTERNAL_EVIDENCE_HEADING_RE.match(stripped):
+            skipping = True
+            continue
+        if skipping and stripped.startswith("#") and "关键线索" not in stripped:
+            skipping = False
+        if skipping:
+            continue
+        if re.match(r"^\s*-\s*(知识卡|关键文件|关键符号|日志短语|断言)\s*[:：]", line):
+            continue
+        out.append(line)
+    return _collapse_blank_lines("\n".join(out)).strip()
+
+
+def _dedupe_repeated_blocks(text: str) -> str:
+    """Drop repeated markdown/prose blocks from plain answers.
+
+    Some models repeat the same outline twice with tiny formatting differences
+    after inline-code stripping. Block-level dedupe is conservative enough for
+    plain summaries and avoids shipping duplicated sections to users.
+    """
+    blocks = re.split(r"\n\s*\n", text.strip())
+    seen: set[str] = set()
+    out: list[str] = []
+    for block in blocks:
+        norm = re.sub(r"\s+", " ", block.strip())
+        norm = norm.replace("**", "").replace("__", "")
+        if len(norm) >= 12 and norm in seen:
+            continue
+        if norm:
+            seen.add(norm)
+        out.append(block.strip())
+    return _collapse_blank_lines("\n\n".join(part for part in out if part)).strip()

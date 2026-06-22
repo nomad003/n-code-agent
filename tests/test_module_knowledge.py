@@ -109,6 +109,7 @@ def test_build_messages_injects_module_card(monkeypatch, tmp_path):
     assert "代码知识库地图" in msgs[0]["content"]
     assert "已命中的模块知识卡" in msgs[0]["content"]
     assert "SkillListForEnemy" in msgs[0]["content"]
+    assert msgs[0]["content"].rfind("对外回答格式") > msgs[0]["content"].rfind("已命中的模块知识卡")
 
 
 def test_build_messages_injects_split_enemy_cards(monkeypatch, tmp_path):
@@ -191,3 +192,27 @@ def test_answer_evidence_footer_uses_specific_card_fields(monkeypatch, tmp_path)
     assert "gameserver/unit/skill/skillcore.cpp" in footer
     assert "SkillConfig::GetEnemySkillConfigX" in footer
     assert "not find in conf" in footer
+
+
+def test_answer_evidence_footer_is_hidden_in_plain_mode(monkeypatch, tmp_path):
+    _write_knowledge_card(
+        tmp_path,
+        "enemy/enemy-template-config.md",
+        (
+            "---\n"
+            "title: Enemy 模板配置\n"
+            "tags: enemy, config, 怪物\n"
+            "resource: tableload/XEntityStatistics\n"
+            "symbols: XEntityStatistics, UnitConf::InitFromTemplate\n"
+            "---\n\n"
+            "# Enemy 模板配置\n\n怪物模板配置。\n"
+        ),
+    )
+    monkeypatch.setattr(config, "PROJECT_ROOT", str(tmp_path))
+    monkeypatch.setattr(config, "CODE_REPOS", {})
+    monkeypatch.setattr(config, "CODE_REPO_DEFAULT", "marvel")
+    monkeypatch.setattr(config, "TARGET_CODE_PATH", str(tmp_path))
+
+    a = agent.CodeAgent(mode="plain")
+    a.question = "怪物如何配置？"
+    assert a._knowledge_evidence_footer("已有回答") == ""

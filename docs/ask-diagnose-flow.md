@@ -15,7 +15,7 @@
    system prompt。
 4. 模型再按问题决定是否调用代码工具，例如 `repo_overview`、`grep_code`、
    `find_symbol`、`read_file`、`find_assert_context`、`find_log_source`。
-5. 最终答案会追加确定性的 `关键线索`，列出命中的知识卡、文件、符号、日志和断言。
+5. `technical` / `edit` 答案会追加确定性的 `关键线索`，列出命中的知识卡、文件、符号、日志和断言；`plain` 答案默认隐藏这些内部线索，只给渐进式纲要。
 
 因此，知识图谱是“开局导航”，代码工具是“按需核实”。当前实现没有硬编码强制
 每个 `/ask` 都必须读代码；是否读代码由 Agent loop 中的模型工具调用决定。

@@ -43,6 +43,32 @@ def test_technical_mode_keeps_implementation_content():
     assert response_policy.enforce(text, mode="technical") == text
 
 
+def test_plain_removes_internal_evidence_footer():
+    text = (
+        "整体：怪物配置先看模板、AI、表现和技能。\n\n"
+        "## 关键线索\n"
+        "- 知识卡: enemy/enemy-template-config.md\n"
+        "- 关键文件: gameserver/ai\n"
+        "- 关键符号: AIEnemyAgent\n"
+        "- 日志短语: not find in conf\n"
+        "- 断言: CHECK_COND\n"
+    )
+    out = response_policy.enforce(text)
+    assert out == "整体：怪物配置先看模板、AI、表现和技能。"
+
+
+def test_plain_dedupes_repeated_blocks_after_inline_strip():
+    text = (
+        "### 1. 基础模板配置 (`XEntityStatistics` 表)\n\n"
+        "这是怪物的主配置表，决定怪物身份和基础规则。\n\n"
+        "### 1. 基础模板配置 (XEntityStatistics 表)\n\n"
+        "这是怪物的主配置表，决定怪物身份和基础规则。"
+    )
+    out = response_policy.enforce(text)
+    assert out.count("基础模板配置") == 1
+    assert out.count("这是怪物的主配置表") == 1
+
+
 def test_keeps_chinese_field_description_lines():
     """A structured field description must not be mistaken for a YAML config."""
     text = "字段说明：\n- host: 主机地址\n- port: 端口号是 8900\n- path: 资源路径"
