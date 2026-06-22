@@ -25,11 +25,15 @@ def test_knowledge_page_smoke():
     assert "调查" in html and "复盘" in html and "知识" in html and "图谱" in html
     assert "theme-toggle" in html
     assert "markdown-preview" in html
+    assert "answer-preview" in html
     assert "knowledge-tree" in html
     assert "showCardPreview" in html
     assert "brand-mark" not in html
     app_js = Path("frontend/static/app.js").read_text(encoding="utf-8")
     assert "renderKnowledgeDiagrams" in app_js
+    assert "renderedAskAnswer" in app_js
+    assert "等待提交问题。" in app_js
+    assert "querySelectorAll('.markdown-preview .diagram-card" in app_js
     assert "modeOptions" in app_js
     assert "preferredKnowledgeQaMode" in app_js
     assert "knowledgeCardRows" in app_js

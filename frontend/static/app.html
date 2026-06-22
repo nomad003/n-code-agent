@@ -113,7 +113,7 @@
             <h2>分析结果</h2>
             <button class="ghost" @click="clearAskOutput">清空</button>
           </div>
-          <pre>{{ ask.answer || '等待提交问题。' }}</pre>
+          <article class="markdown-preview answer-preview" v-html="renderedAskAnswer"></article>
           <details v-if="ask.raw">
             <summary>原始响应</summary>
             <pre>{{ ask.raw }}</pre>

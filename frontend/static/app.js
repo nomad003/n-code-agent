@@ -433,7 +433,7 @@
     return text.slice(end + 4).replace(/^\s+/, "");
   }
 
-  function renderMarkdown(markdown) {
+  function renderMarkdown(markdown, emptyText = "选择或新建一个知识卡片。") {
     const lines = stripFrontMatter(markdown).split(/\r?\n/);
     const html = [];
     let inCode = false;
@@ -540,7 +540,7 @@
     flushParagraph();
     flushList();
     flushTable();
-    return html.join("\n") || '<p class="empty">选择或新建一个知识卡片。</p>';
+    return html.join("\n") || '<p class="empty">' + escapeHtml(emptyText) + '</p>';
   }
 
   function readSidebarCollapsed() {
@@ -918,9 +918,7 @@
   }
 
   async function renderKnowledgeDiagrams(force = false) {
-    const root = document.querySelector(".markdown-preview");
-    if (!root) return;
-    const figures = Array.from(root.querySelectorAll('.diagram-card[data-diagram-engine="mermaid"]'));
+    const figures = Array.from(document.querySelectorAll('.markdown-preview .diagram-card[data-diagram-engine="mermaid"]'));
     if (!figures.length) return;
     if (force) {
       figures.forEach((figure) => {
@@ -1075,6 +1073,9 @@
       },
       renderedKnowledge() {
         return renderMarkdown(this.knowledge.content);
+      },
+      renderedAskAnswer() {
+        return renderMarkdown(this.ask.answer, "等待提交问题。");
       },
       knowledgeCardRows() {
         const order = ["index.md", "gameserver", "unit", "enemy", "ecs", "common"];
