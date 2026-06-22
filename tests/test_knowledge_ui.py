@@ -98,7 +98,12 @@ def test_trace_page_smoke():
     assert "common_qa_skipped" in app_js
     assert "intent_classified" in app_js
     assert "knowledge_context_injected" in app_js
+    assert "response_policy_applied" in app_js
     assert "buildTraceContextSummary" in app_js
+    assert "context_errors" in app_js
+    assert "combined_system_chars" in app_js
+    assert "context-meta" in app_js
+    assert "context-message" in app_js
     assert "/static/vendor/vue.global.prod.js" in app_js
 
 

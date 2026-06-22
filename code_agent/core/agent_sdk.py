@@ -39,6 +39,8 @@ from claude_agent_sdk import (
 from .. import config
 from ..observability import llm_trace
 from ..retrieval import tools
+from . import operation_modes
+from . import question_intent
 
 # --- Wrap the existing sandboxed tools as SDK tools ------------------------
 # Each delegates to tools.dispatch(), which enforces the path sandbox and the
@@ -136,16 +138,200 @@ def _resolve_cli_path() -> str | None:
     return None  # SDK falls back to the bundled/`claude`-on-PATH binary
 
 
-def _options(mode: str = "plain") -> ClaudeAgentOptions:
+def _trace_error(exc: Exception) -> str:
+    return f"{type(exc).__name__}: {exc}"
+
+
+def _prompt_context_block(
+    key: str,
+    title: str,
+    text: str,
+    *,
+    injected: bool | None = None,
+    enabled: bool = True,
+    reason: str = "",
+    error: str = "",
+    sources: list[str] | None = None,
+    order: int = 0,
+    audit: bool = False,
+) -> dict:
+    body = text or ""
+    return {
+        "key": key,
+        "title": title,
+        "order": order,
+        "enabled": bool(enabled),
+        "injected": bool(body) if injected is None else bool(injected),
+        "chars": len(body),
+        "sources": sources or [],
+        "reason": reason,
+        "error": error,
+        "audit": bool(audit),
+        "content": body,
+    }
+
+
+def _system_prompt_with_profile(mode: str) -> tuple[str, str, str, str]:
     system_prompt = config.system_prompt_for_mode(mode)
+    profile_error = ""
+    profile_reason = ""
     try:
         from ..retrieval import repo_profile
 
         profile_text = repo_profile.format_for_prompt()
-    except Exception:
+    except Exception as exc:
         profile_text = ""
+        profile_error = _trace_error(exc)
+    if not profile_text and not profile_error:
+        profile_reason = "repo overview empty"
     if profile_text:
         system_prompt = system_prompt + "\n\n" + profile_text
+    return system_prompt, profile_text, profile_error, profile_reason
+
+
+def _trace_sdk_context(
+    *,
+    question: str,
+    mode: str,
+    trace: llm_trace.LLMTrace | None,
+    system_prompt: str,
+    profile_text: str,
+    profile_error: str,
+    profile_reason: str,
+) -> None:
+    if not trace:
+        return
+    resolved_question_type = question_intent.classify(question)
+    output_mode_prompt = operation_modes.response_rules(mode).rstrip()
+    sdk_reason = "sdk backend does not inject this custom context block"
+    context_errors = {"repo_overview": profile_error} if profile_error else {}
+    context_reasons = {
+        "repo_overview": profile_reason,
+        "intent_prompt": sdk_reason,
+        "knowledge_graph": sdk_reason,
+        "module_cards": sdk_reason,
+        "assert_knowledge": sdk_reason,
+        "recalled_qa": sdk_reason,
+    }
+    context_reasons = {key: value for key, value in context_reasons.items() if value}
+    assembly_order = [
+        "base_prompt",
+        "intent_prompt",
+        "repo_overview",
+        "knowledge_graph",
+        "module_cards",
+        "assert_knowledge",
+        "recalled_qa",
+        "output_mode",
+    ]
+    blocks = [
+        _prompt_context_block(
+            "base_prompt",
+            "基础系统提示词",
+            config.SYSTEM_PROMPT_BASE,
+            injected=True,
+            order=10,
+        ),
+        _prompt_context_block(
+            "intent_prompt",
+            "当前问题类型提示词",
+            "",
+            injected=False,
+            reason=context_reasons["intent_prompt"],
+            sources=[resolved_question_type],
+            order=20,
+        ),
+        _prompt_context_block(
+            "repo_overview",
+            "Repo Overview",
+            profile_text,
+            reason=profile_reason,
+            error=profile_error,
+            order=30,
+        ),
+        _prompt_context_block(
+            "knowledge_graph",
+            "代码知识图谱摘要",
+            "",
+            injected=False,
+            reason=context_reasons["knowledge_graph"],
+            order=40,
+        ),
+        _prompt_context_block(
+            "module_cards",
+            "命中的模块知识卡",
+            "",
+            injected=False,
+            reason=context_reasons["module_cards"],
+            order=50,
+        ),
+        _prompt_context_block(
+            "assert_knowledge",
+            "Assert 知识",
+            "",
+            injected=False,
+            reason=context_reasons["assert_knowledge"],
+            order=60,
+        ),
+        _prompt_context_block(
+            "recalled_qa",
+            "历史问答沉淀",
+            "",
+            injected=False,
+            reason=context_reasons["recalled_qa"],
+            order=70,
+        ),
+        _prompt_context_block(
+            "output_mode",
+            "plain/technical 模式输出要求",
+            output_mode_prompt,
+            injected=True,
+            sources=[mode],
+            order=80,
+        ),
+        _prompt_context_block(
+            "combined_system_prompt",
+            "最终 System Prompt（组装后）",
+            system_prompt,
+            injected=True,
+            sources=["sdk_request.system_prompt"],
+            order=90,
+            audit=True,
+        ),
+    ]
+    trace.write(
+        "knowledge_context_injected",
+        blocks=blocks,
+        assembly_order=assembly_order,
+        backend="sdk",
+        mode=mode,
+        question_type=resolved_question_type,
+        repo=config.current_repo().name,
+        target_code_path=config.current_target_code_path(),
+        with_tools=True,
+        prompt_cache_enabled=False,
+        combined_system_chars=len(system_prompt or ""),
+        context_errors=context_errors,
+        context_reasons=context_reasons,
+        code_knowledge_map_enabled=config.CODE_KNOWLEDGE_MAP_ENABLED,
+        code_knowledge_map_injected=False,
+        code_knowledge_map_chars=0,
+        code_knowledge_map_cards=[],
+        module_cards_injected=False,
+        module_cards_chars=0,
+        module_cards=[],
+        assert_context_injected=False,
+        assert_context_chars=0,
+        recalled_context_injected=False,
+        recalled_context_chars=0,
+    )
+
+
+def _options(mode: str = "plain", *, system_prompt: str | None = None) -> ClaudeAgentOptions:
+    if system_prompt is None:
+        system_prompt, _profile_text, _profile_error, _profile_reason = (
+            _system_prompt_with_profile(mode)
+        )
     opts = ClaudeAgentOptions(
         system_prompt=system_prompt,
         model=config.SDK_MODEL,
@@ -172,16 +358,27 @@ async def _ask_async(
     trace: llm_trace.LLMTrace | None = None,
 ) -> str:
     parts: list[str] = []
+    system_prompt, profile_text, profile_error, profile_reason = _system_prompt_with_profile(mode)
+    _trace_sdk_context(
+        question=question,
+        mode=mode,
+        trace=trace,
+        system_prompt=system_prompt,
+        profile_text=profile_text,
+        profile_error=profile_error,
+        profile_reason=profile_reason,
+    )
     if trace:
         trace.write(
             "sdk_request",
             prompt=question,
+            system_prompt=system_prompt,
             mode=mode,
             model=config.SDK_MODEL,
             max_turns=config.MAX_ITERATIONS,
             allowed_tools=_ALLOWED_TOOLS,
         )
-    async for message in query(prompt=question, options=_options(mode)):
+    async for message in query(prompt=question, options=_options(mode, system_prompt=system_prompt)):
         if isinstance(message, AssistantMessage):
             for block in message.content:
                 if isinstance(block, TextBlock):

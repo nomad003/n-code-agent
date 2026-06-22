@@ -246,6 +246,16 @@ async def ask(req: AskRequest) -> AskResponse:
             answer = response_policy.enforce(cached, mode=mode)
             with config.use_repo(repo):
                 trace = llm_trace.LLMTrace(question=question, mode=mode, backend="cache")
+            if answer != cached:
+                trace.write(
+                    "response_policy_applied",
+                    stage="cache_hit",
+                    mode=mode,
+                    before=cached,
+                    after=answer,
+                    before_chars=len(cached or ""),
+                    after_chars=len(answer or ""),
+                )
             trace.write("cache_hit", answer=answer)
             trace.write("request_end", answer=answer)
             return AskResponse(answer=answer, cached=True)

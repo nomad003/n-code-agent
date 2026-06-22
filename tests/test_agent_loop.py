@@ -119,6 +119,27 @@ def test_answer_writes_per_request_llm_trace(stub_llm, tmp_path, monkeypatch):
     assert "a.py" in tool_row["result"]
 
 
+def test_answer_traces_response_policy_application(stub_llm, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "USE_SHORTCUT", False)
+    trace_dir = tmp_path / "traces"
+    monkeypatch.setattr(config, "LLM_TRACE_DIR", str(trace_dir))
+    raw_answer = "处理方式：\n```python\nprint(1)\n```"
+    stub_llm([_msg(content=raw_answer)], str(tmp_path))
+
+    answer_text = agent.answer("Foo 怎么实现", mode="plain")
+
+    assert "已按输出策略省略实现内容" in answer_text
+    files = list(Path(config.LLM_TRACE_DIR).glob("*.jsonl"))
+    rows = [json.loads(line) for line in files[0].read_text(encoding="utf-8").splitlines()]
+    policy_row = next(r for r in rows if r["event"] == "response_policy_applied")
+    assert policy_row["stage"] == "agent_answer"
+    assert policy_row["before"] == raw_answer
+    assert policy_row["after"] == answer_text
+    assert policy_row["before"] != policy_row["after"]
+    assert policy_row["before_chars"] == len(raw_answer)
+    assert policy_row["after_chars"] == len(answer_text)
+
+
 def test_build_messages_traces_knowledge_context(tmp_path, monkeypatch):
     root = tmp_path / "docs" / "code-knowledge" / "marvel"
     root.mkdir(parents=True)
@@ -157,6 +178,21 @@ def test_build_messages_traces_knowledge_context(tmp_path, monkeypatch):
         for line in Path(trace.path).read_text(encoding="utf-8").splitlines()
     ]
     event = next(r for r in rows if r["event"] == "knowledge_context_injected")
+    assert event["mode"] == "plain"
+    assert event["question_type"] == "config_impl"
+    assert event["with_tools"] is True
+    assert event["prompt_cache_enabled"] is False
+    assert event["combined_system_chars"] == len(messages[0]["content"])
+    assert event["assembly_order"] == [
+        "base_prompt",
+        "intent_prompt",
+        "repo_overview",
+        "knowledge_graph",
+        "module_cards",
+        "assert_knowledge",
+        "recalled_qa",
+        "output_mode",
+    ]
     assert event["code_knowledge_map_injected"] is True
     assert event["module_cards_injected"] is True
     assert "monster-config.md" in event["code_knowledge_map_cards"]
@@ -167,8 +203,49 @@ def test_build_messages_traces_knowledge_context(tmp_path, monkeypatch):
     assert blocks["knowledge_graph"]["injected"] is True
     assert blocks["module_cards"]["injected"] is True
     assert blocks["output_mode"]["injected"] is True
+    assert blocks["combined_system_prompt"]["audit"] is True
+    assert blocks["combined_system_prompt"]["chars"] == len(messages[0]["content"])
     assert "代码知识库地图" in blocks["knowledge_graph"]["content"]
     assert "已命中的模块知识卡" in blocks["module_cards"]["content"]
+
+
+def test_build_messages_traces_disabled_and_failed_context(tmp_path, monkeypatch):
+    trace_dir = tmp_path / "traces"
+    monkeypatch.setattr(config, "PROJECT_ROOT", str(tmp_path))
+    monkeypatch.setattr(config, "TARGET_CODE_PATH", str(tmp_path))
+    monkeypatch.setattr(config, "CODE_REPOS", {})
+    monkeypatch.setattr(config, "CODE_REPO_DEFAULT", "marvel")
+    monkeypatch.setattr(config, "LLM_TRACE_DIR", str(trace_dir))
+    monkeypatch.setattr(config, "LLM_TRACE_ENABLED", True)
+    monkeypatch.setattr(config, "LLM_PROMPT_CACHE", False)
+    monkeypatch.setattr(config, "CODE_KNOWLEDGE_MAP_ENABLED", False)
+
+    def fail_module_context(question):
+        raise RuntimeError(f"module context failed for {question}")
+
+    monkeypatch.setattr(agent.module_knowledge, "format_for_prompt", fail_module_context)
+
+    trace = agent.llm_trace.LLMTrace(
+        question="怪物配置怎么配", mode="plain", backend="custom"
+    )
+    a = agent.CodeAgent(mode="plain", trace=trace)
+    a.question = "怪物配置怎么配"
+    messages = a._build_messages(with_tools=True)
+
+    assert messages[0]["role"] == "system"
+    rows = [
+        json.loads(line)
+        for line in Path(trace.path).read_text(encoding="utf-8").splitlines()
+    ]
+    event = next(r for r in rows if r["event"] == "knowledge_context_injected")
+    blocks = {block["key"]: block for block in event["blocks"]}
+    assert blocks["knowledge_graph"]["enabled"] is False
+    assert blocks["knowledge_graph"]["injected"] is False
+    assert blocks["knowledge_graph"]["reason"] == "CODE_KNOWLEDGE_MAP_ENABLED=0"
+    assert blocks["module_cards"]["injected"] is False
+    assert "module context failed" in blocks["module_cards"]["error"]
+    assert "module_cards" in event["context_errors"]
+    assert blocks["combined_system_prompt"]["injected"] is True
 
 
 # --- message building keeps pairing ----------------------------------------

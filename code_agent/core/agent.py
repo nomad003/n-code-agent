@@ -77,9 +77,11 @@ def _answer_in_repo(
             requested_question_type=question_type or "",
         )
         if question_intent.should_clarify(question, resolved_question_type):
-            answer_text = response_policy.enforce(
+            answer_text = _enforce_with_trace(
                 question_intent.clarifying_response(question, mode=resolved_mode),
                 mode=resolved_mode,
+                trace=trace,
+                stage="intent_clarification",
             )
             trace.write(
                 "intent_clarification",
@@ -104,7 +106,12 @@ def _answer_in_repo(
             common_hit = _select_common_qa_with_llm(question, trace=trace)
             common_hit_source = "llm" if common_hit is not None else ""
         if common_hit is not None:
-            answer_text = response_policy.enforce(common_hit.body, mode=resolved_mode)
+            answer_text = _enforce_with_trace(
+                common_hit.body,
+                mode=resolved_mode,
+                trace=trace,
+                stage="common_qa_hit",
+            )
             trace.write(
                 "common_qa_hit",
                 title=common_hit.title,
@@ -122,7 +129,12 @@ def _answer_in_repo(
             if hit is not None:
                 if verbose:
                     print("  [shortcut] 命中索引，跳过 LLM")
-                answer_text = response_policy.enforce(hit, mode=resolved_mode)
+                answer_text = _enforce_with_trace(
+                    hit,
+                    mode=resolved_mode,
+                    trace=trace,
+                    stage="shortcut",
+                )
                 trace.write("shortcut", answer=answer_text)
                 trace.write("request_end", answer=answer_text)
                 return answer_text
@@ -130,14 +142,16 @@ def _answer_in_repo(
         if config.AGENT_BACKEND == "sdk":
             agent_sdk = importlib.import_module("code_agent.core.agent_sdk")
 
-            answer_text = response_policy.enforce(
+            answer_text = _enforce_with_trace(
                 agent_sdk.answer(
                     question, verbose=verbose, mode=resolved_mode, trace=trace
                 ),
                 mode=resolved_mode,
+                trace=trace,
+                stage="agent_answer",
             )
         else:
-            answer_text = response_policy.enforce(
+            answer_text = _enforce_with_trace(
                 CodeAgent(
                     verbose=verbose,
                     mode=resolved_mode,
@@ -145,6 +159,8 @@ def _answer_in_repo(
                     trace=trace,
                 ).run(question),
                 mode=resolved_mode,
+                trace=trace,
+                stage="agent_answer",
             )
         trace.write("request_end", answer=answer_text)
         return answer_text
@@ -204,7 +220,15 @@ def _select_common_qa_with_llm(
         },
     ]
     if trace:
-        trace.write("common_qa_intent_request", candidates=catalog)
+        trace.write(
+            "common_qa_intent_request",
+            model=_routed_model(),
+            messages=messages,
+            candidates=catalog,
+            temperature=0,
+            timeout=min(config.LLM_TIMEOUT, 30),
+            num_retries=0,
+        )
     try:
         response = litellm.completion(
             model=_routed_model(),
@@ -224,10 +248,16 @@ def _select_common_qa_with_llm(
             )
         return None
     message = response.choices[0].message
+    usage = getattr(response, "usage", None)
     content = getattr(message, "content", "") or ""
     path = _parse_common_qa_llm_path(content)
     if trace:
-        trace.write("common_qa_intent_response", content=content, path=path)
+        trace.write(
+            "common_qa_intent_response",
+            content=content,
+            path=path,
+            usage=usage.model_dump() if hasattr(usage, "model_dump") else usage,
+        )
     if not path or path == "none":
         return None
     return next((item for item in candidates if item.path == path), None)
@@ -249,6 +279,27 @@ def _parse_common_qa_llm_path(content: str) -> str:
             return ""
     path = data.get("path") if isinstance(data, dict) else ""
     return str(path or "").strip()
+
+
+def _enforce_with_trace(
+    text: str,
+    *,
+    mode: str,
+    trace: llm_trace.LLMTrace,
+    stage: str,
+) -> str:
+    enforced = response_policy.enforce(text, mode=mode)
+    if enforced != text:
+        trace.write(
+            "response_policy_applied",
+            stage=stage,
+            mode=mode,
+            before=text,
+            after=enforced,
+            before_chars=len(text or ""),
+            after_chars=len(enforced or ""),
+        )
+    return enforced
 
 
 def _looks_like_answer(text: str) -> bool:
@@ -287,22 +338,37 @@ def _extract_module_card_sources(text: str) -> list[str]:
     return re.findall(r"^来源: ([^\n]+)$", text or "", flags=re.MULTILINE)
 
 
+def _trace_error(exc: Exception) -> str:
+    """Compact exception text for trace rows."""
+    return f"{type(exc).__name__}: {exc}"
+
+
 def _prompt_context_block(
     key: str,
     title: str,
     text: str,
     *,
     injected: bool | None = None,
+    enabled: bool = True,
+    reason: str = "",
+    error: str = "",
     sources: list[str] | None = None,
+    order: int = 0,
+    audit: bool = False,
 ) -> dict:
     """Build one traceable prompt-context block."""
     body = text or ""
     return {
         "key": key,
         "title": title,
+        "order": order,
+        "enabled": bool(enabled),
         "injected": bool(body) if injected is None else bool(injected),
         "chars": len(body),
         "sources": sources or [],
+        "reason": reason,
+        "error": error,
+        "audit": bool(audit),
         "content": body,
     }
 
@@ -332,6 +398,8 @@ class CodeAgent:
         self.question = ""
         self.history: list = []  # list[Action | Observation]
         self.recalled = ""       # knowledge recalled for this question (方案 3)
+        self.recalled_reason = ""
+        self.recalled_error = ""
         self._context_trace_written = False
 
     # --- LLM ---------------------------------------------------------------
@@ -408,12 +476,17 @@ class CodeAgent:
         intent_prompt = question_intent.prompt(self.question, self.question_type)
         system = base_prompt
         system = system + "\n\n" + intent_prompt
+        context_errors: dict[str, str] = {}
+        context_reasons: dict[str, str] = {}
         try:
             from ..retrieval import repo_profile
 
             profile_text = repo_profile.format_for_prompt()
-        except Exception:
+        except Exception as exc:
             profile_text = ""
+            context_errors["repo_overview"] = _trace_error(exc)
+        if not profile_text and "repo_overview" not in context_errors:
+            context_reasons["repo_overview"] = "repo overview empty"
         if profile_text:
             system = system + "\n\n" + profile_text
         graph_text = ""
@@ -424,24 +497,45 @@ class CodeAgent:
                 graph_text = knowledge_graph.format_map_for_prompt(
                     self.question, limit=config.CODE_KNOWLEDGE_MAP_MAX_CARDS
                 )
-            except Exception:
+            except Exception as exc:
                 graph_text = ""
-            if graph_text:
-                system = system + "\n\n" + graph_text
-        module_text = module_knowledge.format_for_prompt(self.question)
+                context_errors["knowledge_graph"] = _trace_error(exc)
+            if not graph_text and "knowledge_graph" not in context_errors:
+                context_reasons["knowledge_graph"] = "no matching graph cards"
+        else:
+            context_reasons["knowledge_graph"] = "CODE_KNOWLEDGE_MAP_ENABLED=0"
+        if graph_text:
+            system = system + "\n\n" + graph_text
+        try:
+            module_text = module_knowledge.format_for_prompt(self.question)
+        except Exception as exc:
+            module_text = ""
+            context_errors["module_cards"] = _trace_error(exc)
+        if not module_text and "module_cards" not in context_errors:
+            context_reasons["module_cards"] = "no matching module knowledge cards"
         if module_text:
             system = system + "\n\n" + module_text
         try:
             from ..kb import assert_knowledge
 
             assert_text = assert_knowledge.format_for_prompt(self.question)
-        except Exception:
+        except Exception as exc:
             assert_text = ""
+            context_errors["assert_knowledge"] = _trace_error(exc)
+        if not assert_text and "assert_knowledge" not in context_errors:
+            context_reasons["assert_knowledge"] = "no matching assert knowledge"
         if assert_text:
             system = system + "\n\n" + assert_text
         if self.recalled:
             system = system + "\n\n" + self.recalled
+        elif self.recalled_error:
+            context_errors["recalled_qa"] = self.recalled_error
+        else:
+            context_reasons["recalled_qa"] = self.recalled_reason or (
+                "no recalled QA hits" if config.USE_KNOWLEDGE else "USE_KNOWLEDGE=0"
+            )
         output_mode_prompt = operation_modes.response_rules(self.mode).rstrip()
+        final_system = system.rstrip() + "\n\n" + output_mode_prompt + "\n"
         self._trace_context_injection(
             base_prompt=base_prompt,
             intent_prompt=intent_prompt,
@@ -450,10 +544,14 @@ class CodeAgent:
             module_text=module_text,
             assert_text=assert_text,
             output_mode_prompt=output_mode_prompt,
+            combined_system_prompt=final_system,
+            context_errors=context_errors,
+            context_reasons=context_reasons,
+            with_tools=with_tools,
         )
         # Keep the audience/output contract last so question-type investigation
         # rules and recalled knowledge cannot accidentally override it.
-        system = system.rstrip() + "\n\n" + output_mode_prompt + "\n"
+        system = final_system
         # Mark the static prefix (system + initial user question) for prompt
         # caching when the provider supports it. Anthropic / Bedrock honor
         # ``cache_control``; non-Anthropic backends (Gemini through the proxy)
@@ -536,6 +634,10 @@ class CodeAgent:
         module_text: str,
         assert_text: str,
         output_mode_prompt: str,
+        combined_system_prompt: str,
+        context_errors: dict[str, str],
+        context_reasons: dict[str, str],
+        with_tools: bool,
     ) -> None:
         """Record prompt context once so trace viewers can show KB injection."""
         if not self.trace or self._context_trace_written:
@@ -543,37 +645,118 @@ class CodeAgent:
         self._context_trace_written = True
         graph_cards = _extract_graph_card_ids(graph_text)
         module_cards = _extract_module_card_sources(module_text)
+        resolved_question_type = self.question_type or question_intent.classify(self.question)
+        assembly_order = [
+            "base_prompt",
+            "intent_prompt",
+            "repo_overview",
+            "knowledge_graph",
+            "module_cards",
+            "assert_knowledge",
+            "recalled_qa",
+            "output_mode",
+        ]
+
+        def reason(key: str) -> str:
+            return context_reasons.get(key, "")
+
+        def error(key: str) -> str:
+            return context_errors.get(key, "")
+
         blocks = [
-            _prompt_context_block("base_prompt", "基础系统提示词", base_prompt, injected=True),
-            _prompt_context_block("intent_prompt", "当前问题类型提示词", intent_prompt, injected=True),
-            _prompt_context_block("repo_overview", "Repo Overview", profile_text),
+            _prompt_context_block(
+                "base_prompt",
+                "基础系统提示词",
+                base_prompt,
+                injected=True,
+                order=10,
+            ),
+            _prompt_context_block(
+                "intent_prompt",
+                "当前问题类型提示词",
+                intent_prompt,
+                injected=True,
+                order=20,
+                sources=[resolved_question_type],
+            ),
+            _prompt_context_block(
+                "repo_overview",
+                "Repo Overview",
+                profile_text,
+                reason=reason("repo_overview"),
+                error=error("repo_overview"),
+                order=30,
+            ),
             _prompt_context_block(
                 "knowledge_graph",
                 "代码知识图谱摘要",
                 graph_text,
+                enabled=config.CODE_KNOWLEDGE_MAP_ENABLED,
                 injected=bool(graph_text),
+                reason=reason("knowledge_graph"),
+                error=error("knowledge_graph"),
                 sources=graph_cards,
+                order=40,
             ),
             _prompt_context_block(
                 "module_cards",
                 "命中的模块知识卡",
                 module_text,
                 injected=bool(module_text),
+                reason=reason("module_cards"),
+                error=error("module_cards"),
                 sources=module_cards,
+                order=50,
             ),
-            _prompt_context_block("assert_knowledge", "Assert 知识", assert_text),
-            _prompt_context_block("recalled_qa", "历史问答沉淀", self.recalled),
+            _prompt_context_block(
+                "assert_knowledge",
+                "Assert 知识",
+                assert_text,
+                reason=reason("assert_knowledge"),
+                error=error("assert_knowledge"),
+                order=60,
+            ),
+            _prompt_context_block(
+                "recalled_qa",
+                "历史问答沉淀",
+                self.recalled,
+                enabled=config.USE_KNOWLEDGE,
+                reason=reason("recalled_qa"),
+                error=error("recalled_qa"),
+                order=70,
+            ),
             _prompt_context_block(
                 "output_mode",
                 "plain/technical 模式输出要求",
                 output_mode_prompt,
                 injected=True,
                 sources=[self.mode],
+                order=80,
+            ),
+            _prompt_context_block(
+                "combined_system_prompt",
+                "最终 System Prompt（组装后）",
+                combined_system_prompt,
+                injected=True,
+                sources=["llm_request.messages[0]"],
+                order=90,
+                audit=True,
             ),
         ]
         self.trace.write(
             "knowledge_context_injected",
             blocks=blocks,
+            assembly_order=assembly_order,
+            backend="custom",
+            mode=self.mode,
+            question_type=resolved_question_type,
+            repo=config.current_repo().name,
+            target_code_path=config.current_target_code_path(),
+            with_tools=with_tools,
+            prompt_cache_enabled=config.LLM_PROMPT_CACHE,
+            combined_system_chars=len(combined_system_prompt or ""),
+            context_errors=context_errors,
+            context_reasons=context_reasons,
             code_knowledge_map_enabled=config.CODE_KNOWLEDGE_MAP_ENABLED,
             code_knowledge_map_injected=bool(graph_text),
             code_knowledge_map_chars=len(graph_text or ""),
@@ -672,15 +855,20 @@ class CodeAgent:
         Returns "" when the flywheel is off or nothing is recalled. Stale entries
         are downgraded so the agent treats them as leads to re-verify, not facts.
         """
+        self.recalled_reason = ""
+        self.recalled_error = ""
         if not config.USE_KNOWLEDGE:
+            self.recalled_reason = "USE_KNOWLEDGE=0"
             return ""
         try:
             from ..kb import knowledge
 
             hits = knowledge.recall(question)
-        except Exception:
+        except Exception as exc:
+            self.recalled_error = _trace_error(exc)
             return ""
         if not hits:
+            self.recalled_reason = "no recalled QA hits"
             return ""
         lines = ["以下是历史问答沉淀的相关线索（仅供参考，请用工具二次核实后再采信）："]
         for h in hits:

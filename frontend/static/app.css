@@ -1365,6 +1365,32 @@ summary {
   gap: 9px;
 }
 
+.context-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.context-meta span {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text-3);
+  padding: 7px 9px;
+  font-size: 11px;
+}
+
+.context-meta strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .context-block {
   overflow: hidden;
   border: 1px solid var(--border);
@@ -1434,6 +1460,22 @@ summary {
   padding: 3px 7px;
   font-family: var(--mono);
   font-size: 11px;
+}
+
+.context-message {
+  margin: 10px 12px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--text-2);
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.context-message.error {
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  color: var(--danger);
 }
 
 .context-block pre {
@@ -2542,5 +2584,9 @@ html.theme-light .round-card[open] {
 
   .markdown-preview {
     padding: 16px;
+  }
+
+  .context-meta {
+    grid-template-columns: 1fr;
   }
 }

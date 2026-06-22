@@ -177,7 +177,7 @@
   }
 
   function eventText(row) {
-    return row.answer || row.content || row.text || row.output || row.error || "";
+    return row.answer || row.after || row.content || row.text || row.output || row.error || "";
   }
 
   function compactText(value, limit = 260) {
@@ -361,21 +361,47 @@
     const blocks = rawBlocks.map((block) => {
       const content = String(block.content || "");
       const sources = Array.isArray(block.sources) ? block.sources.filter(Boolean) : [];
+      const enabled = block.enabled !== false;
+      const error = String(block.error || "");
+      const reason = String(block.reason || "");
+      const audit = Boolean(block.audit);
+      let status = "无内容";
+      if (error) status = "异常";
+      else if (!enabled) status = "未启用";
+      else if (audit) status = "组装结果";
+      else if (block.injected) status = "已注入";
+      else if (reason) status = "未命中";
       return {
         key: block.key || block.title || "context",
         title: block.title || block.key || "上下文",
         injected: Boolean(block.injected),
+        enabled,
+        audit,
+        order: Number(block.order || 0),
         chars: Number(block.chars || content.length || 0),
         sources,
+        reason,
+        error,
         content,
-        status: block.injected ? "已注入" : "未注入",
+        status,
       };
-    });
+    }).sort((a, b) => a.order - b.order);
+    const sourceBlocks = blocks.filter((block) => !block.audit);
     return {
       available: Boolean(event.event),
       blocks,
-      injectedCount: blocks.filter((block) => block.injected).length,
-      totalChars: blocks.reduce((sum, block) => sum + block.chars, 0),
+      sourceBlocks,
+      injectedCount: sourceBlocks.filter((block) => block.injected).length,
+      sourceCount: sourceBlocks.length,
+      totalChars: Number(event.combined_system_chars || 0) || blocks.reduce((sum, block) => sum + block.chars, 0),
+      mode: event.mode || "",
+      questionType: event.question_type || "",
+      repo: event.repo || "",
+      withTools: event.with_tools === true ? "开启" : event.with_tools === false ? "关闭" : "-",
+      promptCache: event.prompt_cache_enabled === true ? "开启" : event.prompt_cache_enabled === false ? "关闭" : "-",
+      errors: blocks.filter((block) => block.error).length,
+      contextErrors: event.context_errors || {},
+      contextReasons: event.context_reasons || {},
       raw: event,
     };
   }
@@ -422,6 +448,7 @@
         || row.event === "sdk_result"
         || row.event === "final_answer"
         || row.event === "request_end"
+        || row.event === "response_policy_applied"
         || row.event === "shortcut"
         || row.event === "cache_hit"
       ));
@@ -901,10 +928,18 @@
         <div class="context-card">
           <div class="trace-section-head">
             <h3>上下文注入</h3>
-            <span>${context.available ? `${context.injectedCount}/${context.blocks.length} 块 · ${formatCharsValue(context.totalChars)}` : "未记录"}</span>
+            <span>${context.available ? `${context.injectedCount}/${context.sourceCount} 注入源 · system ${formatCharsValue(context.totalChars)}` : "未记录"}</span>
           </div>
           ${context.available ? `
             <div class="context-blocks">
+              <div class="context-meta">
+                <span>Repo <strong>${escapeHtml(context.repo || "-")}</strong></span>
+                <span>模式 <strong>${escapeHtml(context.mode || "-")}</strong></span>
+                <span>问题类型 <strong>${escapeHtml(questionTypeLabel(context.questionType))}</strong></span>
+                <span>工具 <strong>${escapeHtml(context.withTools)}</strong></span>
+                <span>Prompt Cache <strong>${escapeHtml(context.promptCache)}</strong></span>
+                <span>异常 <strong>${escapeHtml(String(context.errors))}</strong></span>
+              </div>
               ${context.blocks.map((block) => `
                 <details class="context-block" ${block.injected && block.key !== "base_prompt" ? "open" : ""}>
                   <summary>
@@ -912,6 +947,8 @@
                     <em>${escapeHtml(formatCharsValue(block.chars))}</em>
                   </summary>
                   ${block.sources.length ? `<div class="context-sources">${block.sources.map((source) => `<span>${escapeHtml(source)}</span>`).join("")}</div>` : ""}
+                  ${block.error ? `<div class="context-message error">异常：${escapeHtml(block.error)}</div>` : ""}
+                  ${!block.error && block.reason ? `<div class="context-message">原因：${escapeHtml(block.reason)}</div>` : ""}
                   ${block.content ? `<pre>${escapeHtml(block.content)}</pre>` : '<div class="trace-muted">本块未注入内容。</div>'}
                 </details>`).join("")}
             </div>` : '<div class="trace-muted">这个 trace 由旧版本生成，未单独记录上下文注入明细。可在原始 llm_request 的 system prompt 中查看。</div>'}
@@ -1508,6 +1545,9 @@
       },
       formatChars(count) {
         return formatCharsValue(count);
+      },
+      questionTypeLabel(value) {
+        return QUESTION_TYPE_LABELS[value || ""] || value || "自动识别";
       },
       isTraceRoundOpen(id) {
         return this.traceOpenRounds[id] === true;

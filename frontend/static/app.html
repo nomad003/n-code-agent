@@ -186,10 +186,18 @@
           <div class="context-card">
             <div class="trace-section-head">
               <h3>上下文注入</h3>
-              <span>{{ traceSummary.context.available ? `${traceSummary.context.injectedCount}/${traceSummary.context.blocks.length} 块 · ${formatChars(traceSummary.context.totalChars)}` : '未记录' }}</span>
+              <span>{{ traceSummary.context.available ? `${traceSummary.context.injectedCount}/${traceSummary.context.sourceCount} 注入源 · system ${formatChars(traceSummary.context.totalChars)}` : '未记录' }}</span>
             </div>
             <div v-if="!traceSummary.context.available" class="trace-muted">这个 trace 由旧版本生成，未单独记录上下文注入明细。可在原始 llm_request 的 system prompt 中查看。</div>
             <div v-else class="context-blocks">
+              <div class="context-meta">
+                <span>Repo <strong>{{ traceSummary.context.repo || '-' }}</strong></span>
+                <span>模式 <strong>{{ traceSummary.context.mode || '-' }}</strong></span>
+                <span>问题类型 <strong>{{ questionTypeLabel(traceSummary.context.questionType) }}</strong></span>
+                <span>工具 <strong>{{ traceSummary.context.withTools }}</strong></span>
+                <span>Prompt Cache <strong>{{ traceSummary.context.promptCache }}</strong></span>
+                <span>异常 <strong>{{ traceSummary.context.errors }}</strong></span>
+              </div>
               <details class="context-block" v-for="block in traceSummary.context.blocks" :key="block.key" :open="block.injected && block.key !== 'base_prompt'">
                 <summary>
                   <span>
@@ -201,6 +209,8 @@
                 <div v-if="block.sources.length" class="context-sources">
                   <span v-for="source in block.sources" :key="source">{{ source }}</span>
                 </div>
+                <div v-if="block.error" class="context-message error">异常：{{ block.error }}</div>
+                <div v-else-if="block.reason" class="context-message">原因：{{ block.reason }}</div>
                 <pre v-if="block.content">{{ block.content }}</pre>
                 <div v-else class="trace-muted">本块未注入内容。</div>
               </details>
