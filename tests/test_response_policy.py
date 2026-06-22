@@ -15,6 +15,16 @@ def test_removes_fenced_code_block():
     assert "输出策略" in out
 
 
+def test_plain_keeps_mermaid_diagram_block():
+    text = "流程：\n```mermaid\nflowchart TD\n  A[配置] --> B[生成怪物]\n```\n结论：用于说明关系。"
+    out = response_policy.enforce(text)
+    assert "```mermaid" in out
+    assert "flowchart TD" in out
+    assert "A[配置] --> B[生成怪物]" in out
+    assert "输出策略" not in out
+    assert response_policy.contains_forbidden_content(text) is False
+
+
 def test_removes_shell_commands():
     text = "步骤：\ncurl http://127.0.0.1:8900/health\n完成后检查结果"
     out = response_policy.enforce(text)

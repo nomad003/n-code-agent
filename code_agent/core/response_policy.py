@@ -14,7 +14,8 @@ from . import operation_modes
 
 _NOTICE = "（已按输出策略省略实现内容，仅保留结构化描述。）"
 
-_FENCED_BLOCK_RE = re.compile(r"```[\s\S]*?```")
+_FENCED_BLOCK_RE = re.compile(r"```([^\n`]*)\n([\s\S]*?)```")
+_ALLOWED_FENCED_LANGS = {"mermaid"}
 _INLINE_CODE_RE = re.compile(r"`([^`\n]{1,200})`")
 _JSON_KEY_RE = re.compile(r'^\s*"[^"]+"\s*:\s*')
 _YAML_CONFIG_RE = re.compile(
@@ -43,8 +44,9 @@ def contains_forbidden_content(text: str) -> bool:
     """Return True when text contains code, commands, or config examples."""
     if not text:
         return False
-    if _FENCED_BLOCK_RE.search(text):
-        return True
+    for match in _FENCED_BLOCK_RE.finditer(text):
+        if not _is_allowed_fenced_block(match):
+            return True
     for line in text.splitlines():
         if _is_forbidden_line(line):
             return True
@@ -67,6 +69,8 @@ def enforce(text: str, mode: str = "plain") -> str:
 
     def _block_repl(_match: re.Match) -> str:
         nonlocal changed
+        if _is_allowed_fenced_block(_match):
+            return _match.group(0)
         changed = True
         return _NOTICE
 
@@ -118,6 +122,11 @@ def _is_forbidden_line(line: str) -> bool:
             _CODE_RE,
         )
     )
+
+
+def _is_allowed_fenced_block(match: re.Match) -> bool:
+    lang = (match.group(1) or "").strip().lower().split()
+    return bool(lang and lang[0] in _ALLOWED_FENCED_LANGS)
 
 
 def _collapse_blank_lines(text: str) -> str:
