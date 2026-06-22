@@ -35,6 +35,7 @@ updated_at: 2026-06-20
 - [UnitController 物理控制器](unit/unit-controller.md)
 - [StateManager 状态管理](unit/state-manager.md)
 - [SkillMgr 技能管理](unit/skill-mgr.md)
+- [技能编辑器节点枚举](unit/skill-editor-nodes.md)
 - [XBuffContainer Buff 容器接入](unit/xbuff-container.md)
 - [AIEntity AI 容器](unit/ai-entity.md)
 - [UnitEffect Affix Effect](unit/unit-effect.md)

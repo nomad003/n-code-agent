@@ -1,7 +1,7 @@
 """Tests for versioned module knowledge cards."""
 from code_agent.core import agent
 from code_agent import config
-from code_agent.kb import module_knowledge
+from code_agent.kb import knowledge_graph, module_knowledge
 
 
 def _write_knowledge_card(tmp_path, name, content):
@@ -160,6 +160,15 @@ def test_build_messages_injects_split_enemy_cards(monkeypatch, tmp_path):
     assert "enemy/enemy-skill-config.md" in msgs[0]["content"]
     assert "Enemy 技能配置查表" in msgs[0]["content"]
     assert "SkillListForEnemy" in msgs[0]["content"]
+
+
+def test_builtin_skill_editor_nodes_card_is_recallable():
+    cards = knowledge_graph.load_cards("marvel", include_common=True)
+    card = next(c for c in cards if c.id == "unit/skill-editor-nodes.md")
+    assert card.title == "技能编辑器节点枚举"
+    assert knowledge_graph.score_card(
+        "技能编辑器节点 XBPNodeSys qteData resultData", card
+    ) > 0
 
 
 def test_answer_evidence_footer_uses_specific_card_fields(monkeypatch, tmp_path):
