@@ -3,13 +3,13 @@ type: Code Module
 title: 技能编辑器节点枚举
 description: XEcs 技能编辑器 JSON 节点到运行时 XNodeData / XBPNodeSys 的映射，覆盖 Skill、Hit、Display、State 脚本的节点清单和排查入口。
 repo: marvel
-module: xecslib/skill-editor-nodes
+module: skill/editor-nodes
 resource: XEcsLib/XEcs/ecs/component/XNodeData.h, XEcsLib/XEcs/ecs/component/XNodeCommon.h, XEcsLib/XEcs/ecs/component/XSkillData.h, XEcsLib/XEcs/ecs/component/XNodeAction.h, XEcsLib/XEcs/ecs/component/XHitData.h, XEcsLib/XEcs/ecs/utility/utility2reader_json.hpp, XEcsLib/XEcs/ecs/utility/utility2parse.hpp, XEcsLib/XEcs/XSirius.cpp
-tags: unit, skill, editor, node, xecs, blueprint, json, 技能编辑器, 节点, 枚举
+tags: skill, editor, node, xecs, blueprint, json, 技能编辑器, 节点, 枚举
 symbols: XNodeData, XScriptData, XSkillData, XHitData, XStateAbilityData, XBPNodeSys, XBPUpdateSys, XLoadCommonType, LoadSkillByJson, LoadHitByJson, LoadDisplayByJson, LoadStateByJson
 question_types: crash_stack, outage_log, feature_impl, config_impl
-part_of: skill-mgr.md
-depends_on: skill-mgr.md, unit-sync.md
+part_of: index.md
+depends_on: ../unit/skill-mgr.md, ../unit/unit-sync.md
 updated_at: 2026-06-22
 ---
 

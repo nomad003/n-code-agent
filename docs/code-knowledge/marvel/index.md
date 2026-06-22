@@ -7,7 +7,7 @@ module: index
 resource: .
 tags: marvel, index, combat, gameserver, ecs
 question_types: crash_stack, outage_log, feature_impl, config_impl
-updated_at: 2026-06-20
+updated_at: 2026-06-22
 ---
 
 # marvel 代码知识库索引
@@ -25,6 +25,9 @@ updated_at: 2026-06-20
 
 - [gameserver 核心战斗总体框架](gameserver/combat-core-overview.md)
 - [Unit 层索引](unit/index.md)
+- [Skill 层索引](skill/index.md)
+- [AI 层索引](ai/index.md)
+- [Level 层索引](level/index.md)
 - [CombatUnit 运行骨架](unit/combatunit.md)
 - [Unit 组件系统](unit/unit-components.md)
 - [UnitConf 配置封装](unit/unit-conf.md)
@@ -35,9 +38,11 @@ updated_at: 2026-06-20
 - [UnitController 物理控制器](unit/unit-controller.md)
 - [StateManager 状态管理](unit/state-manager.md)
 - [SkillMgr 技能管理](unit/skill-mgr.md)
-- [技能编辑器节点枚举](unit/skill-editor-nodes.md)
+- [技能编辑器节点枚举](skill/skill-editor-nodes.md)
 - [XBuffContainer Buff 容器接入](unit/xbuff-container.md)
 - [AIEntity AI 容器](unit/ai-entity.md)
+- [AI 编辑器节点枚举](ai/ai-editor-nodes.md)
+- [关卡编辑器节点枚举](level/level-editor-nodes.md)
 - [UnitEffect Affix Effect](unit/unit-effect.md)
 - [DoodadInfo 掉落物信息](unit/doodad-info.md)
 - [BindInfo 平台绑定](unit/bind-info.md)
@@ -57,9 +62,6 @@ updated_at: 2026-06-20
 ## 后续拆分
 
 - 场景与 SceneBattle
-- 关卡 Level / LevelSpawner / 刷怪
 - CombatRole 派生层
-- SkillConfig 细节
 - BuffConfig / Buff effect 内部
-- AIAgent / AIUnitAgent / AI 节点内部
 - XEcs / XFacility / XSirius

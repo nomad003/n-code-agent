@@ -8,7 +8,7 @@ resource: gameserver/unit
 tags: unit, combatunit, layer, index, 战斗单位
 part_of: ../gameserver/combat-core-overview.md
 depends_on: ../gameserver/combat-core-overview.md
-updated_at: 2026-06-20
+updated_at: 2026-06-22
 ---
 
 # Unit 层索引
@@ -34,7 +34,6 @@ updated_at: 2026-06-20
 - `gameserver/unit/attr/`
 - `gameserver/unit/move/`
 - `gameserver/unit/state/`
-- `gameserver/unit/skill/`
 - `gameserver/unit/sync/`
 - `gameserver/unit/affixeffect/`
 - `gameserver/unit/doodadinfo/`
@@ -45,6 +44,7 @@ updated_at: 2026-06-20
 - `gameserver/buff/`
 - `gameserver/ai/`
 - `gameserver/combat/`
+- `gameserver/unit/skill/`
 - `gameserver/physx/`
 - `gameserver/xecs/`
 - `gameserver/tableload/`
@@ -81,7 +81,6 @@ updated_at: 2026-06-20
 | [UnitController 物理控制器](unit-controller.md) | PhysX CCT、碰撞过滤、控制器释放。 | 物理碰撞和 CCT crash。 |
 | [StateManager 状态管理](state-manager.md) | 阶段、Mode、机制条、技能/hit 窗口。 | 状态切换、状态技能。 |
 | [SkillMgr 技能管理](skill-mgr.md) | 技能创建、AI 注册、条件技能、ECS 绑定。 | 技能对象和 AI 技能。 |
-| [技能编辑器节点枚举](skill-editor-nodes.md) | 技能 JSON 节点、XNodeData、XBPNodeSys 映射。 | 技能编辑器节点、节点不执行。 |
 | [XBuffContainer Buff 容器接入](xbuff-container.md) | Buff 生命周期和 Unit 事件接入。 | 出生 Buff、技能 Buff。 |
 | [AIEntity AI 容器](ai-entity.md) | AI agent 生命周期和每帧驱动。 | AI 不运行。 |
 | [UnitEffect Affix Effect](unit-effect.md) | Affix effect 事件触发。 | Effect/Buff/属性修正。 |
@@ -138,7 +137,6 @@ updated_at: 2026-06-20
 | 物理控制器 | `physx/UnitController.*` | PhysX CCT 创建、移动、过滤、碰撞行为、位置纠正。 | Unit 物理配置、PhysicsScene。 |
 | 状态管理 | `unit/state/StateManager.*` | 阶段、Mode、韧性、机制条、状态技能和受击状态。 | `EnemyStage`、`EnemyModeState`、`EnemyResist`、`EnemyJZ`、`PlayerJZ`。 |
 | 技能管理 | `unit/skill/skillmgr.*`, `unit/skill/skillcore.*` | 技能初始化、CD、条件、ECS 绑定、AI 技能集合。 | `SkillListForRole`、`SkillListForEnemy`、`SkillListForPartner`、`SkillDamage` 等。 |
-| 技能编辑器节点 | `XEcsLib/XEcs/ecs/component/*`, `XEcsLib/XEcs/ecs/system/*`, `utility2reader_json.hpp` | 技能 JSON 节点加载、节点数据结构、节点执行系统映射。 | 技能编辑器导出的 Skill / Hit / Display / State JSON。 |
 | Buff 容器 | `buff/XBuffContainer.*` | Buff 生命周期、触发器、延迟队列、属性和伤害事件。 | `BuffTable`、`BuffIDTable`、Unit Buff 标签。 |
 | AI 实体 | `ai/aientity.*`, `ai/aiunitagent.*` | 挂接 YBehavior agent、tick、启停、目标和技能选择。 | `UnitAITable`、`PatrolTable`、`SightTable`、`SkillCombo`、`Squad*`。 |
 | 附加效果 | `unit/affixeffect/uniteffect.*`, `affixeffect/attreffect.*` | 管理 affix effect 数据，响应技能、伤害、状态、属性变化。 | `AffixEffect`。 |

@@ -162,13 +162,30 @@ def test_build_messages_injects_split_enemy_cards(monkeypatch, tmp_path):
     assert "SkillListForEnemy" in msgs[0]["content"]
 
 
-def test_builtin_skill_editor_nodes_card_is_recallable():
-    cards = knowledge_graph.load_cards("marvel", include_common=True)
-    card = next(c for c in cards if c.id == "unit/skill-editor-nodes.md")
-    assert card.title == "技能编辑器节点枚举"
-    assert knowledge_graph.score_card(
-        "技能编辑器节点 XBPNodeSys qteData resultData", card
-    ) > 0
+def test_builtin_editor_nodes_cards_are_recallable():
+    cards = {
+        card.id: card
+        for card in knowledge_graph.load_cards("marvel", include_common=True)
+    }
+    expected = {
+        "skill/skill-editor-nodes.md": (
+            "技能编辑器节点枚举",
+            "技能编辑器节点 XBPNodeSys qteData resultData",
+        ),
+        "level/level-editor-nodes.md": (
+            "关卡编辑器节点枚举",
+            "关卡编辑器 LevelEditor LevelCallFunctionNode triggerObjects",
+        ),
+        "ai/ai-editor-nodes.md": (
+            "AI 编辑器节点枚举",
+            "AI编辑器节点 AILaunchCore AICastSkillByName AIMove",
+        ),
+    }
+
+    for card_id, (title, query) in expected.items():
+        card = cards[card_id]
+        assert card.title == title
+        assert knowledge_graph.score_card(query, card) > 0
 
 
 def test_answer_evidence_footer_uses_specific_card_fields(monkeypatch, tmp_path):
