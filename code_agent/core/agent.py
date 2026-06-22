@@ -90,20 +90,19 @@ def _answer_in_repo(
             return answer_text
 
         specific_identifiers = common_qa.specific_code_identifiers(question)
-        if specific_identifiers:
+        common_hit = common_qa.find_match(question)
+        common_hit_source = "deterministic" if common_hit is not None else ""
+        if common_hit is None and specific_identifiers and not common_qa.llm_candidates(
+            question
+        ):
             trace.write(
                 "common_qa_skipped",
                 reason="specific_code_identifier",
                 identifiers=specific_identifiers,
             )
-            common_hit = None
-            common_hit_source = ""
-        else:
-            common_hit = common_qa.find_match(question)
-            common_hit_source = "deterministic"
-            if common_hit is None:
-                common_hit = _select_common_qa_with_llm(question, trace=trace)
-                common_hit_source = "llm" if common_hit is not None else ""
+        elif common_hit is None:
+            common_hit = _select_common_qa_with_llm(question, trace=trace)
+            common_hit_source = "llm" if common_hit is not None else ""
         if common_hit is not None:
             answer_text = response_policy.enforce(common_hit.body, mode=resolved_mode)
             trace.write(

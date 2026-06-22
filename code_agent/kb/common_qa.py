@@ -67,13 +67,14 @@ def load(repo: str | None = None, *, include_common: bool = True) -> list[Common
 
 def find_match(query: str, *, repo: str | None = None) -> CommonQA | None:
     """Return a high-confidence maintained answer for a user query."""
-    if should_skip_for_specific_query(query):
-        return None
+    identifiers = specific_code_identifiers(query)
     query_key = _normalize_query(query)
     if not query_key:
         return None
     candidates: list[tuple[int, CommonQA]] = []
     for item in load(repo):
+        if identifiers and not _item_targets_specific_identifiers(item, identifiers):
+            continue
         score = _score(query_key, item)
         if score >= 90:
             candidates.append((score, item))
@@ -96,13 +97,14 @@ def llm_candidates(query: str, *, repo: str | None = None, limit: int = 8) -> li
     This is deliberately broader than ``find_match``: it only decides whether a
     card is worth showing to the LLM router, not whether it is safe to return.
     """
-    if should_skip_for_specific_query(query):
-        return []
+    identifiers = specific_code_identifiers(query)
     terms = knowledge_graph.terms_for_query(query)
     if not terms:
         return []
     scored: list[tuple[int, CommonQA]] = []
     for item in load(repo):
+        if identifiers and not _item_targets_specific_identifiers(item, identifiers):
+            continue
         hay = " ".join(
             [item.path, item.title, *item.questions, *item.aliases, *item.tags]
         ).lower()
@@ -168,6 +170,13 @@ def _looks_specific_identifier(token: str) -> bool:
     has_upper = any(ch.isupper() for ch in token)
     has_digit = any(ch.isdigit() for ch in token)
     return "_" in token or has_digit or (has_lower and has_upper)
+
+
+def _item_targets_specific_identifiers(
+    item: CommonQA, identifiers: list[str]
+) -> bool:
+    hay = " ".join([item.path, item.title, *item.questions]).lower()
+    return all(identifier.lower() in hay for identifier in identifiers)
 
 
 def _normalize_query(text: str) -> str:

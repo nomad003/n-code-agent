@@ -205,6 +205,7 @@ def test_builtin_big_module_common_qa_cards_are_matchable():
         "AI 配置",
         "Buff 配置",
         "Skill 配置",
+        "SkillSlot 配置",
         "关卡 Level 配置",
         "场景配置",
     } <= titles
@@ -212,6 +213,7 @@ def test_builtin_big_module_common_qa_cards_are_matchable():
     expected = {
         "Buff的配置": "Buff 配置",
         "Skill的配置": "Skill 配置",
+        "SkillSlot怎么配置": "SkillSlot 配置",
         "关卡Level的配置": "关卡 Level 配置",
         "场景的配置": "场景配置",
         "AI的配置": "AI 配置",
