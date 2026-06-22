@@ -237,7 +237,7 @@
             <button :class="{ active: knowledge.mode === 'commonqa' }" @click="setKnowledgeMode('commonqa')">通用问答集</button>
             <button :class="{ active: knowledge.mode === 'qa' }" @click="setKnowledgeMode('qa')">问答沉淀</button>
           </div>
-          <div class="knowledge-tree" role="tree">
+          <div v-if="knowledge.mode === 'cards'" class="knowledge-tree" role="tree">
             <template v-for="row in knowledgeCardRows" :key="row.id">
               <button v-if="row.kind === 'folder'" type="button" class="tree-folder" :class="{ open: isKnowledgeTreeOpen(row.id) }" :style="{ '--tree-depth': row.depth }" @click="toggleKnowledgeTree(row.id)">
                 <span class="tree-caret"></span>
@@ -249,6 +249,16 @@
                 <small><strong>{{ row.leaf }}</strong><em>{{ (row.card.tags || []).join(', ') || 'no tags' }}</em></small>
               </button>
             </template>
+          </div>
+          <div v-if="knowledge.mode === 'commonqa'" class="commonqa-sidebar">
+            <div class="section-label">通用问答</div>
+            <div class="commonqa-list">
+              <button v-for="item in knowledge.commonQaItems" :key="item.name" class="list-item" :class="{ active: knowledge.commonQa && knowledge.commonQa.name === item.name }" @click="selectCommonQa(item)">
+                <span>{{ item.title }}</span>
+                <small>{{ (item.questions || []).join(' / ') || item.name }}</small>
+              </button>
+              <p class="hint" v-if="!knowledge.commonQaItems.length">暂无通用问答。在 common-qa 目录新增 Markdown 卡片后会出现在这里。</p>
+            </div>
           </div>
         </div>
 
@@ -291,16 +301,6 @@
               <article class="markdown-preview" v-html="renderedCommonQaAnswer"></article>
               <div class="actions" v-if="knowledge.commonQa">
                 <button class="ghost" @click="editCommonQa(knowledge.commonQa)">编辑卡片</button>
-              </div>
-            </div>
-            <div class="commonqa-picker">
-              <div class="section-label">选择问答</div>
-              <div class="commonqa-list">
-                <button v-for="item in knowledge.commonQaItems" :key="item.name" class="list-item" :class="{ active: knowledge.commonQa && knowledge.commonQa.name === item.name }" @click="selectCommonQa(item)">
-                  <span>{{ item.title }}</span>
-                  <small>{{ (item.questions || []).join(' / ') || item.name }}</small>
-                </button>
-                <p class="hint" v-if="!knowledge.commonQaItems.length">暂无通用问答。在 common-qa 目录新增 Markdown 卡片后会出现在这里。</p>
               </div>
             </div>
           </div>

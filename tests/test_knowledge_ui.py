@@ -54,7 +54,8 @@ def test_knowledge_page_smoke():
     app_css = Path("frontend/static/app.css").read_text(encoding="utf-8")
     assert "grid-template-columns: repeat(3" in app_css
     assert "commonqa-stack" in app_css
-    assert "commonqa-picker" in app_css
+    assert "commonqa-sidebar" in app_css
+    assert "commonqa-picker" not in app_css
     assert "knowledgeCardRows" in app_js
     assert "toggleKnowledgeTree" in app_js
     assert "encodePath(name)" in app_js

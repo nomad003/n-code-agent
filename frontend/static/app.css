@@ -1889,19 +1889,18 @@ html.theme-light .round-card[open] {
   min-width: 0;
 }
 
-.commonqa-picker {
+.commonqa-sidebar {
   display: grid;
   gap: 8px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
+  margin-top: 2px;
 }
 
 .commonqa-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: 1fr;
   align-content: start;
   gap: 8px;
-  max-height: 260px;
+  max-height: calc(100vh - 260px);
   overflow: auto;
 }
 
