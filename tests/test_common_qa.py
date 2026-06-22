@@ -145,3 +145,27 @@ def test_common_qa_llm_router_none_falls_through(monkeypatch, tmp_path):
     monkeypatch.setattr(agent.CodeAgent, "run", lambda self, q: f"loop:{q}")
 
     assert agent.answer("怪物性能怎么配置", mode="technical") == "loop:怪物性能怎么配置"
+
+
+def test_builtin_big_module_common_qa_cards_are_matchable():
+    items = common_qa.load("marvel", include_common=False)
+    titles = {item.title for item in items}
+    assert {
+        "AI 配置",
+        "Buff 配置",
+        "Skill 配置",
+        "关卡 Level 配置",
+        "场景配置",
+    } <= titles
+
+    expected = {
+        "Buff的配置": "Buff 配置",
+        "Skill的配置": "Skill 配置",
+        "关卡Level的配置": "关卡 Level 配置",
+        "场景的配置": "场景配置",
+        "AI的配置": "AI 配置",
+    }
+    for question, title in expected.items():
+        hit = common_qa.find_match(question, repo="marvel")
+        assert hit is not None
+        assert hit.title == title
