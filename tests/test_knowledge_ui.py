@@ -56,6 +56,12 @@ def test_knowledge_page_smoke():
     assert "commonqa-stack" in app_css
     assert "commonqa-sidebar" in app_css
     assert "commonqa-picker" not in app_css
+    assert "qa-workbench" in html
+    assert "qa-flow" in html
+    assert "追问并生成草稿" in html
+    assert "保存后会进入模块卡片列表" in html
+    assert "qa-meta-fields" in app_css
+    assert "qa-compose" in app_css
     assert "knowledgeCardRows" in app_js
     assert "toggleKnowledgeTree" in app_js
     assert "encodePath(name)" in app_js

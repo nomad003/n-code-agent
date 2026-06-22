@@ -311,12 +311,30 @@
             <h2>问答沉淀</h2>
             <button class="ghost" @click="loadKnowledgeQa">刷新</button>
           </div>
-          <div class="qa-layout">
-            <div class="qa-list">
-              <label>后台追问模型
-                <textarea v-model="knowledge.curateQuestion" spellcheck="false" placeholder="输入要追问并准备沉淀的问题。"></textarea>
+          <div class="qa-workbench">
+            <div class="qa-flow" aria-label="问答沉淀流程">
+              <div class="qa-step" :class="{ active: !knowledge.qa }">
+                <span>1</span>
+                <strong>追问</strong>
+                <small>生成候选答案</small>
+              </div>
+              <div class="qa-step" :class="{ active: knowledge.qa && knowledge.qaDraft.answer.trim() }">
+                <span>2</span>
+                <strong>审核</strong>
+                <small>整理标题、标签和结论</small>
+              </div>
+              <div class="qa-step" :class="{ active: knowledge.qa && knowledge.qaDraft.name.trim() }">
+                <span>3</span>
+                <strong>落地</strong>
+                <small>保存为 curated 知识卡</small>
+              </div>
+            </div>
+
+            <div class="qa-compose">
+              <label class="qa-question-field">追问问题
+                <textarea v-model="knowledge.curateQuestion" spellcheck="false" placeholder="粘贴一段 crash / 错误日志，或输入值得沉淀的问题。"></textarea>
               </label>
-              <div class="form-grid single">
+              <div class="qa-compose-side">
                 <label>问题类型
                   <select v-model="knowledge.curateQuestionType">
                     <option value="">自动识别</option>
@@ -327,34 +345,66 @@
                     <option value="config_impl">配置实现</option>
                   </select>
                 </label>
-                <button class="primary" @click="askKnowledgeQa" :disabled="loading || !knowledge.curateQuestion.trim()">追问模型</button>
+                <button class="primary" @click="askKnowledgeQa" :disabled="loading || !knowledge.curateQuestion.trim()">追问并生成草稿</button>
+                <p class="hint">模型答案不会自动入库，需要人工审核后保存。</p>
               </div>
-              <div class="section-label">历史问答</div>
-              <button v-for="item in knowledge.qaItems" :key="item.id" class="list-item" :class="{ active: knowledge.qa && knowledge.qa.id === item.id }" @click="selectQa(item)">
-                <span>{{ item.question }}</span>
-                <small>{{ item.created_at || '-' }} · {{ (item.refs || []).join(', ') || 'no refs' }}</small>
-              </button>
-              <p class="hint" v-if="!knowledge.qaItems.length">没有历史问答也可以直接在上方追问模型，认可后落地为知识卡。</p>
             </div>
-            <div class="qa-draft">
-              <div class="notice" v-if="knowledge.qa">
-                <strong>待沉淀问题</strong>
-                <p>{{ knowledge.qa.question }}</p>
+
+            <div class="qa-layout">
+              <div class="qa-history">
+                <div class="qa-section-head">
+                  <div>
+                    <div class="section-label">来源</div>
+                    <h3>历史问答</h3>
+                  </div>
+                  <span class="pill">{{ knowledge.qaItems.length }}</span>
+                </div>
+                <div class="qa-list">
+                  <button v-for="item in knowledge.qaItems" :key="item.id" class="list-item" :class="{ active: knowledge.qa && knowledge.qa.id === item.id }" @click="selectQa(item)">
+                    <span>{{ item.question }}</span>
+                    <small>{{ item.created_at || '-' }} · {{ (item.refs || []).join(', ') || 'no refs' }}</small>
+                  </button>
+                  <div class="qa-empty" v-if="!knowledge.qaItems.length">
+                    <strong>暂无历史问答</strong>
+                    <p>上方追问模型后，会在右侧生成一个可审核的草稿。</p>
+                  </div>
+                </div>
               </div>
-              <label>卡片标题
-                <input v-model="knowledge.qaDraft.title">
-              </label>
-              <label>文件名
-                <input v-model="knowledge.qaDraft.name">
-              </label>
-              <label>标签
-                <input v-model="knowledge.qaDraft.tags" placeholder="qa, curated, module">
-              </label>
-              <label>沉淀结论
-                <textarea v-model="knowledge.qaDraft.answer" spellcheck="false"></textarea>
-              </label>
-              <div class="actions">
-                <button class="primary" @click="precipitateQa" :disabled="loading || !knowledge.qa">落地为知识卡</button>
+
+              <div class="qa-draft">
+                <div class="qa-section-head">
+                  <div>
+                    <div class="section-label">审核草稿</div>
+                    <h3>落地知识卡</h3>
+                  </div>
+                  <span class="pill">{{ knowledge.qa ? '待审核' : '未选择' }}</span>
+                </div>
+                <div class="notice" v-if="knowledge.qa">
+                  <strong>待沉淀问题</strong>
+                  <p>{{ knowledge.qa.question }}</p>
+                </div>
+                <div class="qa-empty" v-else>
+                  <strong>选择一条问答或追问模型</strong>
+                  <p>右侧会生成标题、文件名、标签和沉淀结论，确认后再保存。</p>
+                </div>
+                <div class="qa-meta-fields">
+                  <label>卡片标题
+                    <input v-model="knowledge.qaDraft.title" placeholder="例如：怪物技能配置排查">
+                  </label>
+                  <label>文件名
+                    <input v-model="knowledge.qaDraft.name" placeholder="qa-monster-skill-config.md">
+                  </label>
+                  <label class="qa-tags">标签
+                    <input v-model="knowledge.qaDraft.tags" placeholder="qa, curated, module">
+                  </label>
+                </div>
+                <label>沉淀结论
+                  <textarea v-model="knowledge.qaDraft.answer" spellcheck="false" placeholder="保留已核实的结论、关键证据、排查步骤和后续追问方向。"></textarea>
+                </label>
+                <div class="actions">
+                  <button class="primary" @click="precipitateQa" :disabled="loading || !knowledge.qa || !knowledge.qaDraft.answer.trim() || !knowledge.qaDraft.name.trim()">落地为知识卡</button>
+                  <span class="hint">保存后会进入模块卡片列表，并参与知识图谱。</span>
+                </div>
               </div>
             </div>
           </div>
