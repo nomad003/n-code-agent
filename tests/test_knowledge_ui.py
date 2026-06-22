@@ -33,6 +33,8 @@ def test_knowledge_page_smoke():
     app_js = Path("frontend/static/app.js").read_text(encoding="utf-8")
     assert "renderKnowledgeDiagrams" in app_js
     assert "renderedAskAnswer" in app_js
+    assert 'this.view === "ask"' in app_js
+    assert "canRenderAsk" in app_js
     assert "等待提交问题。" in app_js
     assert "code-agent.askWorkspace" in app_js
     assert "readAskWorkspace" in app_js

@@ -45,6 +45,7 @@ def test_config_prompt_requires_table_fields_in_plain():
     assert "配置明细表格" in p
     assert "配置面、对应表/配置项、核心字段、字段用途" in p
     assert "Mermaid 关系图" in p
+    assert "条件分支必须保留代码真实判断方向" in p
     assert "technical 模式再补加载文件、函数名和代码位置" in p
     assert "不要只输出抽象模块说明" in p
 
@@ -53,6 +54,7 @@ def test_feature_prompt_requires_flow_not_config_details_in_plain():
     p = question_intent.prompt("怪物索敌功能流程是什么？", "feature_impl")
     assert "Mermaid 图解" in p
     assert "结构化步骤" in p
+    assert "条件分支必须保留代码真实判断方向" in p
     assert "配置只作为输入点说明，不展开字段明细，除非用户追问配置" in p
 
 

@@ -1348,6 +1348,7 @@
       },
       activateView() {
         if (this.view !== "graph") this.destroyKnowledgeGraphVis();
+        if (this.view === "ask") this.$nextTick(() => this.scheduleKnowledgeDiagramRender(true));
         if (this.view === "traces" && !this.traceFiles.length) this.loadTraces();
         if (this.view === "knowledge" && this.selectedRepo) {
           if (this.knowledge.mode === "graph") this.knowledge.mode = "cards";
@@ -1410,6 +1411,7 @@
           });
           this.ask.answer = data.answer || "";
           this.ask.raw = JSON.stringify(data, null, 2);
+          this.$nextTick(() => this.scheduleKnowledgeDiagramRender(true));
         });
       },
       async submitDiagnose() {
@@ -1427,6 +1429,7 @@
           });
           this.ask.answer = data.answer || data.plain || "";
           this.ask.raw = JSON.stringify(data, null, 2);
+          this.$nextTick(() => this.scheduleKnowledgeDiagramRender(true));
         });
       },
       async loadTraces() {
@@ -1490,7 +1493,9 @@
         this.scheduleKnowledgeDiagramRender(true);
       },
       scheduleKnowledgeDiagramRender(force) {
-        if (this.view !== "knowledge" || this.knowledge.mode !== "cards" || this.knowledge.editing) return;
+        const canRenderAsk = this.view === "ask";
+        const canRenderKnowledge = this.view === "knowledge" && this.knowledge.mode === "cards" && !this.knowledge.editing;
+        if (!canRenderAsk && !canRenderKnowledge) return;
         if (this._diagramFrame) window.cancelAnimationFrame(this._diagramFrame);
         this._diagramFrame = window.requestAnimationFrame(() => {
           this._diagramFrame = null;
