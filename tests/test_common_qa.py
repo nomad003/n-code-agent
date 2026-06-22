@@ -115,6 +115,57 @@ def test_agent_uses_llm_router_for_common_qa_intent(monkeypatch, tmp_path):
     assert "通用问答集意图路由器" in calls[0]["messages"][0]["content"]
 
 
+def test_specific_code_identifier_bypasses_common_qa(monkeypatch, tmp_path):
+    _write_common_qa(
+        tmp_path,
+        "buff-config.md",
+        (
+            "---\n"
+            "type: Common QA\n"
+            "title: Buff 配置\n"
+            "questions: Buff配置, Buff怎么配置\n"
+            "aliases: InBornBuff 配置, BuffTable 配置\n"
+            "---\n\n"
+            "# Buff 配置\n\n总览答案。\n"
+        ),
+    )
+    monkeypatch.setattr(config, "PROJECT_ROOT", str(tmp_path))
+    monkeypatch.setattr(config, "CODE_REPOS", {})
+    monkeypatch.setattr(config, "CODE_REPO_DEFAULT", "marvel")
+    monkeypatch.setattr(config, "TARGET_CODE_PATH", str(tmp_path))
+
+    assert common_qa.find_match("Buff怎么配置", repo="marvel").title == "Buff 配置"
+    assert common_qa.find_match("InBornBuff怎么配置", repo="marvel") is None
+    assert common_qa.llm_candidates("InBornBuff怎么配置", repo="marvel") == []
+    assert common_qa.specific_code_identifiers("InBornBuff怎么配置") == ["InBornBuff"]
+
+
+def test_agent_specific_code_identifier_enters_agent_loop(monkeypatch, tmp_path):
+    _write_common_qa(
+        tmp_path,
+        "buff-config.md",
+        (
+            "---\n"
+            "type: Common QA\n"
+            "title: Buff 配置\n"
+            "questions: Buff配置, Buff怎么配置\n"
+            "aliases: InBornBuff 配置\n"
+            "---\n\n"
+            "# Buff 配置\n\n总览答案。\n"
+        ),
+    )
+    monkeypatch.setattr(config, "PROJECT_ROOT", str(tmp_path))
+    monkeypatch.setattr(config, "CODE_REPOS", {})
+    monkeypatch.setattr(config, "CODE_REPO_DEFAULT", "marvel")
+    monkeypatch.setattr(config, "TARGET_CODE_PATH", str(tmp_path))
+    monkeypatch.setattr(config, "USE_SHORTCUT", False)
+    monkeypatch.setattr(config, "AGENT_BACKEND", "custom")
+    monkeypatch.setattr(config, "AGENT_ALLOWED_MODES", ("plain", "technical"))
+    monkeypatch.setattr(agent.CodeAgent, "run", lambda self, q: f"loop:{q}")
+
+    assert agent.answer("InBornBuff怎么配置", mode="technical") == "loop:InBornBuff怎么配置"
+
+
 def test_common_qa_llm_router_none_falls_through(monkeypatch, tmp_path):
     _write_common_qa(
         tmp_path,

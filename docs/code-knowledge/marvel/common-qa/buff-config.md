@@ -6,8 +6,8 @@ repo: marvel
 module: common-qa/buff-config
 resource: docs/code-knowledge/marvel/common-qa/buff-config.md
 tags: qa, common, buff, config, xbuff, unit, 配置
-questions: Buff配置, Buff的配置, Buff怎么配置, Buff如何配置, Buff效果怎么配置, 出生Buff怎么配置
-aliases: buff config, xbuff config, BuffTable 配置, BuffIDTable 配置, InBornBuff 配置
+questions: Buff配置, Buff的配置, Buff怎么配置, Buff如何配置, Buff效果怎么配置
+aliases: buff config, xbuff config, buff 效果配置, buff 触发配置
 question_types: config_impl, feature_impl, outage_log, general
 depends_on: unit/xbuff-container.md, gameserver/combat-core-overview.md
 updated_at: 2026-06-22

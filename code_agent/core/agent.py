@@ -67,6 +67,15 @@ def _answer_in_repo(
     )
     try:
         resolved_question_type = question_intent.normalize(question_type)
+        classified_question_type = resolved_question_type or question_intent.classify(
+            question
+        )
+        trace.write(
+            "intent_classified",
+            question_type=classified_question_type,
+            source="explicit" if resolved_question_type else "auto",
+            requested_question_type=question_type or "",
+        )
         if question_intent.should_clarify(question, resolved_question_type):
             answer_text = response_policy.enforce(
                 question_intent.clarifying_response(question, mode=resolved_mode),
@@ -80,11 +89,21 @@ def _answer_in_repo(
             trace.write("request_end", answer=answer_text)
             return answer_text
 
-        common_hit = common_qa.find_match(question)
-        common_hit_source = "deterministic"
-        if common_hit is None:
-            common_hit = _select_common_qa_with_llm(question, trace=trace)
-            common_hit_source = "llm" if common_hit is not None else ""
+        specific_identifiers = common_qa.specific_code_identifiers(question)
+        if specific_identifiers:
+            trace.write(
+                "common_qa_skipped",
+                reason="specific_code_identifier",
+                identifiers=specific_identifiers,
+            )
+            common_hit = None
+            common_hit_source = ""
+        else:
+            common_hit = common_qa.find_match(question)
+            common_hit_source = "deterministic"
+            if common_hit is None:
+                common_hit = _select_common_qa_with_llm(question, trace=trace)
+                common_hit_source = "llm" if common_hit is not None else ""
         if common_hit is not None:
             answer_text = response_policy.enforce(common_hit.body, mode=resolved_mode)
             trace.write(

@@ -7,7 +7,7 @@ module: common-qa/scene-config
 resource: docs/code-knowledge/marvel/common-qa/scene-config.md
 tags: qa, common, scene, config, scenebattle, handler, level, 配置
 questions: 场景配置, 场景的配置, Scene配置, Scene的配置, SceneBattle配置, 场景怎么配置, 场景如何配置
-aliases: scene config, SceneBattle 配置, SceneHandler 配置, SceneUnitHandler 配置, 场景战斗组配置
+aliases: scene config, 战斗场景配置, 场景 handler 配置, 场景单位配置, 场景战斗组配置
 question_types: config_impl, feature_impl, outage_log, general
 depends_on: gameserver/combat-core-overview.md, enemy/scene-unit-handler.md, enemy/level-spawn-enemy.md
 updated_at: 2026-06-22

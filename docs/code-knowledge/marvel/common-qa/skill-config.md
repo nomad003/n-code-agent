@@ -7,7 +7,7 @@ module: common-qa/skill-config
 resource: docs/code-knowledge/marvel/common-qa/skill-config.md
 tags: qa, common, skill, config, combat, enemy, role, 配置
 questions: Skill配置, Skill的配置, 技能配置, 技能的配置, Skill怎么配置, 技能怎么配置, 怪物技能怎么配置
-aliases: skill config, SkillListForEnemy 配置, SkillListForRole 配置, SkillDamage 配置, SkillSlotTable 配置, 技能表配置
+aliases: skill config, 技能表配置, 怪物技能配置, 角色技能配置, 技能伤害配置, 技能槽位配置
 question_types: config_impl, feature_impl, outage_log, general
 depends_on: unit/skill-mgr.md, enemy/enemy-skill-config.md, gameserver/combat-core-overview.md
 updated_at: 2026-06-22

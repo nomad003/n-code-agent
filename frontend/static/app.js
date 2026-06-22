@@ -15,6 +15,16 @@
     raw: "",
   });
 
+  const QUESTION_TYPE_LABELS = {
+    crash_stack: "程序 crash 堆栈",
+    outage_log: "宕机 / 错误日志",
+    feature_impl: "功能实现",
+    config_impl: "配置实现",
+    general: "通用问题",
+    clarify: "需要追问",
+    "": "自动识别",
+  };
+
   const GRAPH_GROUPS = {
     module: { label: "模块", color: "#a78bfa", glow: "rgba(167,139,250,0.55)" },
     playbook: { label: "手册", color: "#38bdf8", glow: "rgba(56,189,248,0.55)" },
@@ -260,6 +270,91 @@
     return `${(value / 1024 / 1024).toFixed(1)} MB`;
   }
 
+  function questionTypeLabel(value) {
+    return QUESTION_TYPE_LABELS[value || ""] || value || "自动识别";
+  }
+
+  function buildTraceRouteSummary(rows, header = {}) {
+    const traceRows = rows || [];
+    const start = traceRows.find((row) => row.event === "request_start") || {};
+    const intent = traceRows.find((row) => row.event === "intent_classified")
+      || traceRows.find((row) => row.event === "intent_clarification")
+      || {};
+    const commonRequest = traceRows.find((row) => row.event === "common_qa_intent_request") || {};
+    const commonResponse = traceRows.find((row) => row.event === "common_qa_intent_response") || {};
+    const commonHit = traceRows.find((row) => row.event === "common_qa_hit") || {};
+    const commonSkip = traceRows.find((row) => row.event === "common_qa_skipped") || {};
+    const cacheHit = traceRows.find((row) => row.event === "cache_hit") || {};
+    const shortcut = traceRows.find((row) => row.event === "shortcut") || {};
+    const enteredAgentLoop = traceRows.some((row) => row.event === "llm_request" || row.event === "sdk_request");
+    const candidates = Array.isArray(commonRequest.candidates) ? commonRequest.candidates : [];
+    const candidateLabels = candidates
+      .slice(0, 4)
+      .map((item) => item.title || item.path)
+      .filter(Boolean);
+
+    let decision = "等待事件";
+    let detail = "尚未看到完整路由事件。";
+    let tone = "neutral";
+    if (intent.event === "intent_clarification") {
+      decision = "追问澄清";
+      detail = "自动意图不足，已要求用户补充目标。";
+      tone = "warn";
+    } else if (commonHit.event) {
+      decision = "通用问答直返";
+      detail = `${commonHit.source || "deterministic"} 命中 ${commonHit.title || commonHit.path || "-"}`;
+      tone = "qa";
+    } else if (commonSkip.event) {
+      decision = "跳过通用问答";
+      const ids = Array.isArray(commonSkip.identifiers) ? commonSkip.identifiers.join(", ") : "";
+      detail = ids ? `检测到具体符号：${ids}` : "检测到具体代码问题。";
+      tone = "inspect";
+    } else if (cacheHit.event) {
+      decision = "缓存直返";
+      detail = "命中服务端问答缓存，未进入模型工具链。";
+      tone = "qa";
+    } else if (shortcut.event) {
+      decision = "索引快捷命中";
+      detail = "命中离线索引快捷答案，未进入完整工具链。";
+      tone = "qa";
+    } else if (enteredAgentLoop) {
+      decision = "进入工具链";
+      detail = "未被通用问答拦截，已进入 Agent 读代码 / 查知识流程。";
+      tone = "inspect";
+    }
+
+    let commonQaStatus = "未检查";
+    if (commonHit.event) {
+      commonQaStatus = `命中：${commonHit.title || commonHit.path || "-"}`;
+    } else if (commonSkip.event) {
+      commonQaStatus = "已跳过";
+    } else if (commonResponse.event) {
+      commonQaStatus = commonResponse.path && commonResponse.path !== "none"
+        ? `LLM 选择：${commonResponse.path}`
+        : "LLM 判定未命中";
+    } else if (candidates.length) {
+      commonQaStatus = `${candidates.length} 个候选`;
+    } else if (enteredAgentLoop) {
+      commonQaStatus = "无候选";
+    }
+
+    return {
+      decision,
+      detail,
+      tone,
+      mode: header.mode || start.mode || "-",
+      backend: header.backend || start.backend || "-",
+      repo: start.repo || "-",
+      model: header.model || start.model || "-",
+      questionType: questionTypeLabel(intent.question_type),
+      questionTypeSource: intent.source === "explicit" ? "手动选择" : "自动识别",
+      requestedQuestionType: intent.requested_question_type || "",
+      commonQaStatus,
+      commonQaCandidates: candidateLabels,
+      enteredAgentLoop,
+    };
+  }
+
   function buildTraceSummary(rows, header = {}) {
     const traceRows = rows || [];
     const isRoundStart = (row) => row.event === "llm_request" || row.event === "sdk_request";
@@ -347,6 +442,7 @@
       tools: toolRows.length,
       findings,
       roundDetails,
+      route: buildTraceRouteSummary(traceRows, header),
     };
   }
 
@@ -830,6 +926,15 @@
           <div><strong>${summary.rounds}</strong><span>Round</span></div>
           <div><strong>${summary.tools}</strong><span>工具事件</span></div>
           <div><strong>${summary.findings.length}</strong><span>检查项</span></div>
+        </div>
+        <div class="intent-card intent-${escapeAttr(summary.route.tone)}">
+          <div class="trace-section-head"><h3>意图识别</h3><span>${escapeHtml(summary.route.decision)}</span></div>
+          <div class="intent-grid">
+            <div><span>问题类型</span><strong>${escapeHtml(summary.route.questionType)}</strong><small>${escapeHtml(summary.route.questionTypeSource)}</small></div>
+            <div><span>通用问答</span><strong>${escapeHtml(summary.route.commonQaStatus)}</strong><small>${escapeHtml(summary.route.detail)}</small></div>
+            <div><span>执行路径</span><strong>${escapeHtml(summary.route.enteredAgentLoop ? "Agent 工具链" : summary.route.decision)}</strong><small>${escapeHtml(summary.route.backend + " · " + summary.route.mode)}</small></div>
+          </div>
+          ${summary.route.commonQaCandidates.length ? `<div class="intent-candidates">${summary.route.commonQaCandidates.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>` : ""}
         </div>
         ${findings}
         <div class="trace-section-head"><h3>Round 明细</h3><span>${rows.length} events</span></div>

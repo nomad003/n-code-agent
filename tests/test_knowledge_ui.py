@@ -86,11 +86,15 @@ def test_trace_page_smoke():
     html = main.llm_traces_page().body.decode("utf-8")
     assert "调用复盘" in html
     assert "trace-question-card" in html
+    assert "意图识别" in html
+    assert "intent-card" in html
     assert "Round 明细" in html
     assert "本轮原始事件" in html
     assert '<script src="https://unpkg.com' not in html
     app_js = Path("frontend/static/app.js").read_text(encoding="utf-8")
     assert "renderTraceFallback" in app_js
+    assert "common_qa_skipped" in app_js
+    assert "intent_classified" in app_js
     assert "/static/vendor/vue.global.prod.js" in app_js
 
 

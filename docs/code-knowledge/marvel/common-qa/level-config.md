@@ -7,7 +7,7 @@ module: common-qa/level-config
 resource: docs/code-knowledge/marvel/common-qa/level-config.md
 tags: qa, common, level, config, spawner, scene, enemy, 配置
 questions: 关卡配置, 关卡的配置, Level配置, Level的配置, 关卡Level配置, 关卡Level的配置, 刷怪配置, 刷怪怎么配置
-aliases: level config, LevelSpawner 配置, Level::SpawnEnemy, 关卡刷怪配置, wave 配置, group 配置
+aliases: level config, 关卡刷怪配置, 波次配置, 分组配置, 剧情关卡配置
 question_types: config_impl, feature_impl, outage_log, general
 depends_on: enemy/level-spawn-enemy.md, gameserver/combat-core-overview.md, enemy/scene-unit-handler.md
 updated_at: 2026-06-22

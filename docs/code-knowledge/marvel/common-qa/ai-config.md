@@ -7,7 +7,7 @@ module: common-qa/ai-config
 resource: docs/code-knowledge/marvel/common-qa/ai-config.md
 tags: qa, common, ai, config, enemy, behavior, 配置
 questions: AI配置, AI的配置, AI怎么配置, AI如何配置, 怪物AI配置, 怪物AI怎么配置
-aliases: ai config, UnitAITable 配置, SquadMemberAITable 配置, AIID 配置, PatrolTable 配置, SightTable 配置
+aliases: ai config, 怪物 AI 配置, 单位 AI 配置, 巡逻配置, 视野配置
 question_types: config_impl, feature_impl, outage_log, general
 depends_on: enemy/enemy-ai-agent.md, unit/ai-entity.md, gameserver/combat-core-overview.md
 updated_at: 2026-06-22

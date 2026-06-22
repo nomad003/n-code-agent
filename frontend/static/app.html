@@ -157,6 +157,32 @@
             <div><strong>{{ traceSummary.tools }}</strong><span>工具事件</span></div>
             <div><strong>{{ traceSummary.findings.length }}</strong><span>检查项</span></div>
           </div>
+          <div class="intent-card" :class="'intent-' + traceSummary.route.tone">
+            <div class="trace-section-head">
+              <h3>意图识别</h3>
+              <span>{{ traceSummary.route.decision }}</span>
+            </div>
+            <div class="intent-grid">
+              <div>
+                <span>问题类型</span>
+                <strong>{{ traceSummary.route.questionType }}</strong>
+                <small>{{ traceSummary.route.questionTypeSource }}</small>
+              </div>
+              <div>
+                <span>通用问答</span>
+                <strong>{{ traceSummary.route.commonQaStatus }}</strong>
+                <small>{{ traceSummary.route.detail }}</small>
+              </div>
+              <div>
+                <span>执行路径</span>
+                <strong>{{ traceSummary.route.enteredAgentLoop ? 'Agent 工具链' : traceSummary.route.decision }}</strong>
+                <small>{{ traceSummary.route.backend }} · {{ traceSummary.route.mode }}</small>
+              </div>
+            </div>
+            <div class="intent-candidates" v-if="traceSummary.route.commonQaCandidates.length">
+              <span v-for="item in traceSummary.route.commonQaCandidates" :key="item">{{ item }}</span>
+            </div>
+          </div>
           <div class="notice" v-if="traceSummary.findings.length">
             <strong>质量检查</strong>
             <ul>

@@ -15,6 +15,19 @@ from . import knowledge_graph
 
 
 QA_DIR_PREFIX = "common-qa/"
+_GENERIC_IDENTIFIER_TERMS = {
+    "ai",
+    "buff",
+    "combat",
+    "enemy",
+    "level",
+    "role",
+    "scene",
+    "skill",
+    "spawn",
+    "unit",
+}
+_SPECIFIC_SHORT_IDENTIFIERS = {"AIID", "EUID"}
 
 
 @dataclass
@@ -54,6 +67,8 @@ def load(repo: str | None = None, *, include_common: bool = True) -> list[Common
 
 def find_match(query: str, *, repo: str | None = None) -> CommonQA | None:
     """Return a high-confidence maintained answer for a user query."""
+    if should_skip_for_specific_query(query):
+        return None
     query_key = _normalize_query(query)
     if not query_key:
         return None
@@ -81,6 +96,8 @@ def llm_candidates(query: str, *, repo: str | None = None, limit: int = 8) -> li
     This is deliberately broader than ``find_match``: it only decides whether a
     card is worth showing to the LLM router, not whether it is safe to return.
     """
+    if should_skip_for_specific_query(query):
+        return []
     terms = knowledge_graph.terms_for_query(query)
     if not terms:
         return []
@@ -94,6 +111,24 @@ def llm_candidates(query: str, *, repo: str | None = None, limit: int = 8) -> li
             scored.append((score, item))
     scored.sort(key=lambda pair: (-pair[0], pair[1].path))
     return [item for _score, item in scored[:limit]]
+
+
+def should_skip_for_specific_query(query: str) -> bool:
+    """Avoid broad common-QA answers for concrete code symbols or fields."""
+    return bool(specific_code_identifiers(query))
+
+
+def specific_code_identifiers(query: str) -> list[str]:
+    """Return concrete-looking code identifiers mentioned in a user query."""
+    out: list[str] = []
+    for match in re.finditer(
+        r"(?<![A-Za-z0-9_])([A-Za-z_][A-Za-z0-9_]{2,})(?![A-Za-z0-9_])",
+        query or "",
+    ):
+        token = match.group(1)
+        if _looks_specific_identifier(token):
+            out.append(token)
+    return list(dict.fromkeys(out))
 
 
 def _is_common_qa(card: knowledge_graph.KnowledgeCard) -> bool:
@@ -119,6 +154,20 @@ def _score(query_key: str, item: CommonQA) -> int:
         elif len(query_key) >= 4 and query_key in prompt_key:
             best = max(best, 95)
     return best
+
+
+def _looks_specific_identifier(token: str) -> bool:
+    if token in _SPECIFIC_SHORT_IDENTIFIERS:
+        return True
+    if len(token) < 6:
+        return False
+    low = token.lower()
+    if low in _GENERIC_IDENTIFIER_TERMS:
+        return False
+    has_lower = any(ch.islower() for ch in token)
+    has_upper = any(ch.isupper() for ch in token)
+    has_digit = any(ch.isdigit() for ch in token)
+    return "_" in token or has_digit or (has_lower and has_upper)
 
 
 def _normalize_query(text: str) -> str:

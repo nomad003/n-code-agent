@@ -1254,6 +1254,98 @@ summary {
   font-size: 11px;
 }
 
+.intent-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+  padding: 14px;
+}
+
+.intent-card .trace-section-head {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.intent-card .trace-section-head span {
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  padding: 4px 9px;
+  color: var(--text-2);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.intent-qa {
+  border-color: rgba(52, 211, 153, 0.34);
+  background: rgba(52, 211, 153, 0.07);
+}
+
+.intent-inspect {
+  border-color: rgba(79, 142, 247, 0.34);
+  background: var(--blue-dim);
+}
+
+.intent-warn {
+  border-color: rgba(252, 211, 77, 0.38);
+  background: rgba(252, 211, 77, 0.07);
+}
+
+.intent-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.intent-grid div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  padding: 10px 11px;
+}
+
+.intent-grid span {
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.intent-grid strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.intent-grid small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.intent-candidates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.intent-candidates span {
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  padding: 4px 8px;
+  color: var(--text-2);
+  font-size: 11px;
+}
+
 .trace-section-head {
   display: flex;
   justify-content: space-between;
@@ -2222,6 +2314,7 @@ html.theme-light .round-card[open] {
   .topbar,
   .form-grid,
   .form-grid.single,
+  .intent-grid,
   .qa-flow,
   .qa-compose,
   .qa-layout,

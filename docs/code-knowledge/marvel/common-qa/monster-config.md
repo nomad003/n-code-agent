@@ -7,7 +7,7 @@ module: common-qa/monster-config
 resource: docs/code-knowledge/marvel/common-qa/monster-config.md
 tags: qa, common, enemy, monster, config, 怪物, 配置
 questions: 怪物配置, 怪物怎么配置, 怪物如何配置, 怪物技能怎么配置
-aliases: enemy config, monster config, XEntityStatistics 怪物配置
+aliases: enemy config, monster config, 怪物模板配置, 怪物技能配置, 怪物 AI 配置
 question_types: config_impl, feature_impl, general
 depends_on: enemy/enemy-template-config.md, enemy/enemy-skill-config.md, enemy/enemy-ai-agent.md, enemy/enemy-attr-init.md
 updated_at: 2026-06-22
