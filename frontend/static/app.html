@@ -91,6 +91,7 @@
             </label>
             <label>问题类型
               <select v-model="ask.question_type">
+                <option value="">自动识别</option>
                 <option value="general">通用问题</option>
                 <option value="crash_stack">程序 crash 堆栈</option>
                 <option value="outage_log">宕机 / 错误日志</option>
@@ -288,6 +289,7 @@
               <div class="form-grid single">
                 <label>问题类型
                   <select v-model="knowledge.curateQuestionType">
+                    <option value="">自动识别</option>
                     <option value="general">通用问题</option>
                     <option value="crash_stack">程序 crash 堆栈</option>
                     <option value="outage_log">宕机 / 错误日志</option>

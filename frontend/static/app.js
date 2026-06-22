@@ -991,7 +991,7 @@
         },
         ask: {
           mode: "technical",
-          question_type: "outage_log",
+          question_type: "",
           use_cache: true,
           plain: false,
           question: "",
@@ -1025,7 +1025,7 @@
           qaItems: [],
           qa: null,
           curateQuestion: "",
-          curateQuestionType: "general",
+          curateQuestionType: "",
           qaDraft: {
             title: "",
             name: "",

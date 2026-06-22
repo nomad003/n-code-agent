@@ -26,6 +26,7 @@ def test_knowledge_page_smoke():
     assert "theme-toggle" in html
     assert "markdown-preview" in html
     assert "answer-preview" in html
+    assert '<option value="">自动识别</option>' in html
     assert "knowledge-tree" in html
     assert "showCardPreview" in html
     assert "brand-mark" not in html
@@ -33,6 +34,8 @@ def test_knowledge_page_smoke():
     assert "renderKnowledgeDiagrams" in app_js
     assert "renderedAskAnswer" in app_js
     assert "等待提交问题。" in app_js
+    assert 'question_type: ""' in app_js
+    assert 'curateQuestionType: ""' in app_js
     assert "querySelectorAll('.markdown-preview .diagram-card" in app_js
     assert "modeOptions" in app_js
     assert "preferredKnowledgeQaMode" in app_js

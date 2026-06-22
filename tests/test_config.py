@@ -27,8 +27,9 @@ def test_system_prompt_enforces_concise_structured_no_code_by_default():
     assert "严禁输出任何代码片段" in prompt
     assert "即使用户要求代码或示例" in prompt
     assert "只用结构化文字描述" in prompt
+    assert "如果用户问题涉及配置，必须给具体表格和字段" in prompt
     assert "配置面、对应配置表/配置项、核心字段和字段用途" in prompt
-    assert "功能类问题" in prompt and "结构化步骤" in prompt
+    assert "如果用户问题涉及功能，必须给 Mermaid 图解" in prompt
     assert "不要列出知识卡、文件路径、类名、函数名" in prompt
 
 
@@ -40,8 +41,9 @@ def test_system_prompt_for_technical_mode(monkeypatch):
     assert "Mermaid 流程图/时序图" in prompt
     assert "配置问题关注" in prompt
     assert "功能问题关注" in prompt
+    assert "如果用户问题涉及配置，必须先给配置明细表" in prompt
     assert "配置面、对应配置表/配置项、核心字段和字段用途" in prompt
-    assert "功能类问题" in prompt and "结构化步骤" in prompt
+    assert "如果用户问题涉及功能，必须先给 Mermaid 图解" in prompt
     assert "不直接修改代码" in prompt
 
 
