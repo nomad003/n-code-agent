@@ -1877,6 +1877,27 @@ html.theme-light .round-card[open] {
   gap: 14px;
 }
 
+.commonqa-layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 14px;
+}
+
+.commonqa-list {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  max-height: 680px;
+  overflow: auto;
+}
+
+.commonqa-answer {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+}
+
 .qa-list {
   display: grid;
   align-content: start;
@@ -1986,6 +2007,7 @@ html.theme-light .round-card[open] {
   .two-col,
   .trace-layout,
   .knowledge-layout,
+  .commonqa-layout,
   .qa-layout {
     grid-template-columns: 1fr;
   }

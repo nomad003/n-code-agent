@@ -22,6 +22,7 @@ def test_knowledge_page_smoke():
     assert "Code Agent Workbench" in html
     assert "/knowledge/api" in html
     assert "/knowledge/graph" in html
+    assert "常用问答" in html
     assert "调查" in html and "复盘" in html and "知识" in html and "图谱" in html
     assert "theme-toggle" in html
     assert "markdown-preview" in html
@@ -33,6 +34,9 @@ def test_knowledge_page_smoke():
     app_js = Path("frontend/static/app.js").read_text(encoding="utf-8")
     assert "renderKnowledgeDiagrams" in app_js
     assert "renderedAskAnswer" in app_js
+    assert "renderedCommonQaAnswer" in app_js
+    assert "/knowledge/api/common-qa" in app_js
+    assert "loadCommonQa" in app_js
     assert 'this.view === "ask"' in app_js
     assert "canRenderAsk" in app_js
     assert "等待提交问题。" in app_js
@@ -46,6 +50,7 @@ def test_knowledge_page_smoke():
     assert "querySelectorAll('.markdown-preview .diagram-card" in app_js
     assert "modeOptions" in app_js
     assert "preferredKnowledgeQaMode" in app_js
+    assert "commonqa-layout" in Path("frontend/static/app.css").read_text(encoding="utf-8")
     assert "knowledgeCardRows" in app_js
     assert "toggleKnowledgeTree" in app_js
     assert "encodePath(name)" in app_js
@@ -266,3 +271,28 @@ def test_knowledge_qa_ask_calls_agent(knowledge_env, monkeypatch):
         "repo": "marvel",
         "question_type": "feature_impl",
     }
+
+
+def test_knowledge_common_qa_api_lists_curated_cards(knowledge_env):
+    root = knowledge_env / "docs" / "code-knowledge" / "marvel" / "common-qa"
+    root.mkdir(parents=True)
+    (root / "monster-config.md").write_text(
+        (
+            "---\n"
+            "type: Common QA\n"
+            "title: 怪物配置\n"
+            "questions: 怪物配置, 怪物怎么配置\n"
+            "aliases: monster config\n"
+            "tags: qa, monster\n"
+            "---\n\n"
+            "# 怪物配置\n\n编辑好的答案。\n"
+        ),
+        encoding="utf-8",
+    )
+
+    res = main.knowledge_common_qa("marvel")
+    assert res["repo"] == "marvel"
+    assert res["items"][0]["name"] == "common-qa/monster-config.md"
+    assert res["items"][0]["title"] == "怪物配置"
+    assert "怪物怎么配置" in res["items"][0]["questions"]
+    assert "编辑好的答案" in res["items"][0]["answer"]

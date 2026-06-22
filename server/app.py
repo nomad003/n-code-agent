@@ -25,6 +25,7 @@ from code_agent import config
 from code_agent.core import operation_modes
 from code_agent.core import question_intent
 from code_agent.core import response_policy
+from code_agent.kb import common_qa
 from code_agent.kb import knowledge_graph as kg
 from code_agent.observability import llm_trace
 from code_agent.observability import trace_viewer
@@ -415,6 +416,24 @@ def knowledge_qa_recent(repo: str | None = None, limit: int = 20) -> dict:
 
     with config.use_repo(repo_name):
         return {"repo": repo_name, "items": knowledge.recent(limit=limit)}
+
+
+@app.get("/knowledge/api/common-qa")
+def knowledge_common_qa(repo: str | None = None) -> dict:
+    repo_name = _resolve_request_repo(repo)
+    with config.use_repo(repo_name):
+        items = [
+            {
+                "name": item.path,
+                "title": item.title,
+                "questions": item.questions,
+                "aliases": item.aliases,
+                "tags": item.tags,
+                "answer": item.body,
+            }
+            for item in common_qa.load(repo_name)
+        ]
+    return {"repo": repo_name, "items": items}
 
 
 @app.post("/knowledge/api/precipitate")

@@ -20,6 +20,7 @@ import importlib
 import litellm
 
 from .. import config
+from ..kb import common_qa
 from ..kb import knowledge_graph
 from ..observability import llm_trace
 from ..kb import module_knowledge
@@ -73,6 +74,18 @@ def _answer_in_repo(
             trace.write(
                 "intent_clarification",
                 question_type=question_intent.CLARIFY_INTENT,
+                answer=answer_text,
+            )
+            trace.write("request_end", answer=answer_text)
+            return answer_text
+
+        common_hit = common_qa.find_match(question)
+        if common_hit is not None:
+            answer_text = response_policy.enforce(common_hit.body, mode=resolved_mode)
+            trace.write(
+                "common_qa_hit",
+                title=common_hit.title,
+                path=common_hit.path,
                 answer=answer_text,
             )
             trace.write("request_end", answer=answer_text)

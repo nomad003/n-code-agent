@@ -234,6 +234,7 @@
           </label>
           <div class="segmented">
             <button :class="{ active: knowledge.mode === 'cards' }" @click="setKnowledgeMode('cards')">卡片</button>
+            <button :class="{ active: knowledge.mode === 'commonqa' }" @click="setKnowledgeMode('commonqa')">常用问答</button>
             <button :class="{ active: knowledge.mode === 'qa' }" @click="setKnowledgeMode('qa')">问答沉淀</button>
           </div>
           <div class="knowledge-tree" role="tree">
@@ -274,6 +275,32 @@
             <article class="markdown-preview" v-html="renderedKnowledge"></article>
           </div>
           <div class="hint">默认展示 Markdown 预览；编辑后保存为原始 .md 卡片。</div>
+        </div>
+
+        <div v-if="knowledge.mode === 'commonqa'" class="panel commonqa-panel">
+          <div class="panel-head">
+            <h2>常用问答</h2>
+            <button class="ghost" @click="loadCommonQa">刷新</button>
+          </div>
+          <div class="commonqa-layout">
+            <div class="commonqa-list">
+              <button v-for="item in knowledge.commonQaItems" :key="item.name" class="list-item" :class="{ active: knowledge.commonQa && knowledge.commonQa.name === item.name }" @click="selectCommonQa(item)">
+                <span>{{ item.title }}</span>
+                <small>{{ (item.questions || []).join(' / ') || item.name }}</small>
+              </button>
+              <p class="hint" v-if="!knowledge.commonQaItems.length">暂无常用问答。在 common-qa 目录新增 Markdown 卡片后会出现在这里。</p>
+            </div>
+            <div class="commonqa-answer">
+              <div class="notice" v-if="knowledge.commonQa">
+                <strong>{{ knowledge.commonQa.title }}</strong>
+                <p>{{ (knowledge.commonQa.aliases || []).join(' / ') || knowledge.commonQa.name }}</p>
+              </div>
+              <article class="markdown-preview" v-html="renderedCommonQaAnswer"></article>
+              <div class="actions" v-if="knowledge.commonQa">
+                <button class="ghost" @click="editCommonQa(knowledge.commonQa)">编辑卡片</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div v-if="knowledge.mode === 'qa'" class="panel qa-panel">

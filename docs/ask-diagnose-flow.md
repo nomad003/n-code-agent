@@ -12,11 +12,12 @@
 1. 先按请求参数确定 `repo`、回答模式和问题类型。
 2. 满足缓存或 shortcut 时直接返回，不进入完整 Agent loop。
 3. 自动识别但意图不明确时，直接返回澄清问题，不查代码、不调用 LLM。
-4. 进入完整 Agent loop 时，先把知识图谱、模块知识卡、仓库概览等上下文注入
+4. 命中人工维护的常用问答时，直接返回编辑好的 Markdown 答案，不查代码、不调用 LLM。
+5. 进入完整 Agent loop 时，先把知识图谱、模块知识卡、仓库概览等上下文注入
    system prompt。
-5. 模型再按问题决定是否调用代码工具，例如 `repo_overview`、`grep_code`、
+6. 模型再按问题决定是否调用代码工具，例如 `repo_overview`、`grep_code`、
    `find_symbol`、`read_file`、`find_assert_context`、`find_log_source`。
-6. `technical` / `edit` 答案会追加确定性的 `关键线索`，列出命中的知识卡、文件、符号、日志和断言；`plain` 答案默认隐藏这些内部线索，只给渐进式纲要。
+7. `technical` / `edit` 答案会追加确定性的 `关键线索`，列出命中的知识卡、文件、符号、日志和断言；`plain` 答案默认隐藏这些内部线索，只给渐进式纲要。
 
 因此，知识图谱是“开局导航”，代码工具是“按需核实”。当前实现没有硬编码强制
 每个 `/ask` 都必须读代码；是否读代码由 Agent loop 中的模型工具调用决定。
@@ -48,12 +49,14 @@ flowchart TD
   G --> H[agent.answer]
   H --> I{自动识别但意图不明确?}
   I -- 是 --> J[返回澄清问题并写 trace]
-  I -- 否 --> K{USE_SHORTCUT 命中?}
-  K -- 是 --> L[索引直答并写 trace]
-  K -- 否 --> M[custom 或 sdk backend]
-  M --> N[response_policy 过滤]
-  N --> O[写入缓存]
-  O --> P[返回 cached=false]
+  I -- 否 --> K{常用问答命中?}
+  K -- 是 --> L[返回编辑答案并写 common_qa_hit trace]
+  K -- 否 --> M{USE_SHORTCUT 命中?}
+  M -- 是 --> N[索引直答并写 trace]
+  M -- 否 --> O[custom 或 sdk backend]
+  O --> P[response_policy 过滤]
+  P --> Q[写入缓存]
+  Q --> R[返回 cached=false]
 ```
 
 ### 什么时候不看代码
@@ -65,6 +68,7 @@ flowchart TD
 | 空问题 | 直接返回固定提示。 |
 | `/ask` 缓存命中 | 返回缓存答案，只写 `cache_hit` trace，不占并发槽，不调 LLM。 |
 | 自动识别但意图不明确 | 返回澄清问题，只写 `intent_clarification` trace，不查代码、不调 LLM。 |
+| 常用问答高置信命中 | 返回 `common-qa` 里维护好的 Markdown 答案，只写 `common_qa_hit` trace，不查代码、不调 LLM。 |
 | `USE_SHORTCUT=1` 且命中精确符号定义问题 | 通过索引直接回答“某符号定义在哪里”，跳过 LLM loop。 |
 | 模型直接回答 | 进入了 Agent loop，但首轮 LLM 没有发起 tool call，直接返回回答。 |
 

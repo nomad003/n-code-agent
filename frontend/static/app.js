@@ -1077,6 +1077,8 @@
           graphVis: null,
           qaItems: [],
           qa: null,
+          commonQaItems: [],
+          commonQa: null,
           curateQuestion: "",
           curateQuestionType: "",
           qaDraft: {
@@ -1129,6 +1131,9 @@
       },
       renderedAskAnswer() {
         return renderMarkdown(this.ask.answer, "等待提交问题。");
+      },
+      renderedCommonQaAnswer() {
+        return renderMarkdown(this.knowledge.commonQa ? this.knowledge.commonQa.answer : "", "选择一个常用问答。");
       },
       knowledgeCardRows() {
         const order = ["index.md", "gameserver", "unit", "enemy", "ecs", "common"];
@@ -1467,6 +1472,7 @@
             await this.loadCard(first.name);
           }
           if (this.knowledge.mode === "qa") await this.loadKnowledgeQa();
+          if (this.knowledge.mode === "commonqa") await this.loadCommonQa();
         });
       },
       async loadCard(name) {
@@ -1494,7 +1500,11 @@
       },
       scheduleKnowledgeDiagramRender(force) {
         const canRenderAsk = this.view === "ask";
-        const canRenderKnowledge = this.view === "knowledge" && this.knowledge.mode === "cards" && !this.knowledge.editing;
+        const canRenderKnowledge = this.view === "knowledge"
+          && (
+            (this.knowledge.mode === "cards" && !this.knowledge.editing)
+            || this.knowledge.mode === "commonqa"
+          );
         if (!canRenderAsk && !canRenderKnowledge) return;
         if (this._diagramFrame) window.cancelAnimationFrame(this._diagramFrame);
         this._diagramFrame = window.requestAnimationFrame(() => {
@@ -1521,6 +1531,7 @@
       async setKnowledgeMode(mode) {
         this.knowledge.mode = mode;
         if (mode === "qa") await this.loadKnowledgeQa();
+        if (mode === "commonqa") await this.loadCommonQa();
       },
       graphGroupForNode(node) {
         if (node.kind === "tag") return "tag";
@@ -2079,6 +2090,23 @@
           this.knowledge.qaItems = data.items || [];
           if (!this.knowledge.qa && this.knowledge.qaItems.length) this.selectQa(this.knowledge.qaItems[0]);
         });
+      },
+      async loadCommonQa() {
+        await this.withLoading("加载常用问答", async () => {
+          const data = await this.apiJson("/knowledge/api/common-qa?repo=" + encodeURIComponent(this.selectedRepo));
+          this.knowledge.commonQaItems = data.items || [];
+          const selectedExists = this.knowledge.commonQaItems.some((item) => this.knowledge.commonQa && item.name === this.knowledge.commonQa.name);
+          if (!selectedExists) this.knowledge.commonQa = this.knowledge.commonQaItems[0] || null;
+          this.$nextTick(() => this.scheduleKnowledgeDiagramRender(true));
+        });
+      },
+      selectCommonQa(item) {
+        this.knowledge.commonQa = item;
+        this.$nextTick(() => this.scheduleKnowledgeDiagramRender(true));
+      },
+      editCommonQa(item) {
+        if (!item || !item.name) return;
+        this.loadCard(item.name);
       },
       selectQa(item) {
         this.knowledge.qa = item;
