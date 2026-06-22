@@ -355,6 +355,31 @@
     };
   }
 
+  function buildTraceContextSummary(rows) {
+    const event = (rows || []).find((row) => row.event === "knowledge_context_injected") || {};
+    const rawBlocks = Array.isArray(event.blocks) ? event.blocks : [];
+    const blocks = rawBlocks.map((block) => {
+      const content = String(block.content || "");
+      const sources = Array.isArray(block.sources) ? block.sources.filter(Boolean) : [];
+      return {
+        key: block.key || block.title || "context",
+        title: block.title || block.key || "上下文",
+        injected: Boolean(block.injected),
+        chars: Number(block.chars || content.length || 0),
+        sources,
+        content,
+        status: block.injected ? "已注入" : "未注入",
+      };
+    });
+    return {
+      available: Boolean(event.event),
+      blocks,
+      injectedCount: blocks.filter((block) => block.injected).length,
+      totalChars: blocks.reduce((sum, block) => sum + block.chars, 0),
+      raw: event,
+    };
+  }
+
   function buildTraceSummary(rows, header = {}) {
     const traceRows = rows || [];
     const isRoundStart = (row) => row.event === "llm_request" || row.event === "sdk_request";
@@ -443,7 +468,16 @@
       findings,
       roundDetails,
       route: buildTraceRouteSummary(traceRows, header),
+      context: buildTraceContextSummary(traceRows),
     };
+  }
+
+  function formatCharsValue(count) {
+    const value = Number(count || 0);
+    if (!value) return "0 chars";
+    if (value < 1000) return `${value} chars`;
+    if (value < 1000 * 1000) return `${(value / 1000).toFixed(1)}k chars`;
+    return `${(value / 1000 / 1000).toFixed(1)}m chars`;
   }
 
   function escapeHtml(text) {
@@ -862,6 +896,26 @@
     function renderDetail(file, rows) {
       const header = traceHeaderFrom(file, rows);
       const summary = buildTraceSummary(rows, header);
+      const context = summary.context;
+      const contextHtml = `
+        <div class="context-card">
+          <div class="trace-section-head">
+            <h3>上下文注入</h3>
+            <span>${context.available ? `${context.injectedCount}/${context.blocks.length} 块 · ${formatCharsValue(context.totalChars)}` : "未记录"}</span>
+          </div>
+          ${context.available ? `
+            <div class="context-blocks">
+              ${context.blocks.map((block) => `
+                <details class="context-block" ${block.injected && block.key !== "base_prompt" ? "open" : ""}>
+                  <summary>
+                    <span><strong>${escapeHtml(block.title)}</strong><small>${escapeHtml(block.status)}</small></span>
+                    <em>${escapeHtml(formatCharsValue(block.chars))}</em>
+                  </summary>
+                  ${block.sources.length ? `<div class="context-sources">${block.sources.map((source) => `<span>${escapeHtml(source)}</span>`).join("")}</div>` : ""}
+                  ${block.content ? `<pre>${escapeHtml(block.content)}</pre>` : '<div class="trace-muted">本块未注入内容。</div>'}
+                </details>`).join("")}
+            </div>` : '<div class="trace-muted">这个 trace 由旧版本生成，未单独记录上下文注入明细。可在原始 llm_request 的 system prompt 中查看。</div>'}
+        </div>`;
       const findings = summary.findings.length ? `
         <div class="notice">
           <strong>质量检查</strong>
@@ -936,6 +990,7 @@
           </div>
           ${summary.route.commonQaCandidates.length ? `<div class="intent-candidates">${summary.route.commonQaCandidates.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>` : ""}
         </div>
+        ${contextHtml}
         ${findings}
         <div class="trace-section-head"><h3>Round 明细</h3><span>${rows.length} events</span></div>
         ${rounds}
@@ -1450,6 +1505,9 @@
       },
       formatBytes(size) {
         return formatBytesValue(size);
+      },
+      formatChars(count) {
+        return formatCharsValue(count);
       },
       isTraceRoundOpen(id) {
         return this.traceOpenRounds[id] === true;

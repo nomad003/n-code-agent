@@ -179,8 +179,31 @@
                 <small>{{ traceSummary.route.backend }} · {{ traceSummary.route.mode }}</small>
               </div>
             </div>
-            <div class="intent-candidates" v-if="traceSummary.route.commonQaCandidates.length">
+          <div class="intent-candidates" v-if="traceSummary.route.commonQaCandidates.length">
               <span v-for="item in traceSummary.route.commonQaCandidates" :key="item">{{ item }}</span>
+            </div>
+          </div>
+          <div class="context-card">
+            <div class="trace-section-head">
+              <h3>上下文注入</h3>
+              <span>{{ traceSummary.context.available ? `${traceSummary.context.injectedCount}/${traceSummary.context.blocks.length} 块 · ${formatChars(traceSummary.context.totalChars)}` : '未记录' }}</span>
+            </div>
+            <div v-if="!traceSummary.context.available" class="trace-muted">这个 trace 由旧版本生成，未单独记录上下文注入明细。可在原始 llm_request 的 system prompt 中查看。</div>
+            <div v-else class="context-blocks">
+              <details class="context-block" v-for="block in traceSummary.context.blocks" :key="block.key" :open="block.injected && block.key !== 'base_prompt'">
+                <summary>
+                  <span>
+                    <strong>{{ block.title }}</strong>
+                    <small>{{ block.status }}</small>
+                  </span>
+                  <em>{{ formatChars(block.chars) }}</em>
+                </summary>
+                <div v-if="block.sources.length" class="context-sources">
+                  <span v-for="source in block.sources" :key="source">{{ source }}</span>
+                </div>
+                <pre v-if="block.content">{{ block.content }}</pre>
+                <div v-else class="trace-muted">本块未注入内容。</div>
+              </details>
             </div>
           </div>
           <div class="notice" v-if="traceSummary.findings.length">

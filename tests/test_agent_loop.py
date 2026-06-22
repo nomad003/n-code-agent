@@ -110,11 +110,65 @@ def test_answer_writes_per_request_llm_trace(stub_llm, tmp_path, monkeypatch):
     assert events.count("llm_response") == 2
     assert "tool_result" in events
     assert events[-1] == "request_end"
-    assert rows[1]["messages"][0]["role"] == "system"
-    assert rows[1]["messages"][1] == {"role": "user", "content": "Foo 在哪"}
+    assert "knowledge_context_injected" in events
+    first_request = next(r for r in rows if r["event"] == "llm_request")
+    assert first_request["messages"][0]["role"] == "system"
+    assert first_request["messages"][1] == {"role": "user", "content": "Foo 在哪"}
     tool_row = next(r for r in rows if r["event"] == "tool_result")
     assert tool_row["name"] == "find_symbol"
     assert "a.py" in tool_row["result"]
+
+
+def test_build_messages_traces_knowledge_context(tmp_path, monkeypatch):
+    root = tmp_path / "docs" / "code-knowledge" / "marvel"
+    root.mkdir(parents=True)
+    (root / "monster-config.md").write_text(
+        (
+            "---\n"
+            "title: 怪物配置\n"
+            "tags: 怪物, enemy, config\n"
+            "symbols: CombatEnemy\n"
+            "---\n\n"
+            "# 怪物配置\n\nCombatEnemy 使用 XEntityStatistics。\n"
+        ),
+        encoding="utf-8",
+    )
+    trace_dir = tmp_path / "traces"
+    monkeypatch.setattr(config, "PROJECT_ROOT", str(tmp_path))
+    monkeypatch.setattr(config, "TARGET_CODE_PATH", str(tmp_path))
+    monkeypatch.setattr(config, "CODE_REPOS", {})
+    monkeypatch.setattr(config, "CODE_REPO_DEFAULT", "marvel")
+    monkeypatch.setattr(config, "LLM_TRACE_DIR", str(trace_dir))
+    monkeypatch.setattr(config, "LLM_TRACE_ENABLED", True)
+    monkeypatch.setattr(config, "LLM_PROMPT_CACHE", False)
+    monkeypatch.setattr(config, "CODE_KNOWLEDGE_MAP_ENABLED", True)
+
+    trace = agent.llm_trace.LLMTrace(
+        question="怪物配置怎么配", mode="plain", backend="custom"
+    )
+    a = agent.CodeAgent(mode="plain", trace=trace)
+    a.question = "怪物配置怎么配"
+    messages = a._build_messages(with_tools=True)
+
+    assert "代码知识库地图" in messages[0]["content"]
+    assert "已命中的模块知识卡" in messages[0]["content"]
+    rows = [
+        json.loads(line)
+        for line in Path(trace.path).read_text(encoding="utf-8").splitlines()
+    ]
+    event = next(r for r in rows if r["event"] == "knowledge_context_injected")
+    assert event["code_knowledge_map_injected"] is True
+    assert event["module_cards_injected"] is True
+    assert "monster-config.md" in event["code_knowledge_map_cards"]
+    assert any(path.endswith("monster-config.md") for path in event["module_cards"])
+    blocks = {block["key"]: block for block in event["blocks"]}
+    assert blocks["base_prompt"]["injected"] is True
+    assert blocks["intent_prompt"]["injected"] is True
+    assert blocks["knowledge_graph"]["injected"] is True
+    assert blocks["module_cards"]["injected"] is True
+    assert blocks["output_mode"]["injected"] is True
+    assert "代码知识库地图" in blocks["knowledge_graph"]["content"]
+    assert "已命中的模块知识卡" in blocks["module_cards"]["content"]
 
 
 # --- message building keeps pairing ----------------------------------------

@@ -277,6 +277,36 @@ def _unique_nonempty(items: list[str]) -> list[str]:
     return out
 
 
+def _extract_graph_card_ids(text: str) -> list[str]:
+    """Extract card ids from knowledge_graph.format_map_for_prompt output."""
+    return re.findall(r"^- ([^:\n]+):", text or "", flags=re.MULTILINE)
+
+
+def _extract_module_card_sources(text: str) -> list[str]:
+    """Extract card paths from module_knowledge.format_for_prompt output."""
+    return re.findall(r"^来源: ([^\n]+)$", text or "", flags=re.MULTILINE)
+
+
+def _prompt_context_block(
+    key: str,
+    title: str,
+    text: str,
+    *,
+    injected: bool | None = None,
+    sources: list[str] | None = None,
+) -> dict:
+    """Build one traceable prompt-context block."""
+    body = text or ""
+    return {
+        "key": key,
+        "title": title,
+        "injected": bool(body) if injected is None else bool(injected),
+        "chars": len(body),
+        "sources": sources or [],
+        "content": body,
+    }
+
+
 class CodeAgent:
     """Tool-calling loop over the sandboxed code-search tools.
 
@@ -302,6 +332,7 @@ class CodeAgent:
         self.question = ""
         self.history: list = []  # list[Action | Observation]
         self.recalled = ""       # knowledge recalled for this question (方案 3)
+        self._context_trace_written = False
 
     # --- LLM ---------------------------------------------------------------
 
@@ -373,8 +404,10 @@ class CodeAgent:
         message keyed by tool_call_id. This is the one place that has to keep
         request/result pairing consistent.
         """
-        system = config.SYSTEM_PROMPT_BASE
-        system = system + "\n\n" + question_intent.prompt(self.question, self.question_type)
+        base_prompt = config.SYSTEM_PROMPT_BASE
+        intent_prompt = question_intent.prompt(self.question, self.question_type)
+        system = base_prompt
+        system = system + "\n\n" + intent_prompt
         try:
             from ..retrieval import repo_profile
 
@@ -383,6 +416,7 @@ class CodeAgent:
             profile_text = ""
         if profile_text:
             system = system + "\n\n" + profile_text
+        graph_text = ""
         if config.CODE_KNOWLEDGE_MAP_ENABLED:
             try:
                 from ..kb import knowledge_graph
@@ -407,9 +441,19 @@ class CodeAgent:
             system = system + "\n\n" + assert_text
         if self.recalled:
             system = system + "\n\n" + self.recalled
+        output_mode_prompt = operation_modes.response_rules(self.mode).rstrip()
+        self._trace_context_injection(
+            base_prompt=base_prompt,
+            intent_prompt=intent_prompt,
+            profile_text=profile_text,
+            graph_text=graph_text,
+            module_text=module_text,
+            assert_text=assert_text,
+            output_mode_prompt=output_mode_prompt,
+        )
         # Keep the audience/output contract last so question-type investigation
         # rules and recalled knowledge cannot accidentally override it.
-        system = operation_modes.prompt(system, self.mode)
+        system = system.rstrip() + "\n\n" + output_mode_prompt + "\n"
         # Mark the static prefix (system + initial user question) for prompt
         # caching when the provider supports it. Anthropic / Bedrock honor
         # ``cache_control``; non-Anthropic backends (Gemini through the proxy)
@@ -481,6 +525,67 @@ class CodeAgent:
         of the tool name so a round-2 mask string == round-7 mask string.
         """
         return f"[省略较早的 {obs.name} 输出，如需可重新调用]"
+
+    def _trace_context_injection(
+        self,
+        *,
+        base_prompt: str,
+        intent_prompt: str,
+        profile_text: str,
+        graph_text: str,
+        module_text: str,
+        assert_text: str,
+        output_mode_prompt: str,
+    ) -> None:
+        """Record prompt context once so trace viewers can show KB injection."""
+        if not self.trace or self._context_trace_written:
+            return
+        self._context_trace_written = True
+        graph_cards = _extract_graph_card_ids(graph_text)
+        module_cards = _extract_module_card_sources(module_text)
+        blocks = [
+            _prompt_context_block("base_prompt", "基础系统提示词", base_prompt, injected=True),
+            _prompt_context_block("intent_prompt", "当前问题类型提示词", intent_prompt, injected=True),
+            _prompt_context_block("repo_overview", "Repo Overview", profile_text),
+            _prompt_context_block(
+                "knowledge_graph",
+                "代码知识图谱摘要",
+                graph_text,
+                injected=bool(graph_text),
+                sources=graph_cards,
+            ),
+            _prompt_context_block(
+                "module_cards",
+                "命中的模块知识卡",
+                module_text,
+                injected=bool(module_text),
+                sources=module_cards,
+            ),
+            _prompt_context_block("assert_knowledge", "Assert 知识", assert_text),
+            _prompt_context_block("recalled_qa", "历史问答沉淀", self.recalled),
+            _prompt_context_block(
+                "output_mode",
+                "plain/technical 模式输出要求",
+                output_mode_prompt,
+                injected=True,
+                sources=[self.mode],
+            ),
+        ]
+        self.trace.write(
+            "knowledge_context_injected",
+            blocks=blocks,
+            code_knowledge_map_enabled=config.CODE_KNOWLEDGE_MAP_ENABLED,
+            code_knowledge_map_injected=bool(graph_text),
+            code_knowledge_map_chars=len(graph_text or ""),
+            code_knowledge_map_cards=graph_cards,
+            module_cards_injected=bool(module_text),
+            module_cards_chars=len(module_text or ""),
+            module_cards=module_cards,
+            assert_context_injected=bool(assert_text),
+            assert_context_chars=len(assert_text or ""),
+            recalled_context_injected=bool(self.recalled),
+            recalled_context_chars=len(self.recalled or ""),
+        )
 
     # --- tool execution ----------------------------------------------------
 

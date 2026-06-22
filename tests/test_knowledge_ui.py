@@ -87,7 +87,9 @@ def test_trace_page_smoke():
     assert "调用复盘" in html
     assert "trace-question-card" in html
     assert "意图识别" in html
+    assert "上下文注入" in html
     assert "intent-card" in html
+    assert "context-card" in html
     assert "Round 明细" in html
     assert "本轮原始事件" in html
     assert '<script src="https://unpkg.com' not in html
@@ -95,6 +97,8 @@ def test_trace_page_smoke():
     assert "renderTraceFallback" in app_js
     assert "common_qa_skipped" in app_js
     assert "intent_classified" in app_js
+    assert "knowledge_context_injected" in app_js
+    assert "buildTraceContextSummary" in app_js
     assert "/static/vendor/vue.global.prod.js" in app_js
 
 
