@@ -146,8 +146,9 @@ docs/code-knowledge/<repo>/*.md
 
 通用问答集位于 `docs/code-knowledge/<repo>/common-qa/*.md`。这类卡片是人工维护的
 稳定答案，frontmatter 通过 `questions` / `aliases` 声明可直接命中的问法。
-当 `/ask` 高置信命中常用问答时，会返回编辑好的 Markdown 答案并写
-`common_qa_hit` trace，不进入 LLM/tool loop。
+当 `/ask` 高置信命中通用问答时，会返回编辑好的 Markdown 答案并写
+`common_qa_hit` trace，不进入完整 Agent tool loop。命中分两层：先做确定性
+匹配；没命中但存在相关候选时，再调用一次轻量 LLM router 选择候选卡片或返回 none。
 
 如果开启 `USE_KNOWLEDGE=1`，还会追加历史问答召回结果。召回内容被明确标成“线索”，模型必须再用工具核实。
 

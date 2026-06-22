@@ -75,6 +75,27 @@ def answer_if_match(query: str, *, repo: str | None = None) -> str | None:
     return item.body
 
 
+def llm_candidates(query: str, *, repo: str | None = None, limit: int = 8) -> list[CommonQA]:
+    """Return plausible candidates for LLM intent routing.
+
+    This is deliberately broader than ``find_match``: it only decides whether a
+    card is worth showing to the LLM router, not whether it is safe to return.
+    """
+    terms = knowledge_graph.terms_for_query(query)
+    if not terms:
+        return []
+    scored: list[tuple[int, CommonQA]] = []
+    for item in load(repo):
+        hay = " ".join(
+            [item.path, item.title, *item.questions, *item.aliases, *item.tags]
+        ).lower()
+        score = sum(1 for term in terms if term in hay)
+        if score > 0:
+            scored.append((score, item))
+    scored.sort(key=lambda pair: (-pair[0], pair[1].path))
+    return [item for _score, item in scored[:limit]]
+
+
 def _is_common_qa(card: knowledge_graph.KnowledgeCard) -> bool:
     card_type = card.type.strip().lower()
     return card.id.startswith(QA_DIR_PREFIX) or card_type in {

@@ -177,7 +177,8 @@ GET /knowledge
 
 通用问答集使用 `docs/code-knowledge/<repo>/common-qa/*.md`。这类卡片需要在
 frontmatter 声明 `type: Common QA`、`questions` 和 `aliases`。当用户问题与这些
-问法高置信匹配时，`/ask` 会直接返回编辑好的 Markdown 答案，不进入 LLM loop。
+问法高置信匹配时，`/ask` 会直接返回编辑好的 Markdown 答案，不进入完整
+Agent tool loop；精确匹配失败但有相关候选时，会先用一次轻量 LLM 路由选择候选卡片。
 
 图谱 relation 当前定义：
 

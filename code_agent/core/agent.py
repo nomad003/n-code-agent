@@ -16,6 +16,7 @@ read-only Q&A agent: an Action/Observation event history with one centralized
 """
 import json
 import importlib
+import re
 
 import litellm
 
@@ -80,12 +81,17 @@ def _answer_in_repo(
             return answer_text
 
         common_hit = common_qa.find_match(question)
+        common_hit_source = "deterministic"
+        if common_hit is None:
+            common_hit = _select_common_qa_with_llm(question, trace=trace)
+            common_hit_source = "llm" if common_hit is not None else ""
         if common_hit is not None:
             answer_text = response_policy.enforce(common_hit.body, mode=resolved_mode)
             trace.write(
                 "common_qa_hit",
                 title=common_hit.title,
                 path=common_hit.path,
+                source=common_hit_source,
                 answer=answer_text,
             )
             trace.write("request_end", answer=answer_text)
@@ -143,6 +149,88 @@ def _routed_model() -> str:
     """
     model = config.LLM_MODEL
     return model if model.startswith("openai/") else f"openai/{model}"
+
+
+def _select_common_qa_with_llm(
+    question: str, *, trace: llm_trace.LLMTrace | None = None
+) -> common_qa.CommonQA | None:
+    """Use a small LLM router to match natural wording to curated QA cards."""
+    candidates = common_qa.llm_candidates(question)
+    if not candidates:
+        return None
+    catalog = [
+        {
+            "path": item.path,
+            "title": item.title,
+            "questions": item.questions,
+            "aliases": item.aliases,
+            "tags": item.tags,
+        }
+        for item in candidates
+    ]
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "你是通用问答集意图路由器。只能在候选卡片中选择。"
+                "当用户问题和某个候选的 questions/aliases 语义等价时，返回 JSON："
+                "{\"path\":\"候选path\"}。如果只是主题相关但用户实际想问更细、"
+                "更宽或不同问题，返回 {\"path\":\"none\"}。只返回 JSON，不要解释。"
+            ),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(
+                {"question": question, "candidates": catalog}, ensure_ascii=False
+            ),
+        },
+    ]
+    if trace:
+        trace.write("common_qa_intent_request", candidates=catalog)
+    try:
+        response = litellm.completion(
+            model=_routed_model(),
+            api_base=config.LLM_API_BASE,
+            api_key=config.require_api_key(),
+            messages=messages,
+            temperature=0,
+            timeout=min(config.LLM_TIMEOUT, 30),
+            num_retries=0,
+        )
+    except Exception as exc:
+        if trace:
+            trace.write(
+                "common_qa_intent_error",
+                error_type=type(exc).__name__,
+                error=str(exc),
+            )
+        return None
+    message = response.choices[0].message
+    content = getattr(message, "content", "") or ""
+    path = _parse_common_qa_llm_path(content)
+    if trace:
+        trace.write("common_qa_intent_response", content=content, path=path)
+    if not path or path == "none":
+        return None
+    return next((item for item in candidates if item.path == path), None)
+
+
+def _parse_common_qa_llm_path(content: str) -> str:
+    text = (content or "").strip()
+    if not text:
+        return ""
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        match = re.search(r"\{[\s\S]*\}", text)
+        if not match:
+            return ""
+        try:
+            data = json.loads(match.group(0))
+        except json.JSONDecodeError:
+            return ""
+    path = data.get("path") if isinstance(data, dict) else ""
+    return str(path or "").strip()
 
 
 def _looks_like_answer(text: str) -> bool:
