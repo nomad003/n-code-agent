@@ -37,6 +37,7 @@ def test_knowledge_page_smoke():
     assert "renderedCommonQaAnswer" in app_js
     assert "/knowledge/api/common-qa" in app_js
     assert "loadCommonQa" in app_js
+    assert "isCommonQaCard" in app_js
     assert 'this.view === "ask"' in app_js
     assert "canRenderAsk" in app_js
     assert "等待提交问题。" in app_js
@@ -50,7 +51,10 @@ def test_knowledge_page_smoke():
     assert "querySelectorAll('.markdown-preview .diagram-card" in app_js
     assert "modeOptions" in app_js
     assert "preferredKnowledgeQaMode" in app_js
-    assert "commonqa-layout" in Path("frontend/static/app.css").read_text(encoding="utf-8")
+    app_css = Path("frontend/static/app.css").read_text(encoding="utf-8")
+    assert "grid-template-columns: repeat(3" in app_css
+    assert "commonqa-stack" in app_css
+    assert "commonqa-picker" in app_css
     assert "knowledgeCardRows" in app_js
     assert "toggleKnowledgeTree" in app_js
     assert "encodePath(name)" in app_js

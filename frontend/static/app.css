@@ -837,7 +837,7 @@ summary {
 
 .segmented {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
   padding: 3px;
   border: 1px solid var(--border);
@@ -1877,18 +1877,9 @@ html.theme-light .round-card[open] {
   gap: 14px;
 }
 
-.commonqa-layout {
+.commonqa-stack {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
-  gap: 14px;
-}
-
-.commonqa-list {
-  display: grid;
-  align-content: start;
-  gap: 8px;
-  max-height: 680px;
-  overflow: auto;
+  gap: 16px;
 }
 
 .commonqa-answer {
@@ -1896,6 +1887,22 @@ html.theme-light .round-card[open] {
   align-content: start;
   gap: 12px;
   min-width: 0;
+}
+
+.commonqa-picker {
+  display: grid;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.commonqa-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  align-content: start;
+  gap: 8px;
+  max-height: 260px;
+  overflow: auto;
 }
 
 .qa-list {
@@ -2007,7 +2014,6 @@ html.theme-light .round-card[open] {
   .two-col,
   .trace-layout,
   .knowledge-layout,
-  .commonqa-layout,
   .qa-layout {
     grid-template-columns: 1fr;
   }

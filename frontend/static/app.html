@@ -282,14 +282,7 @@
             <h2>通用问答集</h2>
             <button class="ghost" @click="loadCommonQa">刷新</button>
           </div>
-          <div class="commonqa-layout">
-            <div class="commonqa-list">
-              <button v-for="item in knowledge.commonQaItems" :key="item.name" class="list-item" :class="{ active: knowledge.commonQa && knowledge.commonQa.name === item.name }" @click="selectCommonQa(item)">
-                <span>{{ item.title }}</span>
-                <small>{{ (item.questions || []).join(' / ') || item.name }}</small>
-              </button>
-              <p class="hint" v-if="!knowledge.commonQaItems.length">暂无通用问答。在 common-qa 目录新增 Markdown 卡片后会出现在这里。</p>
-            </div>
+          <div class="commonqa-stack">
             <div class="commonqa-answer">
               <div class="notice" v-if="knowledge.commonQa">
                 <strong>{{ knowledge.commonQa.title }}</strong>
@@ -298,6 +291,16 @@
               <article class="markdown-preview" v-html="renderedCommonQaAnswer"></article>
               <div class="actions" v-if="knowledge.commonQa">
                 <button class="ghost" @click="editCommonQa(knowledge.commonQa)">编辑卡片</button>
+              </div>
+            </div>
+            <div class="commonqa-picker">
+              <div class="section-label">选择问答</div>
+              <div class="commonqa-list">
+                <button v-for="item in knowledge.commonQaItems" :key="item.name" class="list-item" :class="{ active: knowledge.commonQa && knowledge.commonQa.name === item.name }" @click="selectCommonQa(item)">
+                  <span>{{ item.title }}</span>
+                  <small>{{ (item.questions || []).join(' / ') || item.name }}</small>
+                </button>
+                <p class="hint" v-if="!knowledge.commonQaItems.length">暂无通用问答。在 common-qa 目录新增 Markdown 卡片后会出现在这里。</p>
               </div>
             </div>
           </div>

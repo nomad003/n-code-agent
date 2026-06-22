@@ -1155,7 +1155,8 @@
           }
           return parent.childMap.get(segment);
         };
-        (this.knowledge.cards || []).forEach((card) => {
+        const isCommonQaCard = (card) => String(card.name || card.path || "").startsWith("common-qa/");
+        (this.knowledge.cards || []).filter((card) => !isCommonQaCard(card)).forEach((card) => {
           const segments = Array.isArray(card.segments) && card.segments.length
             ? card.segments
             : String(card.name || "").split("/").filter(Boolean);
