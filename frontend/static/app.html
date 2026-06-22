@@ -234,7 +234,7 @@
           </label>
           <div class="segmented">
             <button :class="{ active: knowledge.mode === 'cards' }" @click="setKnowledgeMode('cards')">卡片</button>
-            <button :class="{ active: knowledge.mode === 'commonqa' }" @click="setKnowledgeMode('commonqa')">常用问答</button>
+            <button :class="{ active: knowledge.mode === 'commonqa' }" @click="setKnowledgeMode('commonqa')">通用问答集</button>
             <button :class="{ active: knowledge.mode === 'qa' }" @click="setKnowledgeMode('qa')">问答沉淀</button>
           </div>
           <div class="knowledge-tree" role="tree">
@@ -279,7 +279,7 @@
 
         <div v-if="knowledge.mode === 'commonqa'" class="panel commonqa-panel">
           <div class="panel-head">
-            <h2>常用问答</h2>
+            <h2>通用问答集</h2>
             <button class="ghost" @click="loadCommonQa">刷新</button>
           </div>
           <div class="commonqa-layout">
@@ -288,7 +288,7 @@
                 <span>{{ item.title }}</span>
                 <small>{{ (item.questions || []).join(' / ') || item.name }}</small>
               </button>
-              <p class="hint" v-if="!knowledge.commonQaItems.length">暂无常用问答。在 common-qa 目录新增 Markdown 卡片后会出现在这里。</p>
+              <p class="hint" v-if="!knowledge.commonQaItems.length">暂无通用问答。在 common-qa 目录新增 Markdown 卡片后会出现在这里。</p>
             </div>
             <div class="commonqa-answer">
               <div class="notice" v-if="knowledge.commonQa">

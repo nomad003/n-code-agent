@@ -144,7 +144,7 @@ docs/code-knowledge/<repo>/*.md
 `SkillListForEnemy`、`GetEnemySkillConfigX`、`InitEnemySkill` 和常见 enemy skill 缺配置宕机链路。
 知识卡会作为“框架导览”注入 prompt，但答案仍要求用工具读当前代码核实。
 
-常用问答集位于 `docs/code-knowledge/<repo>/common-qa/*.md`。这类卡片是人工维护的
+通用问答集位于 `docs/code-knowledge/<repo>/common-qa/*.md`。这类卡片是人工维护的
 稳定答案，frontmatter 通过 `questions` / `aliases` 声明可直接命中的问法。
 当 `/ask` 高置信命中常用问答时，会返回编辑好的 Markdown 答案并写
 `common_qa_hit` trace，不进入 LLM/tool loop。

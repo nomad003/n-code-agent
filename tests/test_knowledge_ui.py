@@ -22,7 +22,7 @@ def test_knowledge_page_smoke():
     assert "Code Agent Workbench" in html
     assert "/knowledge/api" in html
     assert "/knowledge/graph" in html
-    assert "常用问答" in html
+    assert "通用问答集" in html
     assert "调查" in html and "复盘" in html and "知识" in html and "图谱" in html
     assert "theme-toggle" in html
     assert "markdown-preview" in html

@@ -1133,7 +1133,7 @@
         return renderMarkdown(this.ask.answer, "等待提交问题。");
       },
       renderedCommonQaAnswer() {
-        return renderMarkdown(this.knowledge.commonQa ? this.knowledge.commonQa.answer : "", "选择一个常用问答。");
+        return renderMarkdown(this.knowledge.commonQa ? this.knowledge.commonQa.answer : "", "选择一个通用问答。");
       },
       knowledgeCardRows() {
         const order = ["index.md", "gameserver", "unit", "enemy", "ecs", "common"];
@@ -2092,7 +2092,7 @@
         });
       },
       async loadCommonQa() {
-        await this.withLoading("加载常用问答", async () => {
+        await this.withLoading("加载通用问答", async () => {
           const data = await this.apiJson("/knowledge/api/common-qa?repo=" + encodeURIComponent(this.selectedRepo));
           this.knowledge.commonQaItems = data.items || [];
           const selectedExists = this.knowledge.commonQaItems.some((item) => this.knowledge.commonQa && item.name === this.knowledge.commonQa.name);

@@ -162,7 +162,7 @@ GET /knowledge
 | `GET /knowledge/api/{repo}/{file}` | 读取知识卡片，返回 `content`、`body`、`meta` |
 | `POST /knowledge/api` | 保存知识卡片 |
 | `GET /knowledge/api/graph?repo=<repo>` | 返回知识图谱节点、边和 `relations` 元数据，包含概念、标签、符号、日志、断言、问题类型、资源路径和语义关系 |
-| `GET /knowledge/api/common-qa?repo=<repo>` | 列出人工维护的常用问答卡片，可在知识工作台展示，并可被 `/ask` 高置信命中后直接返回 |
+| `GET /knowledge/api/common-qa?repo=<repo>` | 列出人工维护的通用问答集卡片，可在知识工作台展示，并可被 `/ask` 高置信命中后直接返回 |
 | `GET /knowledge/api/qa?repo=<repo>` | 列出后台知识飞轮沉淀的历史问答 |
 | `POST /knowledge/api/qa/ask` | 在知识库后台追问模型，返回待人工审核的答案 |
 | `POST /knowledge/api/precipitate` | 将人工认可的问答落地为 `Code Playbook` 知识卡 |
@@ -175,7 +175,7 @@ GET /knowledge
 4. 确认答案质量后调用 `precipitate` 落地成 Markdown 知识卡。
 5. 后续类似问题会通过模块知识卡召回这份 `Code Playbook`，但仍要求 agent 用工具核实当前代码。
 
-常用问答集使用 `docs/code-knowledge/<repo>/common-qa/*.md`。这类卡片需要在
+通用问答集使用 `docs/code-knowledge/<repo>/common-qa/*.md`。这类卡片需要在
 frontmatter 声明 `type: Common QA`、`questions` 和 `aliases`。当用户问题与这些
 问法高置信匹配时，`/ask` 会直接返回编辑好的 Markdown 答案，不进入 LLM loop。
 
