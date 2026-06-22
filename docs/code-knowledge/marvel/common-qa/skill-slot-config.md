@@ -23,10 +23,10 @@ updated_at: 2026-06-22
 | 配置面 | 字段 | 用途 | 注意点 |
 | --- | --- | --- | --- |
 | 角色技能模板 | SkillPartnerId | 指向角色技能模板 ID。运行时用 `PartnerConfig::GetSkillPartnerId(partner_id)` 取得。 | 必须能和该角色的 `SkillListForRole` / `SkillListForPartner` 对上。 |
-| 移动状态 | State | 可用 `|` 配多个状态，运行时通过 `CGsDir::StateAbility` 转成 move。 | 每个 State 会展开成一组 `(move, burst, transform)` 索引。 |
+| 移动状态 | State | 可用竖线分隔多个状态，运行时通过 `CGsDir::StateAbility` 转成 move。 | 每个 State 会展开成一组 `(move, burst, transform)` 索引。 |
 | 战斗状态 | BattleState | 区分战斗 / 非战斗槽位。 | 当前代码 `BattleState == 0` 写入 battle 槽位；非 0 写入 non-battle 槽位。 |
-| 爆发状态 | BuffType1 | 可用 `|` 配多个 burst 值。 | 空值会按 `0` 处理。运行时来自 `XBuffChangeSlot` 的 `SkillChangeBusrt`。 |
-| 变身状态 | BuffType2 | 可用 `|` 配多个 transform 值。 | 空值会按 `0` 处理。运行时来自 `XBuffChangeSlot` 的 `SkillChangeTrans`。 |
+| 爆发状态 | BuffType1 | 可用竖线分隔多个 burst 值。 | 空值会按 `0` 处理。运行时来自 `XBuffChangeSlot` 的 `SkillChangeBusrt`。 |
+| 变身状态 | BuffType2 | 可用竖线分隔多个 transform 值。 | 空值会按 `0` 处理。运行时来自 `XBuffChangeSlot` 的 `SkillChangeTrans`。 |
 | 槽位技能 | Slot1 ~ Slot10 | 每列填技能脚本名，运行时 `xecs::hash(skill)` 后绑定到对应槽位。 | `Slot1` 对内部 slot `0`，`Slot10` 对内部 slot `9`。空字段会尝试回退到 run / 非 burst / 非 transform 的同槽位技能。 |
 
 ## 槽位编号
