@@ -34,6 +34,11 @@ def test_knowledge_page_smoke():
     assert "renderKnowledgeDiagrams" in app_js
     assert "renderedAskAnswer" in app_js
     assert "等待提交问题。" in app_js
+    assert "code-agent.askWorkspace" in app_js
+    assert "readAskWorkspace" in app_js
+    assert "saveAskWorkspace" in app_js
+    assert "persistAskWorkspace" in app_js
+    assert "selectedExists" in app_js
     assert 'question_type: ""' in app_js
     assert 'curateQuestionType: ""' in app_js
     assert "querySelectorAll('.markdown-preview .diagram-card" in app_js

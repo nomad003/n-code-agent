@@ -4,6 +4,17 @@
 15:04:47:429[61285][0000006133] [Error] InitEnemySkill(skillcore.cpp:81) Check cond: <false> failed
 15:04:47:429[61285][0000006133] [Error] Log_FlushOnExit(LogInit.cpp:347) *************** Error Exit ***************`;
 
+  const ASK_WORKSPACE_KEY = "code-agent.askWorkspace";
+  const DEFAULT_ASK_STATE = Object.freeze({
+    mode: "technical",
+    question_type: "",
+    use_cache: true,
+    plain: false,
+    question: "",
+    answer: "",
+    raw: "",
+  });
+
   const GRAPH_GROUPS = {
     module: { label: "模块", color: "#a78bfa", glow: "rgba(167,139,250,0.55)" },
     playbook: { label: "手册", color: "#38bdf8", glow: "rgba(56,189,248,0.55)" },
@@ -575,6 +586,55 @@
     }
   }
 
+  function defaultAskState() {
+    return { ...DEFAULT_ASK_STATE };
+  }
+
+  function sanitizeAskState(value) {
+    const source = value && typeof value === "object" ? value : {};
+    return {
+      mode: typeof source.mode === "string" ? source.mode : DEFAULT_ASK_STATE.mode,
+      question_type: typeof source.question_type === "string"
+        ? source.question_type
+        : DEFAULT_ASK_STATE.question_type,
+      use_cache: typeof source.use_cache === "boolean"
+        ? source.use_cache
+        : DEFAULT_ASK_STATE.use_cache,
+      plain: typeof source.plain === "boolean" ? source.plain : DEFAULT_ASK_STATE.plain,
+      question: typeof source.question === "string" ? source.question : "",
+      answer: typeof source.answer === "string" ? source.answer : "",
+      raw: typeof source.raw === "string" ? source.raw : "",
+    };
+  }
+
+  function readAskWorkspace() {
+    try {
+      const raw = window.localStorage.getItem(ASK_WORKSPACE_KEY);
+      if (!raw) return { selectedRepo: "", ask: defaultAskState() };
+      const data = JSON.parse(raw);
+      return {
+        selectedRepo: data && typeof data.selectedRepo === "string" ? data.selectedRepo : "",
+        ask: sanitizeAskState(data && data.ask),
+      };
+    } catch (_err) {
+      return { selectedRepo: "", ask: defaultAskState() };
+    }
+  }
+
+  function saveAskWorkspace(selectedRepo, ask) {
+    try {
+      window.localStorage.setItem(
+        ASK_WORKSPACE_KEY,
+        JSON.stringify({
+          selectedRepo: typeof selectedRepo === "string" ? selectedRepo : "",
+          ask: sanitizeAskState(ask),
+        }),
+      );
+    } catch (_err) {
+      // Very large logs can exceed browser storage quota; keep the current in-memory session.
+    }
+  }
+
   function applyDocumentTheme(value) {
     document.documentElement.classList.toggle("theme-light", value === "light");
   }
@@ -972,6 +1032,7 @@
   function mountVueApp() {
   const app = window.Vue.createApp({
     data() {
+      const savedAskWorkspace = readAskWorkspace();
       return {
         vueReady: window.__CODE_AGENT_VUE_READY__ === true,
         view: pathToView(window.location.pathname),
@@ -983,21 +1044,13 @@
         },
         defaultRepo: "",
         repos: [],
-        selectedRepo: "",
+        selectedRepo: savedAskWorkspace.selectedRepo,
         modes: {
           default: "plain",
           allowed: ["plain"],
           labels: {},
         },
-        ask: {
-          mode: "technical",
-          question_type: "",
-          use_cache: true,
-          plain: false,
-          question: "",
-          answer: "",
-          raw: "",
-        },
+        ask: savedAskWorkspace.ask,
         errorText: "",
         traceDir: "",
         traceFiles: [],
@@ -1180,6 +1233,17 @@
         }));
       },
     },
+    watch: {
+      selectedRepo() {
+        this.persistAskWorkspace();
+      },
+      ask: {
+        deep: true,
+        handler() {
+          this.persistAskWorkspace();
+        },
+      },
+    },
     mounted() {
       this.syncSidebarClass();
       this.syncThemeClass();
@@ -1193,6 +1257,9 @@
       this.scheduleKnowledgeDiagramRender(false);
     },
     methods: {
+      persistAskWorkspace() {
+        saveAskWorkspace(this.selectedRepo, this.ask);
+      },
       async apiJson(url, options) {
         const res = await fetch(url, options);
         const text = await res.text();
@@ -1300,7 +1367,8 @@
           };
           this.syncModeSelection();
           const current = this.repos.find((repo) => repo.name === this.defaultRepo) || this.repos[0];
-          if (current && !this.selectedRepo) this.selectedRepo = current.name;
+          const selectedExists = this.repos.some((repo) => repo.name === this.selectedRepo);
+          if (current && (!this.selectedRepo || !selectedExists)) this.selectedRepo = current.name;
         });
       },
       syncModeSelection() {
