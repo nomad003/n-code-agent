@@ -52,7 +52,7 @@ curl http://localhost:8900/health
 | `use_cache` | bool | `true` | 是否使用缓存 |
 | `mode` | string | `AGENT_DEFAULT_MODE` | 回答/操作等级：`plain`、`technical`、`edit`；必须已在 `AGENT_ALLOWED_MODES` 开启 |
 | `repo` | string | `CODE_REPO_DEFAULT` | 目标代码库名称；来自 `CODE_REPOS` |
-| `question_type` | string | 自动识别 | 覆盖问题类型策略：`crash_stack`、`outage_log`、`feature_impl`、`config_impl`、`general` |
+| `question_type` | string | 自动识别 | 覆盖问题类型策略：`crash_stack`、`outage_log`、`feature_impl`、`config_impl`、`general`；不传或为空时自动识别，若输入缺少对象或目标会直接返回澄清问题 |
 
 **响应**
 

@@ -9,7 +9,9 @@ from __future__ import annotations
 import re
 
 
+CLARIFY_INTENT = "clarify"
 INTENTS = ("crash_stack", "outage_log", "feature_impl", "config_impl", "general")
+CLASSIFIED_INTENTS = INTENTS + (CLARIFY_INTENT,)
 
 
 def classify(question: str) -> str:
@@ -18,6 +20,10 @@ def classify(question: str) -> str:
     low = q.lower()
     if _looks_like_backtrace(q, low):
         return "crash_stack"
+    if _looks_like_strong_outage_log(q, low):
+        return "outage_log"
+    if _needs_clarification(q, low):
+        return CLARIFY_INTENT
     if _looks_like_outage_log(q, low):
         return "outage_log"
     if _looks_like_config_impl(q, low):
@@ -65,6 +71,29 @@ def normalize(intent: str | None) -> str:
     return normalized
 
 
+def should_clarify(question: str, override: str | None = None) -> bool:
+    """Return True when auto intent cannot safely pick an answer strategy."""
+    return not normalize(override) and classify(question) == CLARIFY_INTENT
+
+
+def clarifying_response(question: str, mode: str = "plain") -> str:
+    """Deterministic response for low-information questions.
+
+    This keeps ambiguous requests from spending a model/tool round and gives the
+    user the exact missing input needed to route the next turn.
+    """
+    return """我还不能确定你要我按哪种方向查。请补充一个目标，任选一种：
+
+| 方向 | 需要你补充 |
+|------|------------|
+| 程序 crash 堆栈 | 调用栈或 core 相关栈帧 |
+| 宕机 / 错误日志 | 原始日志片段、错误短语或时间点 |
+| 配置实现 | 模块 / 业务对象、配置表名或字段名 |
+| 功能实现 | 功能名，以及想看流程、调用链还是数据结构 |
+
+可以直接改成类似：“怪物技能怎么配置？”、“not find in conf 日志怎么排查？”或“Buff 添加流程怎么走？”。"""
+
+
 def _looks_like_backtrace(q: str, low: str) -> bool:
     if re.search(r"(?m)^\s*#\d+\s+", q):
         return True
@@ -89,9 +118,7 @@ def _looks_like_backtrace(q: str, low: str) -> bool:
 
 
 def _looks_like_outage_log(q: str, low: str) -> bool:
-    if any(s in low for s in ("assert", "check failed", "fatal", "panic")):
-        return True
-    if re.search(r"\b(error|warn|critical|exception)\b", low):
+    if _looks_like_strong_outage_log(q, low):
         return True
     return any(
         s in low
@@ -107,6 +134,115 @@ def _looks_like_outage_log(q: str, low: str) -> bool:
             "日志",
         )
     )
+
+
+def _looks_like_strong_outage_log(q: str, low: str) -> bool:
+    if any(s in low for s in ("assert", "check failed", "fatal", "panic")):
+        return True
+    if re.search(r"\b(error|warn|critical|exception)\b", low):
+        return True
+    if re.search(r"\b\d{2}:\d{2}:\d{2}[:.]\d{3}\b", q) and re.search(
+        r"\[(error|warn|fatal|critical)\]", low
+    ):
+        return True
+    return False
+
+
+def _needs_clarification(q: str, low: str) -> bool:
+    stripped = q.strip()
+    if not stripped:
+        return True
+    if _looks_like_backtrace(q, low) or _looks_like_strong_outage_log(q, low):
+        return False
+    if _has_action_intent(low):
+        return not _has_specific_subject(q)
+    if _is_generic_request(q, low):
+        return not _has_specific_subject(q)
+    return _is_short_topic_only(q, low)
+
+
+def _has_action_intent(low: str) -> bool:
+    return any(
+        s in low
+        for s in (
+            "怎么配置",
+            "如何配置",
+            "怎么配",
+            "配置",
+            "字段",
+            "怎么实现",
+            "如何实现",
+            "实现逻辑",
+            "流程",
+            "调用链",
+            "怎么查",
+            "怎么排查",
+            "排查",
+            "分析",
+            "是什么",
+            "在哪",
+            "哪里",
+            "日志",
+            "报错",
+            "错误",
+            "异常",
+            "crash",
+            "stack",
+            "config",
+            "feature",
+            "how",
+            "where",
+            "what",
+        )
+    )
+
+
+def _is_generic_request(q: str, low: str) -> bool:
+    if low.strip() in {"hi", "hello", "help", "继续", "看一下", "分析一下", "怎么弄", "怎么处理"}:
+        return True
+    return any(
+        s in low
+        for s in (
+            "这个问题",
+            "这个怎么",
+            "这里不对",
+            "有问题",
+            "帮我看看",
+            "帮看",
+        )
+    )
+
+
+def _has_specific_subject(q: str) -> bool:
+    clean = q
+    clean = re.sub(
+        r"(怎么配置|如何配置|怎么配|怎么实现|如何实现|实现逻辑|怎么查|怎么排查|"
+        r"配置表|配置项|配置|字段含义|字段|流程|调用链|作用|机制|是什么|在哪|哪里|"
+        r"日志|报错|错误|异常|问题|怎么|如何|为什么|为何|这个|那个|这里|那里|帮我|帮忙|帮看|看一下|"
+        r"分析一下|分析|排查|处理|继续|一下|请|的|了|吗|呢|吧)",
+        "",
+        clean,
+        flags=re.IGNORECASE,
+    )
+    clean = re.sub(
+        r"\b(how|what|where|why|config|configuration|feature|implementation|"
+        r"flow|trace|log|error|issue|problem|help|please)\b",
+        "",
+        clean,
+        flags=re.IGNORECASE,
+    )
+    tokens = re.findall(r"[A-Za-z][A-Za-z0-9_:<>]*|[\u4e00-\u9fff]{2,}", clean)
+    return any(token not in {"模块", "功能", "代码", "系统"} for token in tokens)
+
+
+def _is_short_topic_only(q: str, low: str) -> bool:
+    if _has_action_intent(low):
+        return False
+    compact = re.sub(r"[\s\W_]+", "", q, flags=re.UNICODE)
+    if len(compact) > 12:
+        return False
+    tokens = re.findall(r"[A-Za-z][A-Za-z0-9_:<>]*|[\u4e00-\u9fff]{2,}", q)
+    return len(tokens) <= 1
 
 
 def _looks_like_config_impl(q: str, low: str) -> bool:
@@ -162,6 +298,7 @@ _LABELS = {
     "feature_impl": "功能实现分析",
     "config_impl": "配置实现分析",
     "general": "通用代码问答",
+    CLARIFY_INTENT: "需要澄清的问题",
 }
 
 
@@ -204,4 +341,10 @@ _PROMPTS = {
 1. 先判断问题更接近 crash、日志、功能实现还是配置实现；能归类就按对应策略查。
 2. 先用低成本工具缩小范围，再读关键代码片段。
 3. 回答要区分已确认事实和推断；证据不足时说明还需要什么输入。""",
+    CLARIFY_INTENT: """\
+最佳实践：
+1. 当前问题无法明确判断是 crash 堆栈、宕机日志、配置实现、功能实现还是通用代码问答。
+2. 不要调用代码检索工具，不要猜测用户目标，不要输出泛泛代码概览。
+3. 只追问 1 到 3 个澄清问题，并给出可选方向：crash 堆栈、宕机/错误日志、配置实现、功能实现、通用代码解释。
+4. 追问必须说明每个方向需要用户补充什么输入，例如日志原文、配置表/字段、功能名或调用栈。""",
 }

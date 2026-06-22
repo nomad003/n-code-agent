@@ -73,7 +73,7 @@ def test_answer_dispatches_to_custom(monkeypatch):
     monkeypatch.setattr(config, "AGENT_BACKEND", "custom")
     monkeypatch.setattr(config, "AGENT_ALLOWED_MODES", ("plain",))
     monkeypatch.setattr(agent.CodeAgent, "run", lambda self, q: f"custom:{q}")
-    assert agent.answer("hi") == "custom:hi"
+    assert agent.answer("hi", question_type="general") == "custom:hi"
 
 
 def test_answer_enforces_response_policy(monkeypatch):
@@ -82,9 +82,26 @@ def test_answer_enforces_response_policy(monkeypatch):
     monkeypatch.setattr(config, "AGENT_BACKEND", "custom")
     monkeypatch.setattr(config, "AGENT_ALLOWED_MODES", ("plain",))
     monkeypatch.setattr(agent.CodeAgent, "run", lambda self, q: "说明\n```python\nprint(1)\n```")
-    out = agent.answer("hi")
+    out = agent.answer("hi", question_type="general")
     assert "print" not in out
     assert "输出策略" in out
+
+
+def test_answer_clarifies_unclear_auto_intent(monkeypatch):
+    from code_agent.core import agent
+
+    monkeypatch.setattr(config, "USE_SHORTCUT", False)
+    monkeypatch.setattr(config, "AGENT_BACKEND", "custom")
+    monkeypatch.setattr(config, "AGENT_ALLOWED_MODES", ("plain",))
+    monkeypatch.setattr(
+        agent.CodeAgent,
+        "run",
+        lambda self, q: (_ for _ in ()).throw(AssertionError("should not run LLM loop")),
+    )
+    out = agent.answer("看一下")
+    assert "我还不能确定" in out
+    assert "配置表名或字段名" in out
+    assert "功能实现" in out
 
 
 def test_answer_dispatches_to_sdk(monkeypatch):
@@ -106,7 +123,7 @@ def test_answer_dispatches_to_sdk(monkeypatch):
     monkeypatch.setitem(sys.modules, "code_agent.core.agent_sdk", fake)
     monkeypatch.setattr(config, "AGENT_BACKEND", "sdk")
     monkeypatch.setattr(config, "AGENT_ALLOWED_MODES", ("plain", "technical"))
-    assert agent.answer("hi", mode="technical") == "sdk:hi"
+    assert agent.answer("hi", mode="technical", question_type="general") == "sdk:hi"
     assert captured["mode"] == "technical"
     assert captured["trace"] is not None
 

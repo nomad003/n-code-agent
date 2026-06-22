@@ -64,6 +64,20 @@ def _answer_in_repo(
         question=question, mode=resolved_mode, backend=config.AGENT_BACKEND
     )
     try:
+        resolved_question_type = question_intent.normalize(question_type)
+        if question_intent.should_clarify(question, resolved_question_type):
+            answer_text = response_policy.enforce(
+                question_intent.clarifying_response(question, mode=resolved_mode),
+                mode=resolved_mode,
+            )
+            trace.write(
+                "intent_clarification",
+                question_type=question_intent.CLARIFY_INTENT,
+                answer=answer_text,
+            )
+            trace.write("request_end", answer=answer_text)
+            return answer_text
+
         if config.USE_SHORTCUT:
             from ..retrieval import shortcut
 
@@ -90,7 +104,7 @@ def _answer_in_repo(
                 CodeAgent(
                     verbose=verbose,
                     mode=resolved_mode,
-                    question_type=question_type,
+                    question_type=resolved_question_type,
                     trace=trace,
                 ).run(question),
                 mode=resolved_mode,
